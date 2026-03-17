@@ -1,0 +1,35 @@
+fortigate:
+  host: "192.168.1.1"
+  api_token: "${FORTIGATE_API_TOKEN}"
+  verify_ssl: false
+  ssh:
+    host: "192.168.1.1"
+    port: 22
+    username: "admin"
+    key_file: "/etc/forti-monitor/id_rsa"
+    # password: "${FORTIGATE_SSH_PASSWORD}"
+    timeout: 10
+
+interfaces:
+  - wan1
+  - wan2
+  - port1
+
+gateways:
+  - name: gw-wan1
+    ip: "10.0.0.1"
+  - name: gw-wan2
+    ip: "10.0.1.1"
+  - name: gw-lan
+    ip: "192.168.1.254"
+
+polling_interval_seconds: 30
+ping_count: 5
+ping_timeout_seconds: 3
+retention_days: 30
+sqlite_path: "/var/lib/forti-monitor/monitor.db"
+api_ping_enabled: false
+
+server:
+  host: "0.0.0.0"
+  port: 8000
