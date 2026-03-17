@@ -21,8 +21,8 @@ dashboard/dist/
 *.log
 *.pid
 config.yaml
-/etc/forti-monitor/
-/var/lib/forti-monitor/
+/etc/n8watch/
+/var/lib/n8watch/
 .idea/
 .vscode/
 *.swp

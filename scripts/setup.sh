@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# FortiGate Monitor Setup Script for Ubuntu 22.04
+# n8watch Setup Script for Ubuntu 22.04
 # Run as root: sudo bash scripts/setup.sh
 
-INSTALL_DIR="/opt/forti-monitor"
-CONFIG_DIR="/etc/forti-monitor"
-DATA_DIR="/var/lib/forti-monitor"
-SERVICE_USER="forti-monitor"
+INSTALL_DIR="/opt/n8watch"
+CONFIG_DIR="/etc/n8watch"
+DATA_DIR="/var/lib/n8watch"
+SERVICE_USER="n8watch"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 log() { echo "[$(date +'%H:%M:%S')] $*"; }
@@ -16,7 +16,7 @@ log() { echo "[$(date +'%H:%M:%S')] $*"; }
 log "Installing system packages..."
 apt-get update -qq
 apt-get install -y -qq \
-    python3.11 python3.11-venv python3-pip \
+    python3 python3-venv python3-pip \
     nodejs npm build-essential curl
 
 # ── 2. Service user ───────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ rsync -a --delete \
 
 # ── 5. Python virtual environment ─────────────────────────────────────────────
 log "Creating Python virtual environment..."
-python3.11 -m venv "${INSTALL_DIR}/venv"
+python3 -m venv "${INSTALL_DIR}/venv"
 "${INSTALL_DIR}/venv/bin/pip" install --upgrade pip -q
 
 log "Installing Python dependencies..."
@@ -79,10 +79,10 @@ fi
 
 # ── 9. Systemd services ───────────────────────────────────────────────────────
 log "Installing systemd services..."
-cp "${INSTALL_DIR}/systemd/forti-poller.service" /etc/systemd/system/
-cp "${INSTALL_DIR}/systemd/forti-api.service" /etc/systemd/system/
+cp "${INSTALL_DIR}/systemd/n8watch-poller.service" /etc/systemd/system/
+cp "${INSTALL_DIR}/systemd/n8watch-api.service" /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable forti-poller.service forti-api.service
+systemctl enable n8watch-poller.service n8watch-api.service
 
 # ── 10. Ownership ─────────────────────────────────────────────────────────────
 chown -R "${SERVICE_USER}:${SERVICE_USER}" "${INSTALL_DIR}"
@@ -90,7 +90,7 @@ chown "${SERVICE_USER}:${SERVICE_USER}" "${DATA_DIR}"
 
 # ── 11. Start services ────────────────────────────────────────────────────────
 log "Starting services..."
-systemctl start forti-poller.service forti-api.service
+systemctl start n8watch-poller.service n8watch-api.service
 
 log "✅ Setup complete!"
 log ""
@@ -101,9 +101,9 @@ log "  3. Add the FortiGate SSH host key (required for SSH polling):"
 log "       ssh-keyscan -H <fortigate_ip> >> ${CONFIG_DIR}/known_hosts"
 log "       chown ${SERVICE_USER}:${SERVICE_USER} ${CONFIG_DIR}/known_hosts"
 log "     Then set 'known_hosts_file: ${CONFIG_DIR}/known_hosts' in config.yaml"
-log "  4. Restart services: systemctl restart forti-poller forti-api"
+log "  4. Restart services: systemctl restart n8watch-poller n8watch-api"
 log "  5. View dashboard at http://$(hostname -I | awk '{print $1}'):8000"
 log ""
 log "Service logs:"
-log "  journalctl -u forti-poller -f"
-log "  journalctl -u forti-api -f"
+log "  journalctl -u n8watch-poller -f"
+log "  journalctl -u n8watch-api -f"

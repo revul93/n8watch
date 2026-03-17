@@ -64,7 +64,7 @@ class FortiGateSSH:
 
         To add the FortiGate host key to a custom file, run::
 
-            ssh-keyscan -H <fortigate_host> >> /etc/forti-monitor/known_hosts
+            ssh-keyscan -H <fortigate_host> >> /etc/n8watch/known_hosts
         """
         client = paramiko.SSHClient()
         if self.known_hosts_file:

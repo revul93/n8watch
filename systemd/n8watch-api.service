@@ -1,0 +1,19 @@
+[Unit]
+Description=n8watch API
+After=network.target n8watch-poller.service
+
+[Service]
+Type=simple
+User=n8watch
+Group=n8watch
+WorkingDirectory=/opt/n8watch
+EnvironmentFile=-/etc/n8watch/env
+ExecStart=/opt/n8watch/venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=n8watch-api
+
+[Install]
+WantedBy=multi-user.target

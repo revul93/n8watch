@@ -8,7 +8,7 @@ export default function App() {
     <BrowserRouter>
       <nav className="nav">
         <div className="nav-brand">
-          🛡️ FortiGate Monitor
+          🛡️ n8watch
         </div>
         <div className="nav-links">
           <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
