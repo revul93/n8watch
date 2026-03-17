@@ -29,6 +29,7 @@ fi
 log "Creating directories..."
 mkdir -p "${INSTALL_DIR}" "${CONFIG_DIR}" "${DATA_DIR}"
 chown "${SERVICE_USER}:${SERVICE_USER}" "${DATA_DIR}"
+chown "root:${SERVICE_USER}" "${CONFIG_DIR}"
 chmod 750 "${CONFIG_DIR}"
 
 # ── 4. Copy application files ─────────────────────────────────────────────────
