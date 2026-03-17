@@ -38,6 +38,7 @@ class FortiGateSSH:
         key_file: Optional[str] = None,
         password: Optional[str] = None,
         timeout: int = 10,
+        verify_host_key: bool = False,
     ):
         self.host = host
         self.port = port
@@ -45,12 +46,17 @@ class FortiGateSSH:
         self.key_file = key_file
         self.password = password
         self.timeout = timeout
+        self.verify_host_key = verify_host_key
         self._client: Optional[paramiko.SSHClient] = None
 
     def connect(self) -> None:
         """Establish SSH connection."""
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        if self.verify_host_key:
+            client.load_system_host_keys()
+            client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        else:
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         kwargs = {
             "hostname": self.host,
             "port": self.port,

@@ -9,6 +9,7 @@ fortigate:
     key_file: "/etc/forti-monitor/id_rsa"
     # password: "${FORTIGATE_SSH_PASSWORD}"
     timeout: 10
+    # verify_host_key: true  # set to true and pre-populate ~/.ssh/known_hosts for MITM protection
 
 interfaces:
   - wan1
