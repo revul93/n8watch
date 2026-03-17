@@ -9,7 +9,14 @@ fortigate:
     key_file: "/etc/forti-monitor/id_rsa"
     # password: "${FORTIGATE_SSH_PASSWORD}"
     timeout: 10
-    # verify_host_key: true  # set to true and pre-populate ~/.ssh/known_hosts for MITM protection
+    # Host key verification (recommended for production):
+    #   Option A: specify a known_hosts file populated via:
+    #     ssh-keyscan -H 192.168.1.1 >> /etc/forti-monitor/known_hosts
+    # known_hosts_file: "/etc/forti-monitor/known_hosts"
+    #   Option B: use system known_hosts (ensure the host was already SSH'd to):
+    # verify_host_key: true
+    # If neither is set, the system known_hosts is still checked; unknown keys
+    # will cause connection failures (add them with ssh-keyscan as shown above).
 
 interfaces:
   - wan1

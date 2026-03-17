@@ -36,6 +36,7 @@ class SSHConfig:
     password: Optional[str] = None
     timeout: int = 10
     verify_host_key: bool = False
+    known_hosts_file: Optional[str] = None
 
 
 @dataclass
@@ -89,6 +90,7 @@ def _build_config(raw: dict) -> Config:
             password=ssh_raw.get("password"),
             timeout=int(ssh_raw.get("timeout", 10)),
             verify_host_key=bool(ssh_raw.get("verify_host_key", False)),
+            known_hosts_file=ssh_raw.get("known_hosts_file"),
         ),
     )
 

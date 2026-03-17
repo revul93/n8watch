@@ -114,6 +114,27 @@ Copy `config.example.yaml` and set:
 | `sqlite_path` | `/var/lib/forti-monitor/monitor.db` | DB location |
 | `server.port` | `8000` | API listen port |
 
+### SSH Host Key Setup
+
+Before the poller can connect via SSH, the FortiGate's host key must be trusted. Add it with:
+
+```bash
+# Add FortiGate host key to the dedicated known_hosts file
+ssh-keyscan -H 192.168.1.1 >> /etc/forti-monitor/known_hosts
+chown forti-monitor:forti-monitor /etc/forti-monitor/known_hosts
+chmod 600 /etc/forti-monitor/known_hosts
+```
+
+Then reference it in `config.yaml`:
+
+```yaml
+fortigate:
+  ssh:
+    known_hosts_file: "/etc/forti-monitor/known_hosts"
+```
+
+Alternatively, set `verify_host_key: true` if the FortiGate is already in the system `~/.ssh/known_hosts`.
+
 ### Environment Variable Substitution
 
 Any `${VAR}` in the config YAML is replaced with the corresponding environment variable at load time. Use the `EnvironmentFile` in the systemd unit (`/etc/forti-monitor/env`):

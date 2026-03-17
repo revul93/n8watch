@@ -68,6 +68,7 @@ def _poll_interface(
         password=ssh_cfg.password,
         timeout=ssh_cfg.timeout,
         verify_host_key=ssh_cfg.verify_host_key,
+        known_hosts_file=ssh_cfg.known_hosts_file,
     )
     try:
         result = ssh.get_interface_status(iface)
@@ -89,6 +90,7 @@ def _poll_ping(target_name: str, target_ip: str, cfg: Config) -> dict:
         password=ssh_cfg.password,
         timeout=ssh_cfg.timeout,
         verify_host_key=ssh_cfg.verify_host_key,
+        known_hosts_file=ssh_cfg.known_hosts_file,
     )
     try:
         result = ssh.run_ping(

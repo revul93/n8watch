@@ -53,7 +53,7 @@ def init_db(path: str) -> None:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA temp_store=MEMORY")
-        conn.execute("PRAGMA mmap_size=268435456")  # 256 MB
+        conn.execute("PRAGMA mmap_size=67108864")   # 64 MB
         conn.execute("PRAGMA cache_size=-16000")     # ~16 MB
         conn.execute("PRAGMA foreign_keys=ON")
         for statement in SCHEMA.strip().split(";"):

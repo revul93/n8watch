@@ -39,6 +39,7 @@ class FortiGateSSH:
         password: Optional[str] = None,
         timeout: int = 10,
         verify_host_key: bool = False,
+        known_hosts_file: Optional[str] = None,
     ):
         self.host = host
         self.port = port
@@ -47,16 +48,37 @@ class FortiGateSSH:
         self.password = password
         self.timeout = timeout
         self.verify_host_key = verify_host_key
+        self.known_hosts_file = known_hosts_file
         self._client: Optional[paramiko.SSHClient] = None
 
     def connect(self) -> None:
-        """Establish SSH connection."""
+        """Establish SSH connection with host key verification.
+
+        Host key verification uses RejectPolicy for safety. The FortiGate's SSH
+        host key must be present in one of the following locations:
+          1. The file specified by ``known_hosts_file`` in config.
+          2. The system known_hosts (~/.ssh/known_hosts) when
+             ``verify_host_key`` is true.
+          3. The default known_hosts files loaded by paramiko when neither
+             option is set (falls back to ~/.ssh/known_hosts).
+
+        To add the FortiGate host key to a custom file, run::
+
+            ssh-keyscan -H <fortigate_host> >> /etc/forti-monitor/known_hosts
+        """
         client = paramiko.SSHClient()
-        if self.verify_host_key:
+        if self.known_hosts_file:
+            client.load_host_keys(self.known_hosts_file)
+        elif self.verify_host_key:
             client.load_system_host_keys()
-            client.set_missing_host_key_policy(paramiko.RejectPolicy())
         else:
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            # Attempt to load default system known_hosts so that the
+            # RejectPolicy below can match already-trusted host keys.
+            try:
+                client.load_system_host_keys()
+            except OSError:
+                pass
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
         kwargs = {
             "hostname": self.host,
             "port": self.port,
