@@ -22,6 +22,7 @@ _RTT_RE = re.compile(
 )
 _ADMIN_STATUS_RE = re.compile(r"^\s*status\s*:\s*(up|down)", re.MULTILINE | re.IGNORECASE)
 _LINK_STATUS_RE = re.compile(r"link-status\s*:\s*(up|down|unknown)", re.IGNORECASE)
+_PING_WAIT_BUFFER_SECONDS = 5
 
 
 class FortiGateSSHError(Exception):
@@ -167,7 +168,7 @@ class FortiGateSSH:
             # Longer wait for ping to complete (count * timeout + buffer)
             raw_text = self._exec_interactive(
                 commands,
-                wait_time=float(count * timeout + 5),
+                wait_time=float(count * timeout + _PING_WAIT_BUFFER_SECONDS),
             )
         except FortiGateSSHError as e:
             return {

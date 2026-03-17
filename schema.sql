@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS interface_samples (
     raw_json TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_iface_ts ON interface_samples (iface, ts);
-CREATE INDEX IF NOT EXISTS idx_iface_ts2 ON interface_samples (ts);
+CREATE INDEX IF NOT EXISTS idx_ts ON interface_samples (ts);
 
 CREATE TABLE IF NOT EXISTS ping_samples (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,4 +26,4 @@ CREATE TABLE IF NOT EXISTS ping_samples (
     raw_text TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_ping_target_ts ON ping_samples (target_name, ts);
-CREATE INDEX IF NOT EXISTS idx_ping_ts ON ping_samples (ts);
+CREATE INDEX IF NOT EXISTS idx_ping_ts_only ON ping_samples (ts);

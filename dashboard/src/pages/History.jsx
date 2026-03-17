@@ -58,6 +58,7 @@ const CHART_OPTS = (yLabel, yMax) => ({
 });
 
 const STATE_COLORS = { UP: '#22c55e', LINK_DOWN: '#eab308', ADMIN_DOWN: '#ef4444' };
+const MAX_DISPLAY_ROWS = 500;
 
 export default function History() {
   const [fromDt, setFromDt] = useState(localDatetime(-3600));
@@ -272,7 +273,7 @@ export default function History() {
                 </tr>
               </thead>
               <tbody>
-                {pingRows.slice(0, 500).map(row => (
+                {pingRows.slice(0, MAX_DISPLAY_ROWS).map(row => (
                   <tr key={row.id}>
                     <td>{fmt(row.ts)}</td>
                     <td>{row.target_name}</td>
@@ -311,7 +312,7 @@ export default function History() {
                 </tr>
               </thead>
               <tbody>
-                {ifaceRows.slice(0, 500).map(row => {
+                {ifaceRows.slice(0, MAX_DISPLAY_ROWS).map(row => {
                   const cls = row.state === 'UP' ? 'badge-green' : row.state === 'LINK_DOWN' ? 'badge-yellow' : 'badge-red';
                   return (
                     <tr key={row.id}>
