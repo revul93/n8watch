@@ -1,0 +1,43 @@
+fortigate:
+  host: "192.168.1.1"
+  api_token: "${FORTIGATE_API_TOKEN}"
+  verify_ssl: false
+  ssh:
+    host: "192.168.1.1"
+    port: 22
+    username: "admin"
+    key_file: "/etc/forti-monitor/id_rsa"
+    # password: "${FORTIGATE_SSH_PASSWORD}"
+    timeout: 10
+    # Host key verification (recommended for production):
+    #   Option A: specify a known_hosts file populated via:
+    #     ssh-keyscan -H 192.168.1.1 >> /etc/forti-monitor/known_hosts
+    # known_hosts_file: "/etc/forti-monitor/known_hosts"
+    #   Option B: use system known_hosts (ensure the host was already SSH'd to):
+    # verify_host_key: true
+    # If neither is set, the system known_hosts is still checked; unknown keys
+    # will cause connection failures (add them with ssh-keyscan as shown above).
+
+interfaces:
+  - wan1
+  - wan2
+  - port1
+
+gateways:
+  - name: gw-wan1
+    ip: "10.0.0.1"
+  - name: gw-wan2
+    ip: "10.0.1.1"
+  - name: gw-lan
+    ip: "192.168.1.254"
+
+polling_interval_seconds: 30
+ping_count: 5
+ping_timeout_seconds: 3
+retention_days: 30
+sqlite_path: "/var/lib/forti-monitor/monitor.db"
+api_ping_enabled: false
+
+server:
+  host: "0.0.0.0"
+  port: 8000
