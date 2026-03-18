@@ -1,5 +1,5 @@
 """
-FortiGate monitor poller: main loop with systemd-friendly graceful shutdown.
+n8watch poller: main loop with systemd-friendly graceful shutdown.
 """
 import json
 import logging
@@ -23,7 +23,7 @@ logging.basicConfig(
     format='{"ts": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "msg": "%(message)s"}',
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
-logger = logging.getLogger("forti-poller")
+logger = logging.getLogger("n8watch-poller")
 
 _shutdown = False
 
@@ -157,7 +157,7 @@ def _run_poll_cycle(cfg: Config, conn: sqlite3.Connection, api: FortiGateAPI) ->
 
 
 def main() -> None:
-    logger.info("Starting FortiGate poller")
+    logger.info("Starting n8watch poller")
 
     try:
         cfg = get_config()

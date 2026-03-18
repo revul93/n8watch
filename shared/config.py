@@ -7,8 +7,8 @@ import yaml
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 
-CONFIG_PATH_ENV = "FORTI_CONFIG"
-DEFAULT_CONFIG_PATH = "/etc/forti-monitor/config.yaml"
+CONFIG_PATH_ENV = "N8WATCH_CONFIG"
+DEFAULT_CONFIG_PATH = "/etc/n8watch/config.yaml"
 
 _ENV_VAR_PATTERN = re.compile(r'\$\{([^}]+)\}')
 
@@ -68,7 +68,7 @@ class Config:
     ping_count: int = 5
     ping_timeout_seconds: int = 3
     retention_days: int = 30
-    sqlite_path: str = "/var/lib/forti-monitor/monitor.db"
+    sqlite_path: str = "/var/lib/n8watch/monitor.db"
     server: ServerConfig = field(default_factory=ServerConfig)
     api_ping_enabled: bool = False
 
@@ -106,7 +106,7 @@ def _build_config(raw: dict) -> Config:
     cfg.ping_count = int(raw.get("ping_count", 5))
     cfg.ping_timeout_seconds = int(raw.get("ping_timeout_seconds", 3))
     cfg.retention_days = int(raw.get("retention_days", 30))
-    cfg.sqlite_path = raw.get("sqlite_path", "/var/lib/forti-monitor/monitor.db")
+    cfg.sqlite_path = raw.get("sqlite_path", "/var/lib/n8watch/monitor.db")
     cfg.api_ping_enabled = bool(raw.get("api_ping_enabled", False))
 
     server_raw = raw.get("server", {})

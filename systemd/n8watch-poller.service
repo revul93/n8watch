@@ -1,0 +1,19 @@
+[Unit]
+Description=n8watch Poller
+After=network.target
+
+[Service]
+Type=simple
+User=n8watch
+Group=n8watch
+WorkingDirectory=/opt/n8watch
+EnvironmentFile=-/etc/n8watch/env
+ExecStart=/opt/n8watch/venv/bin/python -m poller.main
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=n8watch-poller
+
+[Install]
+WantedBy=multi-user.target

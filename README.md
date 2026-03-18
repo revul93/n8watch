@@ -7,8 +7,8 @@ A lightweight, self-hosted monitoring system for FortiGate firewalls. Polls inte
 ```
 ┌─────────────────────┐     SQLite (WAL)    ┌─────────────────────┐
 │   poller/main.py    │ ──────────────────► │   api/main.py       │
-│  (systemd service)  │   /var/lib/forti-   │  FastAPI + React    │
-│                     │   monitor/monitor.db │  (systemd service)  │
+│  (systemd service)  │   /var/lib/n8watch/ │  FastAPI + React    │
+│                     │   monitor.db        │  (systemd service)  │
 │  • FortiOS REST API │                     │                     │
 │  • SSH fallback     │                     │  GET /api/latest    │
 │  • Ping via SSH     │                     │  GET /api/history/* │
@@ -52,10 +52,12 @@ n8watch/
 │       ├── pages/Realtime.jsx
 │       └── pages/History.jsx
 ├── systemd/                   # systemd unit files
-│   ├── forti-poller.service
-│   └── forti-api.service
+│   ├── n8watch-poller.service
+│   └── n8watch-api.service
 └── scripts/
-    └── setup.sh               # Ubuntu 22.04 setup script
+    ├── setup.sh               # Ubuntu 22.04 setup script
+    ├── seed_db.py             # Seed the database with mock data
+    └── nuke_db.py             # Wipe all data from the database
 ```
 
 ## Quick Start
@@ -66,8 +68,8 @@ n8watch/
 git clone https://github.com/your-org/n8watch.git
 cd n8watch
 sudo bash scripts/setup.sh
-# Edit /etc/forti-monitor/config.yaml
-sudo systemctl restart forti-poller forti-api
+# Edit /etc/n8watch/config.yaml
+sudo systemctl restart n8watch-poller n8watch-api
 ```
 
 ### Development
@@ -79,7 +81,7 @@ pip install -r poller/requirements.txt -r api/requirements.txt
 
 # Copy and edit config
 cp config.example.yaml config.yaml
-export FORTI_CONFIG=./config.yaml
+export N8WATCH_CONFIG=./config.yaml
 export FORTIGATE_API_TOKEN=your_token_here
 
 # Run poller
@@ -111,7 +113,7 @@ Copy `config.example.yaml` and set:
 | `polling_interval_seconds` | `30` | Poll cadence |
 | `ping_count` | `5` | Packets per ping |
 | `retention_days` | `30` | How long to keep data |
-| `sqlite_path` | `/var/lib/forti-monitor/monitor.db` | DB location |
+| `sqlite_path` | `/var/lib/n8watch/monitor.db` | DB location |
 | `server.port` | `8000` | API listen port |
 
 ### SSH Host Key Setup
@@ -120,9 +122,9 @@ Before the poller can connect via SSH, the FortiGate's host key must be trusted.
 
 ```bash
 # Add FortiGate host key to the dedicated known_hosts file
-ssh-keyscan -H 192.168.1.1 >> /etc/forti-monitor/known_hosts
-chown forti-monitor:forti-monitor /etc/forti-monitor/known_hosts
-chmod 600 /etc/forti-monitor/known_hosts
+ssh-keyscan -H 192.168.1.1 >> /etc/n8watch/known_hosts
+chown n8watch:n8watch /etc/n8watch/known_hosts
+chmod 600 /etc/n8watch/known_hosts
 ```
 
 Then reference it in `config.yaml`:
@@ -130,14 +132,14 @@ Then reference it in `config.yaml`:
 ```yaml
 fortigate:
   ssh:
-    known_hosts_file: "/etc/forti-monitor/known_hosts"
+    known_hosts_file: "/etc/n8watch/known_hosts"
 ```
 
 Alternatively, set `verify_host_key: true` if the FortiGate is already in the system `~/.ssh/known_hosts`.
 
 ### Environment Variable Substitution
 
-Any `${VAR}` in the config YAML is replaced with the corresponding environment variable at load time. Use the `EnvironmentFile` in the systemd unit (`/etc/forti-monitor/env`):
+Any `${VAR}` in the config YAML is replaced with the corresponding environment variable at load time. Use the `EnvironmentFile` in the systemd unit (`/etc/n8watch/env`):
 
 ```
 FORTIGATE_API_TOKEN=your_token_here

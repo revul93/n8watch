@@ -1,5 +1,5 @@
 """
-FortiGate Monitor API: FastAPI application serving REST endpoints and React dashboard.
+n8watch API: FastAPI application serving REST endpoints and React dashboard.
 """
 import logging
 import os
@@ -13,9 +13,9 @@ from fastapi.staticfiles import StaticFiles
 
 from api.routers import health, latest, history
 
-logger = logging.getLogger("forti-api")
+logger = logging.getLogger("n8watch-api")
 
-app = FastAPI(title="FortiGate Monitor", version="1.0.0")
+app = FastAPI(title="n8watch", version="1.0.0")
 
 app.include_router(health.router)
 app.include_router(latest.router)

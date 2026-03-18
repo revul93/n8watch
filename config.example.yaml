@@ -6,13 +6,13 @@ fortigate:
     host: "192.168.1.1"
     port: 22
     username: "admin"
-    key_file: "/etc/forti-monitor/id_rsa"
+    key_file: "/etc/n8watch/id_rsa"
     # password: "${FORTIGATE_SSH_PASSWORD}"
     timeout: 10
     # Host key verification (recommended for production):
     #   Option A: specify a known_hosts file populated via:
-    #     ssh-keyscan -H 192.168.1.1 >> /etc/forti-monitor/known_hosts
-    # known_hosts_file: "/etc/forti-monitor/known_hosts"
+    #     ssh-keyscan -H 192.168.1.1 >> /etc/n8watch/known_hosts
+    # known_hosts_file: "/etc/n8watch/known_hosts"
     #   Option B: use system known_hosts (ensure the host was already SSH'd to):
     # verify_host_key: true
     # If neither is set, the system known_hosts is still checked; unknown keys
@@ -35,7 +35,7 @@ polling_interval_seconds: 30
 ping_count: 5
 ping_timeout_seconds: 3
 retention_days: 30
-sqlite_path: "/var/lib/forti-monitor/monitor.db"
+sqlite_path: "/var/lib/n8watch/monitor.db"
 api_ping_enabled: false
 
 server:
