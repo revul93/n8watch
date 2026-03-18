@@ -52,15 +52,19 @@ class FortiGateSSH:
         self._client: Optional[paramiko.SSHClient] = None
 
     def connect(self) -> None:
-        """Establish SSH connection with host key verification.
+        """Establish SSH connection with configurable host key verification.
 
-        Host key verification uses RejectPolicy for safety. The FortiGate's SSH
-        host key must be present in one of the following locations:
-          1. The file specified by ``known_hosts_file`` in config.
-          2. The system known_hosts (~/.ssh/known_hosts) when
-             ``verify_host_key`` is true.
-          3. The default known_hosts files loaded by paramiko when neither
-             option is set (falls back to ~/.ssh/known_hosts).
+        Host key verification behaviour depends on the configuration:
+
+        * If ``known_hosts_file`` is set, keys are loaded from that file and
+          unknown hosts are rejected (``RejectPolicy``).
+        * If ``verify_host_key`` is ``true``, the system known_hosts is loaded
+          and unknown hosts are rejected (``RejectPolicy``).
+        * If neither is set (the default), unknown host keys are automatically
+          accepted (``AutoAddPolicy``).  This is convenient for environments
+          where the FortiGate host key has not been pre-registered, but it does
+          not provide MITM protection.  For production deployments set
+          ``known_hosts_file`` or ``verify_host_key: true``.
 
         To add the FortiGate host key to a custom file, run::
 
@@ -69,16 +73,14 @@ class FortiGateSSH:
         client = paramiko.SSHClient()
         if self.known_hosts_file:
             client.load_host_keys(self.known_hosts_file)
+            client.set_missing_host_key_policy(paramiko.RejectPolicy())
         elif self.verify_host_key:
             client.load_system_host_keys()
+            client.set_missing_host_key_policy(paramiko.RejectPolicy())
         else:
-            # Attempt to load default system known_hosts so that the
-            # RejectPolicy below can match already-trusted host keys.
-            try:
-                client.load_system_host_keys()
-            except OSError:
-                pass
-        client.set_missing_host_key_policy(paramiko.RejectPolicy())
+            # No host-key verification requested: accept unknown keys so that
+            # connections work without pre-registering the FortiGate.
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         kwargs = {
             "hostname": self.host,
             "port": self.port,

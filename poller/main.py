@@ -12,7 +12,7 @@ import time
 # Allow running as `python -m poller.main` from repo root
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.config import get_config, Config
+from shared.config import get_config, Config, is_unexpanded_env_var
 from shared.db import init_db, get_connection, insert_interface_sample, insert_ping_sample, cleanup_old_data
 from poller.fortigate_api import FortiGateAPI, FortiGateAPIError
 from poller.fortigate_ssh import FortiGateSSH, FortiGateSSHError
@@ -52,12 +52,16 @@ def _poll_interface(
     cfg: Config,
 ) -> dict:
     """Poll interface status via API, fallback to SSH."""
-    try:
-        result = api.get_interface_status(iface)
-        logger.info(f"API poll interface {iface}: admin_up={result['admin_up']}, link_up={result['link_up']}")
-        return result
-    except FortiGateAPIError as e:
-        logger.warning(f"API failed for {iface}: {e}, falling back to SSH")
+    token = cfg.fortigate.api_token
+    if token and not is_unexpanded_env_var(token):
+        try:
+            result = api.get_interface_status(iface)
+            logger.info(f"API poll interface {iface}: admin_up={result['admin_up']}, link_up={result['link_up']}")
+            return result
+        except FortiGateAPIError as e:
+            logger.warning(f"API failed for {iface}: {e}, falling back to SSH")
+    else:
+        logger.debug(f"Skipping API for {iface}: api_token not configured, using SSH directly")
 
     ssh_cfg = cfg.fortigate.ssh
     ssh = FortiGateSSH(

@@ -118,10 +118,14 @@ Copy `config.example.yaml` and set:
 
 ### SSH Host Key Setup
 
-Before the poller can connect via SSH, the FortiGate's host key must be trusted. Add it with:
+By default (`verify_host_key: false`, no `known_hosts_file`), the poller accepts unknown SSH host keys automatically. This is convenient for initial setup but does not protect against MITM attacks.
+
+For production deployments, lock down the FortiGate host key using one of the following options:
+
+**Option A – custom known_hosts file (recommended):**
 
 ```bash
-# Add FortiGate host key to the dedicated known_hosts file
+# Scan and store the FortiGate host key
 ssh-keyscan -H 192.168.1.1 >> /etc/n8watch/known_hosts
 chown n8watch:n8watch /etc/n8watch/known_hosts
 chmod 600 /etc/n8watch/known_hosts
@@ -135,7 +139,11 @@ fortigate:
     known_hosts_file: "/etc/n8watch/known_hosts"
 ```
 
-Alternatively, set `verify_host_key: true` if the FortiGate is already in the system `~/.ssh/known_hosts`.
+**Option B – system known_hosts:**
+
+Set `verify_host_key: true` if the FortiGate is already trusted in the system `~/.ssh/known_hosts`.
+
+When either option is enabled, connections to hosts not present in the known_hosts file are rejected.
 
 ### Environment Variable Substitution
 

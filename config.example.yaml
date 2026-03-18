@@ -15,8 +15,9 @@ fortigate:
     # known_hosts_file: "/etc/n8watch/known_hosts"
     #   Option B: use system known_hosts (ensure the host was already SSH'd to):
     # verify_host_key: true
-    # If neither is set, the system known_hosts is still checked; unknown keys
-    # will cause connection failures (add them with ssh-keyscan as shown above).
+    # If neither is set (default), unknown host keys are accepted automatically
+    # (AutoAddPolicy). This is convenient but does not protect against MITM
+    # attacks. Use one of the options above for production deployments.
 
 interfaces:
   - wan1

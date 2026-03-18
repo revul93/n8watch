@@ -1,11 +1,14 @@
 """
 YAML configuration loader with environment variable substitution.
 """
+import logging
 import os
 import re
 import yaml
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
+
+_logger = logging.getLogger(__name__)
 
 CONFIG_PATH_ENV = "N8WATCH_CONFIG"
 DEFAULT_CONFIG_PATH = "/etc/n8watch/config.yaml"
@@ -25,6 +28,11 @@ def _substitute_env_vars(value: Any) -> Any:
     elif isinstance(value, list):
         return [_substitute_env_vars(item) for item in value]
     return value
+
+
+def is_unexpanded_env_var(value: str) -> bool:
+    """Return True if *value* still contains an unexpanded ``${VAR}`` placeholder."""
+    return isinstance(value, str) and bool(_ENV_VAR_PATTERN.search(value))
 
 
 @dataclass
@@ -135,6 +143,14 @@ def get_config(path: Optional[str] = None) -> Config:
 
     raw = _substitute_env_vars(raw) if raw else {}
     _cached_config = _build_config(raw)
+
+    if is_unexpanded_env_var(_cached_config.fortigate.api_token):
+        _logger.warning(
+            "fortigate.api_token contains an unexpanded environment variable "
+            "(%s). API polling will be skipped until the variable is set.",
+            _cached_config.fortigate.api_token,
+        )
+
     return _cached_config
 
 
