@@ -1,0 +1,138 @@
+'use strict';
+
+const { evaluateCondition } = require('./utils/condition-parser');
+const { calculateDowntime } = require('./utils/helpers');
+
+let _db          = null;
+let _wss         = null;
+let _emailSvc    = null;
+let _rules       = [];
+
+// cooldownMap: "targetId-ruleName" -> timestamp of last alert sent
+const cooldownMap = new Map();
+
+function initAlertEngine(db, wss, emailService, config) {
+  _db       = db;
+  _wss      = wss;
+  _emailSvc = emailService;
+  _rules    = (config.alerts && config.alerts.rules) ? config.alerts.rules : [];
+
+  console.log(`[AlertEngine] Initialized with ${_rules.length} rule(s)`);
+}
+
+/**
+ * processAlerts - evaluate all rules against the latest ping result for a target.
+ *
+ * @param {{ id: number, name: string, ip: string }} target
+ * @param {object} pingResult  - metrics from the ping engine
+ */
+async function processAlerts(target, pingResult) {
+  if (!_db || _rules.length === 0) return;
+
+  const metrics = {
+    is_alive:         pingResult.is_alive ? 1 : 0,
+    packet_loss:      pingResult.packet_loss      ?? 100,
+    avg_latency:      pingResult.avg_latency      ?? 0,
+    min_latency:      pingResult.min_latency      ?? 0,
+    max_latency:      pingResult.max_latency      ?? 0,
+    jitter:           pingResult.jitter           ?? 0,
+    packets_sent:     pingResult.packets_sent     ?? 0,
+    packets_received: pingResult.packets_received ?? 0,
+  };
+
+  for (const rule of _rules) {
+    const triggered = evaluateCondition(rule.condition, metrics);
+    if (!triggered) continue;
+
+    const cooldownKey = `${target.id}-${rule.name}`;
+    const cooldownSec = rule.cooldown || 300;
+    const lastAlerted = cooldownMap.get(cooldownKey) || 0;
+    const now = Date.now();
+
+    if (now - lastAlerted < cooldownSec * 1000) continue;
+
+    cooldownMap.set(cooldownKey, now);
+
+    const alertId = _db.insertAlert({
+      target_id:  target.id,
+      rule_name:  rule.name,
+      severity:   rule.severity,
+      condition:  rule.condition,
+      message:    `Rule "${rule.name}" triggered for ${target.name} (${target.ip})`,
+      created_at: now,
+    });
+
+    const alertPayload = {
+      id:          alertId,
+      target_id:   target.id,
+      target_name: target.name,
+      target_ip:   target.ip,
+      rule_name:   rule.name,
+      severity:    rule.severity,
+      condition:   rule.condition,
+      metrics,
+      created_at:  now,
+    };
+
+    if (_wss) {
+      const { broadcast } = require('./websocket');
+      broadcast('alert', alertPayload);
+    }
+
+    if (_emailSvc) {
+      await _emailSvc.sendAlertEmail(target, rule, metrics).catch((err) =>
+        console.error('[AlertEngine] Email error:', err.message)
+      );
+    }
+
+    console.log(`[AlertEngine] Alert fired: ${rule.name} for ${target.name} (${target.ip})`);
+  }
+}
+
+/**
+ * checkRecovery - if target is now alive, resolve any open "Host Down" alerts.
+ *
+ * @param {{ id: number, name: string, ip: string }} target
+ * @param {object} pingResult
+ */
+async function checkRecovery(target, pingResult) {
+  if (!_db || !pingResult.is_alive) return;
+
+  const activeAlerts = _db.getActiveAlerts().filter(
+    (a) => a.target_id === target.id && a.rule_name === 'Host Down'
+  );
+
+  if (activeAlerts.length === 0) return;
+
+  const now = Date.now();
+  for (const alert of activeAlerts) {
+    _db.resolveAlert(alert.id, now);
+
+    const downtime = calculateDowntime(alert.created_at);
+
+    const recoveryPayload = {
+      alert_id:    alert.id,
+      target_id:   target.id,
+      target_name: target.name,
+      target_ip:   target.ip,
+      rule_name:   alert.rule_name,
+      downtime_ms: downtime,
+      resolved_at: now,
+    };
+
+    if (_wss) {
+      const { broadcast } = require('./websocket');
+      broadcast('recovery', recoveryPayload);
+    }
+
+    if (_emailSvc) {
+      await _emailSvc.sendRecoveryEmail(target, alert, downtime).catch((err) =>
+        console.error('[AlertEngine] Recovery email error:', err.message)
+      );
+    }
+
+    console.log(`[AlertEngine] Recovery: ${target.name} (${target.ip}) is back online`);
+  }
+}
+
+module.exports = { initAlertEngine, processAlerts, checkRecovery };

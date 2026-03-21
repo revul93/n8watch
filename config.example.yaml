@@ -1,0 +1,49 @@
+general:
+  ping_interval: 30
+  ping_count: 5
+  ping_timeout: 5
+  data_retention_days: 90
+
+targets:
+  - name: "Google DNS"
+    ip: "8.8.8.8"
+    group: "DNS Servers"
+  - name: "Cloudflare DNS"
+    ip: "1.1.1.1"
+    group: "DNS Servers"
+  - name: "Core Router"
+    ip: "192.168.1.1"
+    group: "Local Network"
+
+alerts:
+  smtp:
+    host: "smtp.gmail.com"
+    port: 587
+    secure: false
+    user: "you@gmail.com"
+    pass: "app-password"
+    from: "n8netwatch <monitor@yourdomain.com>"
+    to:
+      - "admin@yourdomain.com"
+
+  rules:
+    - name: "Host Down"
+      condition: "packet_loss == 100"
+      severity: "critical"
+      cooldown: 300
+    - name: "High Packet Loss"
+      condition: "packet_loss > 20"
+      severity: "warning"
+      cooldown: 600
+    - name: "High Latency"
+      condition: "avg_latency > 200"
+      severity: "warning"
+      cooldown: 600
+    - name: "High Jitter"
+      condition: "jitter > 50"
+      severity: "warning"
+      cooldown: 600
+
+server:
+  port: 3000
+  host: "0.0.0.0"
