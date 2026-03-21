@@ -3,6 +3,7 @@
 const http    = require('http');
 const path    = require('path');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 
 const { loadConfig }     = require('./config');
 const db                 = require('./database');
@@ -35,6 +36,16 @@ async function main() {
   // 4. Create Express app
   const app = express();
   app.use(express.json());
+
+  // Global rate limiter — 300 requests per minute per IP
+  const globalLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' },
+  });
+  app.use(globalLimiter);
 
   // 5. Serve static files from client/dist
   const distPath = path.join(__dirname, '..', 'client', 'dist');
