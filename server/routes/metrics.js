@@ -5,6 +5,7 @@ const router  = express.Router();
 const db      = require('../database');
 
 const INTERVAL_MAP = {
+  '1m':  60,
   '5m':  300,
   '15m': 900,
   '30m': 1800,

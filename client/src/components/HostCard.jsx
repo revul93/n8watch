@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom';
-import { cn, formatMs, formatPercent, statusBg } from '../lib/utils';
+import { cn, formatMs, formatPercent } from '../lib/utils';
 import SparklineChart from './SparklineChart';
 
 export default function HostCard({ target, lastPingResult, sparklineData = [] }) {
   const navigate = useNavigate();
   const result = lastPingResult || target;
 
-  const isUp = result?.is_alive ?? null;
+  const rawAlive = result?.is_alive;
+  const isUp = rawAlive === null || rawAlive === undefined ? null : !!rawAlive;
   const avgLatency = result?.avg_latency ?? null;
   const packetLoss = result?.packet_loss ?? null;
   const uptime24h = target?.uptime_24h ?? null;

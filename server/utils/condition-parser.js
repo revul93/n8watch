@@ -110,7 +110,7 @@ function evaluateCondition(condition, metrics) {
 
     if (terms.length === 0) return false;
 
-    // Evaluate left-to-right (&&  before ||  is not handled; for simple rules this suffices)
+    // Evaluate left-to-right (no operator precedence; simple rules only)
     let result = terms[0];
     for (let j = 0; j < logics.length; j++) {
       if (logics[j] === '&&') result = result && terms[j + 1];

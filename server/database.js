@@ -170,10 +170,19 @@ function getTargetById(id) {
   `).get(id) || null;
 }
 
+function parseMs(val, defaultVal) {
+  if (val === undefined || val === null) return defaultVal;
+  const n = Number(val);
+  if (!isNaN(n)) return n;
+  const d = new Date(val);
+  if (!isNaN(d.getTime())) return d.getTime();
+  return defaultVal;
+}
+
 function getPingResults(targetId, from, to, limit = 100, offset = 0) {
   const db = getDb();
-  const fromMs = from ? Number(from) : 0;
-  const toMs   = to   ? Number(to)   : Date.now();
+  const fromMs = parseMs(from, 0);
+  const toMs   = parseMs(to, Date.now());
   const lim    = Math.min(Number(limit) || 100, 1000);
   const off    = Number(offset) || 0;
 
@@ -198,13 +207,13 @@ function getPingResults(targetId, from, to, limit = 100, offset = 0) {
 
 function getMetrics(targetId, from, to, intervalSeconds = 300) {
   const db = getDb();
-  const fromMs = from ? Number(from) : Date.now() - 86400000;
-  const toMs   = to   ? Number(to)   : Date.now();
+  const fromMs = parseMs(from, Date.now() - 86400000);
+  const toMs   = parseMs(to, Date.now());
   const bucketMs = intervalSeconds * 1000;
 
   return db.prepare(`
     SELECT
-      (created_at / @bucket) * @bucket AS bucket_ts,
+      (created_at / @bucket) * @bucket AS bucket,
       AVG(avg_latency)       AS avg_latency,
       MIN(min_latency)       AS min_latency,
       MAX(max_latency)       AS max_latency,
@@ -216,8 +225,8 @@ function getMetrics(targetId, from, to, intervalSeconds = 300) {
     WHERE target_id = @target_id
       AND created_at >= @from
       AND created_at <= @to
-    GROUP BY bucket_ts
-    ORDER BY bucket_ts ASC
+    GROUP BY bucket
+    ORDER BY bucket ASC
   `).all({ bucket: bucketMs, target_id: targetId, from: fromMs, to: toMs });
 }
 
@@ -324,11 +333,11 @@ function getAlerts(filters = {}) {
   }
   if (filters.from) {
     conditions.push('a.created_at >= @from');
-    params.from = Number(filters.from);
+    params.from = parseMs(filters.from, 0);
   }
   if (filters.to) {
     conditions.push('a.created_at <= @to');
-    params.to = Number(filters.to);
+    params.to = parseMs(filters.to, Date.now());
   }
 
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';

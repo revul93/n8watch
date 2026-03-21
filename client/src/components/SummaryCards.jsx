@@ -27,7 +27,8 @@ export default function SummaryCards({ targets = [], lastPingResults = {} }) {
 
   targets.forEach(t => {
     const latest = lastPingResults[t.id];
-    const isUp = latest ? latest.is_alive : (t.is_alive ?? null);
+    const rawAlive = latest ? latest.is_alive : t.is_alive;
+    const isUp = rawAlive === null || rawAlive === undefined ? null : !!rawAlive;
     if (isUp === true) up++;
     else if (isUp === false) down++;
 

@@ -1,10 +1,23 @@
 const BASE = '/api';
 
+function toMs(val) {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'number') return val;
+  const n = Number(val);
+  if (!isNaN(n)) return n;
+  const d = new Date(val);
+  if (!isNaN(d.getTime())) return d.getTime();
+  return undefined;
+}
+
 async function request(path, params) {
   const url = new URL(BASE + path, window.location.origin);
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) url.searchParams.set(k, v);
+      if (v !== undefined && v !== null) {
+        const coerced = (k === 'from' || k === 'to') ? toMs(v) : v;
+        if (coerced !== undefined) url.searchParams.set(k, coerced);
+      }
     });
   }
   const res = await fetch(url.toString());
@@ -13,11 +26,11 @@ async function request(path, params) {
 }
 
 export function getTargets() {
-  return request('/targets');
+  return request('/targets').then(res => res.targets || []);
 }
 
 export function getTarget(id) {
-  return request(`/targets/${id}`);
+  return request(`/targets/${id}`).then(res => res.target || res);
 }
 
 export function getPingResults(targetId, params) {
@@ -25,11 +38,11 @@ export function getPingResults(targetId, params) {
 }
 
 export function getLatestPingResults() {
-  return request('/ping-results/latest');
+  return request('/ping-results/latest').then(res => res.rows || []);
 }
 
 export function getMetrics(targetId, params) {
-  return request(`/targets/${targetId}/metrics`, params);
+  return request(`/targets/${targetId}/metrics`, params).then(res => res.metrics || []);
 }
 
 export function getUptime(targetId) {
@@ -37,7 +50,7 @@ export function getUptime(targetId) {
 }
 
 export function getDashboardSummary() {
-  return request('/dashboard/summary');
+  return request('/dashboard/summary').then(res => res.summary || res);
 }
 
 export function getAlerts(params) {
@@ -45,12 +58,12 @@ export function getAlerts(params) {
 }
 
 export function getActiveAlerts() {
-  return request('/alerts/active');
+  return request('/alerts/active').then(res => res.alerts || []);
 }
 
 export function getExportUrl(targetId, from, to) {
   const url = new URL(`/api/targets/${targetId}/export`, window.location.origin);
-  if (from) url.searchParams.set('from', from);
-  if (to) url.searchParams.set('to', to);
+  if (from) url.searchParams.set('from', toMs(from));
+  if (to) url.searchParams.set('to', toMs(to));
   return url.toString();
 }
