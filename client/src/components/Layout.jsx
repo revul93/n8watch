@@ -1,0 +1,100 @@
+import { useState } from 'react';
+import { NavLink } from 'react-router-dom';
+import { Activity, History, Bell, Menu, X } from 'lucide-react';
+import ConnectionStatus from './ConnectionStatus';
+import ThemeToggle from './ThemeToggle';
+import { cn } from '../lib/utils';
+
+const navItems = [
+  { to: '/', label: 'Dashboard', icon: Activity, exact: true },
+  { to: '/history', label: 'History', icon: History },
+  { to: '/alerts', label: 'Alerts', icon: Bell },
+];
+
+export default function Layout({ children, darkMode, setDarkMode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-gray-950 text-gray-100">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/60 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-30 w-56 flex-shrink-0 flex flex-col bg-gray-900 border-r border-gray-800 transition-transform duration-200',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          'lg:relative lg:translate-x-0'
+        )}
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-2 px-4 py-4 border-b border-gray-800">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <Activity size={16} className="text-white" />
+          </div>
+          <span className="text-lg font-bold text-white tracking-tight">n8netwatch</span>
+          <button
+            className="ml-auto lg:hidden text-gray-400 hover:text-white"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-2 py-4 space-y-1">
+          {navItems.map(({ to, label, icon: Icon, exact }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={exact}
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                )
+              }
+            >
+              <Icon size={18} />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
+          n8netwatch v1.0
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* Header */}
+        <header className="flex items-center gap-3 px-4 py-3 bg-gray-900 border-b border-gray-800 flex-shrink-0">
+          <button
+            className="lg:hidden text-gray-400 hover:text-white"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu size={20} />
+          </button>
+          <span className="text-base font-semibold text-white lg:hidden">n8netwatch</span>
+          <div className="flex-1" />
+          <ConnectionStatus />
+          <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
