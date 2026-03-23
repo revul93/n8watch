@@ -84,6 +84,17 @@ function syncTargets(targets) {
     for (const t of targets) {
       upsert.run({ name: t.name, ip: t.ip, grp: t.group || null, now });
     }
+
+    // Remove targets that are no longer in the config.
+    // Placeholders (e.g. "?,?,?") are built from the array length, not user data,
+    // so this is not a SQL injection risk; actual IP values are passed as bound parameters.
+    if (targets.length > 0) {
+      const placeholders = targets.map(() => '?').join(', ');
+      const ips = targets.map(t => t.ip);
+      db.prepare(`DELETE FROM targets WHERE ip NOT IN (${placeholders})`).run(...ips);
+    } else {
+      db.prepare('DELETE FROM targets').run();
+    }
   });
 
   syncAll(targets);

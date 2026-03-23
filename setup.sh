@@ -37,6 +37,7 @@ npm run build
 cd ..
 
 mkdir -p data
+mkdir -p logs
 
 if [ ! -f config.yaml ]; then
     cp config.example.yaml config.yaml
@@ -55,6 +56,18 @@ echo "=================================="
 echo ""
 echo "Next steps:"
 echo "  1. Edit config.yaml with your target IP addresses and SMTP settings"
-echo "  2. Start the application:  npm start"
-echo "  3. Open in browser:        http://localhost:3000"
+echo ""
+echo "  ── Running with Node.js directly ──────────────────────────────────"
+echo "  2a. Start:  npm start"
+echo "      Open:   http://localhost:3000"
+echo "      Stop:   Ctrl+C"
+echo ""
+echo "  ── Running with PM2 (recommended for production) ───────────────────"
+echo "  Install PM2 globally (one-time):  npm install -g pm2"
+echo "  2b. Start:    npm run pm2:start"
+echo "      Logs:     npm run pm2:logs"
+echo "      Status:   npm run pm2:status"
+echo "      Stop:     npm run pm2:stop"
+echo "      Restart:  npm run pm2:restart"
+echo "      Auto-start on boot:  npm run pm2:save && npm run pm2:startup"
 echo ""

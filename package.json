@@ -5,7 +5,15 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node server/index.js"
+    "dev": "node server/index.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop n8netwatch",
+    "pm2:restart": "pm2 restart n8netwatch",
+    "pm2:reload": "pm2 reload n8netwatch",
+    "pm2:logs": "pm2 logs n8netwatch",
+    "pm2:status": "pm2 status",
+    "pm2:save": "pm2 save",
+    "pm2:startup": "pm2 startup"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",

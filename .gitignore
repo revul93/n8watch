@@ -4,4 +4,5 @@ config.yaml
 client/dist/
 client/node_modules/
 *.log
+logs/
 .env

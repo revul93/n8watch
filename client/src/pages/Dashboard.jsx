@@ -8,7 +8,7 @@ import HostGrid from '../components/HostGrid';
 import { RefreshCw } from 'lucide-react';
 
 export default function Dashboard() {
-  const { lastPingResults } = useWebSocket();
+  const { lastPingResults, configReloadedAt } = useWebSocket();
   const { data: targets, loading, refetch } = useApi(getTargets, []);
   const [sparklineData, setSparklineData] = useState({});
 
@@ -41,6 +41,11 @@ export default function Dashboard() {
     const timer = setTimeout(() => fetchSparklines(targets), 3000);
     return () => clearTimeout(timer);
   }, [lastPingResults, targets, fetchSparklines]);
+
+  // Refetch targets when config.yaml changes (live reload)
+  useEffect(() => {
+    if (configReloadedAt) refetch();
+  }, [configReloadedAt, refetch]);
 
   if (loading) {
     return (

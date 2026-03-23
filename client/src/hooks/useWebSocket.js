@@ -5,6 +5,7 @@ export function useWebSocket() {
   const [connected, setConnected] = useState(wsManager.connected);
   const [lastPingResults, setLastPingResults] = useState({});
   const [lastAlert, setLastAlert] = useState(null);
+  const [configReloadedAt, setConfigReloadedAt] = useState(null);
 
   useEffect(() => {
     wsManager.connect();
@@ -26,19 +27,25 @@ export function useWebSocket() {
       setLastAlert({ type: 'resolved', ...data, _ts: Date.now() });
     };
 
+    const onConfigReloaded = () => {
+      setConfigReloadedAt(Date.now());
+    };
+
     wsManager.on('ping_result', onPingResult);
     wsManager.on('alert', onAlertTriggered);
     wsManager.on('recovery', onAlertResolved);
+    wsManager.on('config_reloaded', onConfigReloaded);
 
     return () => {
       removeStatus();
       wsManager.off('ping_result', onPingResult);
       wsManager.off('alert', onAlertTriggered);
       wsManager.off('recovery', onAlertResolved);
+      wsManager.off('config_reloaded', onConfigReloaded);
     };
   }, []);
 
   const clearLastAlert = useCallback(() => setLastAlert(null), []);
 
-  return { connected, lastPingResults, lastAlert, clearLastAlert };
+  return { connected, lastPingResults, lastAlert, clearLastAlert, configReloadedAt };
 }
