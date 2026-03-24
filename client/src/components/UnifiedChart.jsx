@@ -20,7 +20,7 @@ function formatTooltipLabel(ts) {
   try { return format(new Date(ts), 'MMM d HH:mm:ss'); } catch { return ts; }
 }
 
-export default function UnifiedChart({ targets = [], lastPingResults = {} }) {
+export default function UnifiedChart({ targets = [], lastPingResults = {}, chartHeight = 280 }) {
   const [metric, setMetric] = useState('latency');
   const [range, setRange] = useState(RANGES[2]); // 1h default
   const [chartData, setChartData] = useState([]);
@@ -152,7 +152,7 @@ export default function UnifiedChart({ targets = [], lastPingResults = {} }) {
 
     if (metric === 'packet_loss') {
       return (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <AreaChart {...commonProps}>
             {grid}{xAxis}{yAxis}
             <Tooltip {...tooltipStyle} />
@@ -177,7 +177,7 @@ export default function UnifiedChart({ targets = [], lastPingResults = {} }) {
 
     if (metric === 'uptime') {
       return (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart {...commonProps}>
             {grid}{xAxis}{yAxis}
             <Tooltip {...tooltipStyle} />
@@ -198,7 +198,7 @@ export default function UnifiedChart({ targets = [], lastPingResults = {} }) {
 
     // latency / jitter — multi-line
     return (
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <LineChart {...commonProps}>
           {grid}{xAxis}{yAxis}
           <Tooltip {...tooltipStyle} />
