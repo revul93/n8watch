@@ -5,13 +5,15 @@ import { getTargets, getPingResults } from '../lib/api';
 import SummaryCards from '../components/SummaryCards';
 import UnifiedChart from '../components/UnifiedChart';
 import HostGrid from '../components/HostGrid';
-import { RefreshCw } from 'lucide-react';
+import FullscreenChartModal from '../components/FullscreenChartModal';
+import { RefreshCw, Maximize2 } from 'lucide-react';
 
 export default function Dashboard() {
   const { lastPingResults, configReloadedAt } = useWebSocket();
   const { data: targets, loading, refetch } = useApi(getTargets, []);
   const [sparklineData, setSparklineData] = useState({});
   const [selectedTargetIds, setSelectedTargetIds] = useState([]);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const fetchSparklines = useCallback(async (targetList) => {
     if (!targetList?.length) return;
@@ -71,13 +73,23 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold text-white">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">Real-time network monitoring</p>
         </div>
-        <button
-          onClick={refetch}
-          className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={refetch}
+            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+          <button
+            onClick={() => setFullscreen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+            title="Open chart in fullscreen"
+          >
+            <Maximize2 size={14} />
+            Fullscreen
+          </button>
+        </div>
       </div>
 
       <SummaryCards targets={targetList} lastPingResults={lastPingResults} />
@@ -109,6 +121,14 @@ export default function Dashboard() {
           onTargetClick={handleTargetClick}
         />
       </div>
+
+      {fullscreen && (
+        <FullscreenChartModal
+          targets={targetList}
+          lastPingResults={lastPingResults}
+          onClose={() => setFullscreen(false)}
+        />
+      )}
     </div>
   );
 }

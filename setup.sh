@@ -120,7 +120,7 @@ if start is None:
     print('  Warning: targets: section not found in config.yaml')
     sys.exit(0)
 
-new_section = 'targets:\n' + targets_block
+new_section = 'targets:\n' + targets_block.rstrip('\n') + '\n\n'
 new_lines = lines[:start] + [new_section] + lines[end:]
 with open('config.yaml', 'w') as f:
     f.writelines(new_lines)

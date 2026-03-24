@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { cn, formatMs, formatPercent } from '../lib/utils';
 import SparklineChart from './SparklineChart';
+import UptimeCircle from './UptimeCircle';
 
 export default function HostCard({ target, lastPingResult, sparklineData = [], isSelected = false, onTargetClick }) {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
         </span>
       )}
 
-      <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+      <div className="grid grid-cols-3 gap-2 mb-3 text-center items-end">
         <div>
           <p className="text-xs text-gray-500">Latency</p>
           <p className="text-sm font-medium text-white">{formatMs(avgLatency)}</p>
@@ -76,12 +77,7 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
             {formatPercent(packetLoss)}
           </p>
         </div>
-        <div>
-          <p className="text-xs text-gray-500">Uptime 24h</p>
-          <p className={cn('text-sm font-medium', uptime24h !== null && uptime24h < 95 ? 'text-red-400' : 'text-white')}>
-            {uptime24h !== null ? formatPercent(uptime24h) : 'N/A'}
-          </p>
-        </div>
+        <UptimeCircle percent={uptime24h} size={52} />
       </div>
 
       <SparklineChart data={sparklineData} />
