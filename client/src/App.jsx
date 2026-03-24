@@ -6,9 +6,13 @@ import History from './pages/History';
 import Alerts from './pages/Alerts';
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved !== null ? saved === 'true' : true;
+  });
 
   useEffect(() => {
+    localStorage.setItem('darkMode', darkMode);
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
