@@ -61,6 +61,10 @@ export function getActiveAlerts() {
   return request('/alerts/active').then(res => res.alerts || []);
 }
 
+export function getAlertRules() {
+  return request('/alerts/rules').then(res => res.rules || []);
+}
+
 export function getExportUrl(targetId, from, to) {
   const url = new URL(`/api/targets/${targetId}/export`, window.location.origin);
   if (from) url.searchParams.set('from', toMs(from));

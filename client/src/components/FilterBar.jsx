@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, Play } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const METRICS = [
@@ -15,8 +15,26 @@ const INTERVALS = [
   { key: '1h', label: '1 hour' },
 ];
 
+const DEFAULT_METRIC = 'latency';
+const DEFAULT_INTERVAL = '5m';
+
 export default function FilterBar({ targets = [], filters, onChange }) {
   const groups = [...new Set(targets.map(t => t.group).filter(Boolean))];
+  // Local draft for the search text — only committed on "Apply Search"
+  const [searchDraft, setSearchDraft] = useState(filters.search || '');
+
+  function applySearch() {
+    onChange({ ...filters, search: searchDraft });
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') applySearch();
+  }
+
+  function handleReset() {
+    setSearchDraft('');
+    onChange({ metric: DEFAULT_METRIC, interval: DEFAULT_INTERVAL, search: '', from: filters.from, to: filters.to });
+  }
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -24,15 +42,26 @@ export default function FilterBar({ targets = [], filters, onChange }) {
         {/* Search */}
         <div className="flex-1 min-w-48">
           <label className="block text-xs text-gray-500 mb-1">Search</label>
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              type="text"
-              value={filters.search || ''}
-              onChange={e => onChange({ ...filters, search: e.target.value })}
-              placeholder="Host name or IP…"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-600"
-            />
+          <div className="flex gap-1.5">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                value={searchDraft}
+                onChange={e => setSearchDraft(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Host name or IP…"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-600"
+              />
+            </div>
+            <button
+              onClick={applySearch}
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+              title="Apply search"
+            >
+              <Play size={13} />
+              Apply
+            </button>
           </div>
         </div>
 
@@ -94,7 +123,7 @@ export default function FilterBar({ targets = [], filters, onChange }) {
         <div>
           <label className="block text-xs text-gray-500 mb-1">Metric</label>
           <select
-            value={filters.metric || 'latency'}
+            value={filters.metric || DEFAULT_METRIC}
             onChange={e => onChange({ ...filters, metric: e.target.value })}
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-600"
           >
@@ -108,7 +137,7 @@ export default function FilterBar({ targets = [], filters, onChange }) {
         <div>
           <label className="block text-xs text-gray-500 mb-1">Interval</label>
           <select
-            value={filters.interval || '5m'}
+            value={filters.interval || DEFAULT_INTERVAL}
             onChange={e => onChange({ ...filters, interval: e.target.value })}
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-600"
           >
@@ -120,7 +149,7 @@ export default function FilterBar({ targets = [], filters, onChange }) {
 
         {/* Reset */}
         <button
-          onClick={() => onChange({ metric: 'latency', interval: '5m' })}
+          onClick={handleReset}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
         >
           <Filter size={14} />
