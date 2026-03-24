@@ -4,12 +4,15 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
 import Alerts from './pages/Alerts';
+import { useWebSocket } from './hooks/useWebSocket';
 
-export default function App() {
+function AppInner() {
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved !== null ? saved === 'true' : true;
   });
+
+  const { configReloadedAt, lastConfigData } = useWebSocket();
 
   useEffect(() => {
     localStorage.setItem('darkMode', darkMode);
@@ -21,14 +24,20 @@ export default function App() {
   }, [darkMode]);
 
   return (
+    <Layout darkMode={darkMode} setDarkMode={setDarkMode} configReloadedAt={configReloadedAt} lastConfigData={lastConfigData}>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/history" element={<History />} />
+        <Route path="/alerts" element={<Alerts />} />
+      </Routes>
+    </Layout>
+  );
+}
+
+export default function App() {
+  return (
     <BrowserRouter>
-      <Layout darkMode={darkMode} setDarkMode={setDarkMode}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/alerts" element={<Alerts />} />
-        </Routes>
-      </Layout>
+      <AppInner />
     </BrowserRouter>
   );
 }

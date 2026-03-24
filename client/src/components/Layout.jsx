@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, History, Bell, Menu, X } from 'lucide-react';
+import { Activity, History, Bell, Menu, X, RefreshCw } from 'lucide-react';
 import ConnectionStatus from './ConnectionStatus';
 import ThemeToggle from './ThemeToggle';
 import { cn } from '../lib/utils';
@@ -11,8 +11,21 @@ const navItems = [
   { to: '/alerts', label: 'Alerts', icon: Bell },
 ];
 
-export default function Layout({ children, darkMode, setDarkMode }) {
+export default function Layout({ children, darkMode, setDarkMode, configReloadedAt, lastConfigData }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notification, setNotification] = useState(null);
+
+  // Show a banner whenever config.yaml is reloaded
+  useEffect(() => {
+    if (!configReloadedAt) return;
+    const count = lastConfigData?.targets_count;
+    const message = count != null
+      ? `config.yaml reloaded — ${count} target${count !== 1 ? 's' : ''} synced`
+      : 'config.yaml reloaded — targets synced';
+    setNotification(message);
+    const timer = setTimeout(() => setNotification(null), 6000);
+    return () => clearTimeout(timer);
+  }, [configReloadedAt, lastConfigData]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-950 text-gray-100">
@@ -76,6 +89,27 @@ export default function Layout({ children, darkMode, setDarkMode }) {
 
       {/* Main */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* Config reload notification banner */}
+        {notification && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center justify-between gap-3 px-4 py-2 bg-blue-600 text-white text-sm flex-shrink-0"
+          >
+            <div className="flex items-center gap-2">
+              <RefreshCw size={14} />
+              <span>{notification}</span>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="text-white/80 hover:text-white"
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <header className="flex items-center gap-3 px-4 py-3 bg-gray-900 border-b border-gray-800 flex-shrink-0">
           <button

@@ -41,6 +41,14 @@ async function processAlerts(target, pingResult) {
   };
 
   for (const rule of _rules) {
+    // If the rule has a targets list, skip targets not in that list
+    if (Array.isArray(rule.targets) && rule.targets.length > 0) {
+      const targetMatch = rule.targets.some(
+        t => String(t) === String(target.id) || t === target.name || t === target.ip
+      );
+      if (!targetMatch) continue;
+    }
+
     const triggered = evaluateCondition(rule.condition, metrics);
     if (!triggered) continue;
 

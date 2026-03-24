@@ -32,14 +32,21 @@ alerts:
       condition: "packet_loss == 100"
       severity: "critical"
       cooldown: 300
+      # targets: apply to all targets (default — omit field or leave empty)
     - name: "High Packet Loss"
       condition: "packet_loss > 20"
       severity: "warning"
       cooldown: 600
+      # targets: apply to specific targets by name, IP, or numeric ID
+      # targets:
+      #   - "Google DNS"
+      #   - "Cloudflare DNS"
     - name: "High Latency"
       condition: "avg_latency > 200"
       severity: "warning"
       cooldown: 600
+      # targets:
+      #   - "Core Router"
     - name: "High Jitter"
       condition: "jitter > 50"
       severity: "warning"

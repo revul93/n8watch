@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn, formatMs, formatPercent } from '../lib/utils';
 import SparklineChart from './SparklineChart';
 
-export default function HostCard({ target, lastPingResult, sparklineData = [] }) {
+export default function HostCard({ target, lastPingResult, sparklineData = [], isSelected = false, onTargetClick }) {
   const navigate = useNavigate();
   const result = lastPingResult || target;
 
@@ -13,10 +13,26 @@ export default function HostCard({ target, lastPingResult, sparklineData = [] })
   const uptime24h = target?.uptime_24h ?? null;
   const group = target?.group || null;
 
+  function handleClick() {
+    if (onTargetClick) {
+      // Filter mode: toggle this target in the chart selection
+      onTargetClick(target.id);
+    } else {
+      // Fallback: navigate to history for this target
+      navigate(`/history?target=${target.id}`);
+    }
+  }
+
   return (
     <div
-      className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-blue-700 transition-colors"
-      onClick={() => navigate(`/history?target=${target.id}`)}
+      className={cn(
+        'bg-gray-900 border rounded-xl p-4 cursor-pointer transition-colors',
+        isSelected
+          ? 'border-blue-500 ring-1 ring-blue-500/40'
+          : 'border-gray-800 hover:border-blue-700'
+      )}
+      onClick={handleClick}
+      title={isSelected ? 'Click to deselect (remove from chart filter)' : 'Click to filter chart to this host'}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="min-w-0">

@@ -3,6 +3,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { getAlerts } from '../lib/api';
 import ActiveAlerts from '../components/ActiveAlerts';
 import AlertsTable from '../components/AlertsTable';
+import AlertRules from '../components/AlertRules';
 import { RefreshCw } from 'lucide-react';
 
 export default function Alerts() {
@@ -52,6 +53,8 @@ export default function Alerts() {
       </div>
 
       <ActiveAlerts lastAlert={lastAlert} />
+
+      <AlertRules />
 
       <AlertsTable alerts={alerts} loading={loading} />
     </div>

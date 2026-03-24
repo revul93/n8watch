@@ -11,6 +11,7 @@ export default function Dashboard() {
   const { lastPingResults, configReloadedAt } = useWebSocket();
   const { data: targets, loading, refetch } = useApi(getTargets, []);
   const [sparklineData, setSparklineData] = useState({});
+  const [selectedTargetIds, setSelectedTargetIds] = useState([]);
 
   const fetchSparklines = useCallback(async (targetList) => {
     if (!targetList?.length) return;
@@ -47,15 +48,21 @@ export default function Dashboard() {
     if (configReloadedAt) refetch();
   }, [configReloadedAt, refetch]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
-        Loading dashboard…
-      </div>
+  // Toggle a target in the selection; clicking again deselects
+  const handleTargetClick = useCallback((targetId) => {
+    setSelectedTargetIds(prev =>
+      prev.includes(targetId)
+        ? prev.filter(id => id !== targetId)
+        : [...prev, targetId]
     );
-  }
+  }, []);
 
   const targetList = targets || [];
+
+  // Targets shown in the chart: use selection if any, otherwise all
+  const chartTargets = selectedTargetIds.length > 0
+    ? targetList.filter(t => selectedTargetIds.includes(t.id))
+    : targetList;
 
   return (
     <div className="space-y-6">
@@ -75,14 +82,31 @@ export default function Dashboard() {
 
       <SummaryCards targets={targetList} lastPingResults={lastPingResults} />
 
-      <UnifiedChart targets={targetList} lastPingResults={lastPingResults} />
+      <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} />
 
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Hosts</h2>
+        <div className="flex items-center gap-3 mb-3">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Hosts</h2>
+          {selectedTargetIds.length > 0 && (
+            <span className="text-xs text-blue-400">
+              {selectedTargetIds.length} selected — click a host again to deselect
+            </span>
+          )}
+          {selectedTargetIds.length > 0 && (
+            <button
+              onClick={() => setSelectedTargetIds([])}
+              className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              Clear selection
+            </button>
+          )}
+        </div>
         <HostGrid
           targets={targetList}
           lastPingResults={lastPingResults}
           sparklineData={sparklineData}
+          selectedTargetIds={selectedTargetIds}
+          onTargetClick={handleTargetClick}
         />
       </div>
     </div>
