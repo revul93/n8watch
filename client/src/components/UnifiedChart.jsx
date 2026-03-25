@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  LineChart, Line, AreaChart, Area, BarChart, Bar,
+  LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { format } from 'date-fns';
 import MetricToggle from './MetricToggle';
 import TimeRangeSelector, { RANGES } from './TimeRangeSelector';
-import { getMetrics } from '../lib/api';
+import { getMetrics, getUptime } from '../lib/api';
 
 const COLORS = ['#60a5fa', '#34d399', '#f87171', '#fbbf24', '#a78bfa', '#fb923c', '#38bdf8', '#4ade80'];
 
@@ -20,15 +20,94 @@ function formatTooltipLabel(ts) {
   try { return format(new Date(ts), 'MMM d HH:mm:ss'); } catch { return ts; }
 }
 
-export default function UnifiedChart({ targets = [], lastPingResults = {}, chartHeight = 280 }) {
+const CHART_HEADER_HEIGHT = 56; // title row + controls row
+
+/** Circular uptime display used in the chart's uptime view */
+function UptimeGauge({ name, color, percent }) {
+  const size = 140;
+  const strokeWidth = 10;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = percent !== null && percent !== undefined ? Number(percent) : null;
+  const offset = pct !== null ? circumference * (1 - pct / 100) : circumference;
+
+  const gaugeColor = pct === null
+    ? '#4b5563'
+    : pct >= 99 ? '#34d399'
+    : pct >= 95 ? '#fbbf24'
+    : '#f87171';
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#1f2937" strokeWidth={strokeWidth} />
+          <circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke={gaugeColor} strokeWidth={strokeWidth}
+            strokeDasharray={circumference} strokeDashoffset={offset}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-bold" style={{ color: gaugeColor }}>
+            {pct !== null ? `${Math.round(pct)}%` : 'N/A'}
+          </span>
+        </div>
+      </div>
+      <span className="text-sm font-medium text-gray-300 text-center px-2">{name}</span>
+      <span className="text-xs text-gray-500">Overall Uptime</span>
+    </div>
+  );
+}
+
+export default function UnifiedChart({ targets = [], lastPingResults = {}, chartHeight = 280, fillHeight = false }) {
   const [metric, setMetric] = useState('latency');
   const [range, setRange] = useState(RANGES[2]); // 1h default
   const [chartData, setChartData] = useState([]);
+  const [uptimeData, setUptimeData] = useState({});
   const [loading, setLoading] = useState(false);
+  const containerRef = useRef(null);
+  const [dynamicHeight, setDynamicHeight] = useState(chartHeight);
+
+  // When fillHeight=true, measure the container and use its full height
+  useEffect(() => {
+    if (!fillHeight) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      setDynamicHeight(Math.max(200, el.clientHeight - CHART_HEADER_HEIGHT));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fillHeight]);
+
+  const effectiveHeight = fillHeight ? dynamicHeight : chartHeight;
 
   const fetchData = useCallback(async () => {
     if (!targets.length) return;
     setLoading(true);
+
+    if (metric === 'uptime') {
+      try {
+        const results = await Promise.allSettled(targets.map(t => getUptime(t.id)));
+        const map = {};
+        results.forEach((res, i) => {
+          if (res.status === 'fulfilled') {
+            map[targets[i].id] = res.value?.uptime_overall ?? null;
+          } else {
+            map[targets[i].id] = null;
+          }
+        });
+        setUptimeData(map);
+      } catch (e) {
+        console.error('Uptime fetch error:', e);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       const now = new Date();
       const from = new Date(now.getTime() - range.minutes * 60 * 1000).toISOString();
@@ -36,8 +115,7 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
 
       const metricKey = metric === 'latency' ? 'avg_latency'
         : metric === 'jitter' ? 'jitter'
-        : metric === 'packet_loss' ? 'packet_loss'
-        : 'uptime';
+        : 'packet_loss';
 
       const interval = range.minutes <= 30 ? '1m'
         : range.minutes <= 180 ? '5m'
@@ -90,7 +168,6 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
 
   const yLabel = metric === 'latency' ? 'ms'
     : metric === 'jitter' ? 'ms'
-    : metric === 'packet_loss' ? '%'
     : '%';
 
   const renderChart = () => {
@@ -101,6 +178,33 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
         </div>
       );
     }
+
+    // ── Uptime: show circles ──────────────────────────────────────────────────
+    if (metric === 'uptime') {
+      if (!targets.length) {
+        return (
+          <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
+            No targets configured.
+          </div>
+        );
+      }
+      return (
+        <div
+          className="flex flex-wrap items-center justify-center gap-8 py-4 overflow-auto"
+          style={{ minHeight: 200, maxHeight: fillHeight ? effectiveHeight : undefined }}
+        >
+          {targets.map((t, i) => (
+            <UptimeGauge
+              key={t.id}
+              name={t.name}
+              color={COLORS[i % COLORS.length]}
+              percent={uptimeData[t.id] ?? null}
+            />
+          ))}
+        </div>
+      );
+    }
+
     if (!chartData.length) {
       return (
         <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
@@ -152,7 +256,7 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
 
     if (metric === 'packet_loss') {
       return (
-        <ResponsiveContainer width="100%" height={chartHeight}>
+        <ResponsiveContainer width="100%" height={effectiveHeight}>
           <AreaChart {...commonProps}>
             {grid}{xAxis}{yAxis}
             <Tooltip {...tooltipStyle} />
@@ -175,30 +279,9 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
       );
     }
 
-    if (metric === 'uptime') {
-      return (
-        <ResponsiveContainer width="100%" height={chartHeight}>
-          <BarChart {...commonProps}>
-            {grid}{xAxis}{yAxis}
-            <Tooltip {...tooltipStyle} />
-            {legend}
-            {targets.map((t, i) => (
-              <Bar
-                key={t.id}
-                dataKey={String(t.id)}
-                fill={COLORS[i % COLORS.length]}
-                isAnimationActive={false}
-                maxBarSize={12}
-              />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      );
-    }
-
     // latency / jitter — multi-line
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <ResponsiveContainer width="100%" height={effectiveHeight}>
         <LineChart {...commonProps}>
           {grid}{xAxis}{yAxis}
           <Tooltip {...tooltipStyle} />
@@ -221,15 +304,20 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
   };
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div ref={containerRef} className={`bg-gray-900 border border-gray-800 rounded-xl p-4 ${fillHeight ? 'flex-1 flex flex-col' : ''}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-200">Live Metrics</h2>
         <div className="flex flex-wrap gap-2">
           <MetricToggle value={metric} onChange={setMetric} />
-          <TimeRangeSelector value={range.key} onChange={handleRangeChange} />
+          {metric !== 'uptime' && (
+            <TimeRangeSelector value={range.key} onChange={handleRangeChange} />
+          )}
         </div>
       </div>
-      {renderChart()}
+      <div className={fillHeight ? 'flex-1 min-h-0' : ''}>
+        {renderChart()}
+      </div>
     </div>
   );
 }
+

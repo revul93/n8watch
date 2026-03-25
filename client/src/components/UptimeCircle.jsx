@@ -16,13 +16,13 @@ export default function UptimeCircle({ percent, size = 56 }) {
 
   return (
     <div className="flex flex-col items-center">
-      <p className="text-xs text-gray-500 mb-1">Uptime 24h</p>
+      <p className="text-xs text-gray-500 mb-1">Uptime</p>
       <div className="relative" style={{ width: size, height: size }}>
         <svg
           width={size}
           height={size}
           style={{ transform: 'rotate(-90deg)' }}
-          aria-label={pct !== null ? `Uptime 24h: ${Math.round(pct)}%` : 'Uptime 24h: no data'}
+          aria-label={pct !== null ? `Uptime: ${Math.round(pct)}%` : 'Uptime: no data'}
           role="img"
         >
           <circle

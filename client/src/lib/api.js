@@ -49,6 +49,10 @@ export function getUptime(targetId) {
   return request(`/targets/${targetId}/uptime`);
 }
 
+export function getSystemStatus() {
+  return request('/dashboard/system');
+}
+
 export function getDashboardSummary() {
   return request('/dashboard/summary').then(res => res.summary || res);
 }

@@ -149,7 +149,12 @@ function getAllTargetsWithLatest() {
       pr.packet_loss,
       pr.packets_sent,
       pr.packets_received,
-      pr.created_at   AS last_checked_at
+      pr.created_at   AS last_checked_at,
+      (
+        SELECT SUM(CASE WHEN pr2.is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)
+        FROM ping_results pr2
+        WHERE pr2.target_id = t.id
+      ) AS uptime_overall
     FROM targets t
     LEFT JOIN ping_results pr ON pr.id = (
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
@@ -253,17 +258,31 @@ function getUptime(targetId) {
     WHERE target_id = ? AND created_at >= ?
   `);
 
+  const queryAll = db.prepare(`
+    SELECT
+      SUM(CASE WHEN is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) AS uptime_pct,
+      COUNT(*) AS total
+    FROM ping_results
+    WHERE target_id = ?
+  `);
+
   const calc = (windowMs) => {
     const row = query.get(targetId, now - windowMs);
     if (!row || row.total === 0) return null;
     return Math.round(row.uptime_pct * 100) / 100;
   };
 
+  const rowAll = queryAll.get(targetId);
+  const uptime_overall = (!rowAll || rowAll.total === 0)
+    ? null
+    : Math.round(rowAll.uptime_pct * 100) / 100;
+
   return {
-    uptime_1h:  calc(3600000),
-    uptime_24h: calc(86400000),
-    uptime_7d:  calc(604800000),
-    uptime_30d: calc(2592000000),
+    uptime_1h:      calc(3600000),
+    uptime_24h:     calc(86400000),
+    uptime_7d:      calc(604800000),
+    uptime_30d:     calc(2592000000),
+    uptime_overall,
   };
 }
 
