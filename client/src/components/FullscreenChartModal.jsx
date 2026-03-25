@@ -3,7 +3,7 @@ import { X, Minimize2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
 
-export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose }) {
+export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose, colorMap = {} }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const containerRef = useRef(null);
   const onCloseRef = useRef(onClose);
@@ -129,10 +129,11 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
       </div>
 
       {/* Chart — takes remaining vertical space, stretched to fill */}
-      <div className="flex-1 p-6 min-h-0 flex flex-col">
+      <div className="flex-1 p-6 min-h-0 flex flex-col overflow-hidden">
         <UnifiedChart
           targets={filteredTargets}
           lastPingResults={lastPingResults}
+          colorMap={colorMap}
           fillHeight
         />
       </div>

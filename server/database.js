@@ -20,12 +20,14 @@ function initDatabase() {
 
   _db.exec(`
     CREATE TABLE IF NOT EXISTS targets (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT    NOT NULL,
-      ip          TEXT    NOT NULL UNIQUE,
-      grp         TEXT,
-      created_at  INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
-      updated_at  INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      name            TEXT    NOT NULL,
+      ip              TEXT    NOT NULL UNIQUE,
+      grp             TEXT,
+      is_user_target  INTEGER NOT NULL DEFAULT 0,
+      expires_at      INTEGER,
+      created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
+      updated_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
     );
 
     CREATE TABLE IF NOT EXISTS ping_results (
@@ -64,6 +66,15 @@ function initDatabase() {
       ON alerts(resolved, created_at DESC);
   `);
 
+  // Migrate existing databases: add columns if they don't exist yet
+  const targetCols = _db.prepare("PRAGMA table_info(targets)").all().map(c => c.name);
+  if (!targetCols.includes('is_user_target')) {
+    _db.exec('ALTER TABLE targets ADD COLUMN is_user_target INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!targetCols.includes('expires_at')) {
+    _db.exec('ALTER TABLE targets ADD COLUMN expires_at INTEGER');
+  }
+
   return _db;
 }
 
@@ -72,12 +83,15 @@ function syncTargets(targets) {
   const now = Date.now();
 
   const upsert = db.prepare(`
-    INSERT INTO targets (name, ip, grp, created_at, updated_at)
-    VALUES (@name, @ip, @grp, @now, @now)
+    INSERT INTO targets (name, ip, grp, is_user_target, created_at, updated_at)
+    VALUES (@name, @ip, @grp, 0, @now, @now)
     ON CONFLICT(ip) DO UPDATE SET
-      name       = excluded.name,
-      grp        = excluded.grp,
-      updated_at = excluded.updated_at
+      name           = excluded.name,
+      grp            = excluded.grp,
+      is_user_target = 0,
+      expires_at     = NULL,
+      updated_at     = excluded.updated_at
+    WHERE is_user_target = 0
   `);
 
   const syncAll = db.transaction((targets) => {
@@ -85,15 +99,15 @@ function syncTargets(targets) {
       upsert.run({ name: t.name, ip: t.ip, grp: t.group || null, now });
     }
 
-    // Remove targets that are no longer in the config.
+    // Remove config targets that are no longer in the config (preserve user targets).
     // Placeholders (e.g. "?,?,?") are built from the array length, not user data,
     // so this is not a SQL injection risk; actual IP values are passed as bound parameters.
     if (targets.length > 0) {
       const placeholders = targets.map(() => '?').join(', ');
       const ips = targets.map(t => t.ip);
-      db.prepare(`DELETE FROM targets WHERE ip NOT IN (${placeholders})`).run(...ips);
+      db.prepare(`DELETE FROM targets WHERE ip NOT IN (${placeholders}) AND is_user_target = 0`).run(...ips);
     } else {
-      db.prepare('DELETE FROM targets').run();
+      db.prepare('DELETE FROM targets WHERE is_user_target = 0').run();
     }
   });
 
@@ -139,7 +153,9 @@ function getAllTargetsWithLatest() {
   const db = getDb();
   return db.prepare(`
     SELECT
-      t.id, t.name, t.ip, t.grp AS "group", t.created_at, t.updated_at,
+      t.id, t.name, t.ip, t.grp AS "group",
+      t.is_user_target, t.expires_at,
+      t.created_at, t.updated_at,
       pr.id           AS latest_ping_id,
       pr.is_alive,
       pr.min_latency,
@@ -159,8 +175,9 @@ function getAllTargetsWithLatest() {
     LEFT JOIN ping_results pr ON pr.id = (
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
     )
+    WHERE (t.is_user_target = 0) OR (t.is_user_target = 1 AND (t.expires_at IS NULL OR t.expires_at > ?))
     ORDER BY t.name ASC
-  `).all();
+  `).all(Date.now());
 }
 
 function getTargetById(id) {
@@ -411,14 +428,72 @@ function resolveAlert(alertId, resolvedAt) {
   `).run(resolvedAt || Date.now(), alertId);
 }
 
+function addUserTarget(name, ip) {
+  const db = getDb();
+  const now = Date.now();
+  const expiresAt = now + 5 * 86400000; // 5 days
+  const result = db.prepare(`
+    INSERT INTO targets (name, ip, grp, is_user_target, expires_at, created_at, updated_at)
+    VALUES (@name, @ip, NULL, 1, @expires_at, @now, @now)
+  `).run({ name, ip, expires_at: expiresAt, now });
+  return result.lastInsertRowid;
+}
+
+function deleteUserTarget(id) {
+  const db = getDb();
+  const info = db.prepare(
+    'DELETE FROM targets WHERE id = ? AND is_user_target = 1'
+  ).run(id);
+  return info.changes > 0;
+}
+
+function getUserTargets() {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      t.id, t.name, t.ip, t.is_user_target, t.expires_at,
+      t.created_at, t.updated_at,
+      pr.is_alive,
+      pr.min_latency,
+      pr.avg_latency,
+      pr.max_latency,
+      pr.jitter,
+      pr.packet_loss,
+      pr.packets_sent,
+      pr.packets_received,
+      pr.created_at AS last_checked_at,
+      (
+        SELECT SUM(CASE WHEN pr2.is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)
+        FROM ping_results pr2
+        WHERE pr2.target_id = t.id
+      ) AS uptime_overall
+    FROM targets t
+    LEFT JOIN ping_results pr ON pr.id = (
+      SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
+    )
+    WHERE t.is_user_target = 1
+      AND (t.expires_at IS NULL OR t.expires_at > ?)
+    ORDER BY t.created_at DESC
+  `).all(Date.now());
+}
+
+function cleanupExpiredUserTargets() {
+  const db = getDb();
+  const info = db.prepare(
+    'DELETE FROM targets WHERE is_user_target = 1 AND expires_at IS NOT NULL AND expires_at <= ?'
+  ).run(Date.now());
+  return info.changes;
+}
+
 function deleteOldData(retentionDays) {
   const db = getDb();
   const cutoff = Date.now() - retentionDays * 86400000;
 
   const delPings = db.prepare('DELETE FROM ping_results WHERE created_at < ?').run(cutoff);
   const delAlerts = db.prepare('DELETE FROM alerts WHERE created_at < ? AND resolved = 1').run(cutoff);
+  const delUserTargets = cleanupExpiredUserTargets();
 
-  return { deletedPings: delPings.changes, deletedAlerts: delAlerts.changes };
+  return { deletedPings: delPings.changes, deletedAlerts: delAlerts.changes, deletedUserTargets: delUserTargets };
 }
 
 function getLatestPingResultForAll() {
@@ -452,4 +527,8 @@ module.exports = {
   resolveAlert,
   deleteOldData,
   getLatestPingResultForAll,
+  addUserTarget,
+  deleteUserTarget,
+  getUserTargets,
+  cleanupExpiredUserTargets,
 };

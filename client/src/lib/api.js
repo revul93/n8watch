@@ -75,3 +75,21 @@ export function getExportUrl(targetId, from, to) {
   if (to) url.searchParams.set('to', toMs(to));
   return url.toString();
 }
+
+export function addUserTarget(name, ip) {
+  return fetch(`${BASE}/targets/user-targets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, ip }),
+  }).then(async res => {
+    if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
+    return res.json();
+  });
+}
+
+export function deleteUserTarget(id) {
+  return fetch(`${BASE}/targets/user-targets/${id}`, { method: 'DELETE' }).then(async res => {
+    if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
+    return res.json();
+  });
+}

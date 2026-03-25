@@ -10,6 +10,19 @@ import { getMetrics, getUptime } from '../lib/api';
 
 const COLORS = ['#60a5fa', '#34d399', '#f87171', '#fbbf24', '#a78bfa', '#fb923c', '#38bdf8', '#4ade80'];
 
+/**
+ * Build a stable color map from an ordered list of all targets (not just the
+ * currently filtered subset). Colors are assigned by position in that master
+ * list so they never shift when targets are filtered in or out.
+ */
+export function buildColorMap(allTargets) {
+  const map = {};
+  allTargets.forEach((t, i) => {
+    map[t.id] = COLORS[i % COLORS.length];
+  });
+  return map;
+}
+
 function formatTick(ts) {
   if (!ts) return '';
   try { return format(new Date(ts), 'HH:mm'); } catch { return ''; }
@@ -61,7 +74,7 @@ function UptimeGauge({ name, color, percent }) {
   );
 }
 
-export default function UnifiedChart({ targets = [], lastPingResults = {}, chartHeight = 280, fillHeight = false }) {
+export default function UnifiedChart({ targets = [], lastPingResults = {}, chartHeight = 280, fillHeight = false, colorMap = {} }) {
   const [metric, setMetric] = useState('latency');
   const [range, setRange] = useState(RANGES[2]); // 1h default
   const [chartData, setChartData] = useState([]);
@@ -70,13 +83,17 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
   const containerRef = useRef(null);
   const [dynamicHeight, setDynamicHeight] = useState(chartHeight);
 
-  // When fillHeight=true, measure the container and use its full height
+  // When fillHeight=true, observe the *parent* element so we don't create a
+  // feedback loop where the chart growing causes a re-measure → more growth.
   useEffect(() => {
     if (!fillHeight) return;
-    const el = containerRef.current;
+    const el = containerRef.current?.parentElement;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      setDynamicHeight(Math.max(200, el.clientHeight - CHART_HEADER_HEIGHT));
+      const available = el.clientHeight;
+      if (available > 0) {
+        setDynamicHeight(Math.max(200, available - CHART_HEADER_HEIGHT - 32));
+      }
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -261,19 +278,22 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
             {grid}{xAxis}{yAxis}
             <Tooltip {...tooltipStyle} />
             {legend}
-            {targets.map((t, i) => (
-              <Area
-                key={t.id}
-                type="monotone"
-                dataKey={String(t.id)}
-                stroke={COLORS[i % COLORS.length]}
-                fill={COLORS[i % COLORS.length] + '22'}
-                strokeWidth={1.5}
-                dot={false}
-                isAnimationActive={false}
-                connectNulls
-              />
-            ))}
+            {targets.map((t, i) => {
+              const color = colorMap[t.id] || COLORS[i % COLORS.length];
+              return (
+                <Area
+                  key={t.id}
+                  type="monotone"
+                  dataKey={String(t.id)}
+                  stroke={color}
+                  fill={color + '22'}
+                  strokeWidth={1.5}
+                  dot={false}
+                  isAnimationActive={false}
+                  connectNulls
+                />
+              );
+            })}
           </AreaChart>
         </ResponsiveContainer>
       );
@@ -286,25 +306,28 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
           {grid}{xAxis}{yAxis}
           <Tooltip {...tooltipStyle} />
           {legend}
-          {targets.map((t, i) => (
-            <Line
-              key={t.id}
-              type="monotone"
-              dataKey={String(t.id)}
-              stroke={COLORS[i % COLORS.length]}
-              strokeWidth={1.5}
-              dot={false}
-              isAnimationActive={false}
-              connectNulls
-            />
-          ))}
+          {targets.map((t, i) => {
+            const color = colorMap[t.id] || COLORS[i % COLORS.length];
+            return (
+              <Line
+                key={t.id}
+                type="monotone"
+                dataKey={String(t.id)}
+                stroke={color}
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+            );
+          })}
         </LineChart>
       </ResponsiveContainer>
     );
   };
 
   return (
-    <div ref={containerRef} className={`bg-gray-900 border border-gray-800 rounded-xl p-4 ${fillHeight ? 'flex-1 flex flex-col' : ''}`}>
+    <div ref={containerRef} className={`bg-gray-900 border border-gray-800 rounded-xl p-4 ${fillHeight ? 'flex-1 flex flex-col overflow-hidden' : ''}`}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-200">Live Metrics</h2>
         <div className="flex flex-wrap gap-2">
@@ -314,7 +337,7 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
           )}
         </div>
       </div>
-      <div className={fillHeight ? 'flex-1 min-h-0' : ''}>
+      <div className={fillHeight ? 'flex-1 min-h-0 overflow-hidden' : ''}>
         {renderChart()}
       </div>
     </div>
