@@ -9,6 +9,8 @@
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+  - [One-line install](#one-line-install-recommended)
+  - [Manual installation](#manual-installation)
 - [Configuration](#configuration)
   - [General Settings](#general-settings)
   - [Targets](#targets)
@@ -51,6 +53,31 @@
 ---
 
 ## Installation
+
+### One-line install (recommended)
+
+Clone the repository, make the setup script executable, and run the interactive setup — all in a single command:
+
+**Using curl:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/revul93/n8netwatch/main/install.sh | bash
+```
+
+**Using wget:**
+```bash
+wget -qO- https://raw.githubusercontent.com/revul93/n8netwatch/main/install.sh | bash
+```
+
+This will clone the repository into an `n8netwatch` directory in your current working directory, then launch the interactive setup automatically.
+
+> **Security note:** As with any install-from-pipe command, you can review the script before running it:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/revul93/n8netwatch/main/install.sh
+> ```
+
+---
+
+### Manual installation
 
 ### 1. Clone the repository
 
