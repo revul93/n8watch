@@ -1,6 +1,6 @@
 import HostCard from './HostCard';
 
-export default function HostGrid({ targets = [], lastPingResults = {}, sparklineData = {}, selectedTargetIds = [], onTargetClick }) {
+export default function HostGrid({ targets = [], lastPingResults = {}, sparklineData = {}, selectedTargetIds = [], onTargetClick, onDeleteUserTarget }) {
   if (!targets.length) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -19,6 +19,7 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
           sparklineData={sparklineData[target.id] || []}
           isSelected={selectedTargetIds.includes(target.id)}
           onTargetClick={onTargetClick}
+          onDelete={onDeleteUserTarget}
         />
       ))}
     </div>

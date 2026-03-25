@@ -29,6 +29,9 @@ function initAlertEngine(db, wss, emailService, config) {
 async function processAlerts(target, pingResult) {
   if (!_db || _rules.length === 0) return;
 
+  // Skip user-defined temporary targets — no alerts applied to them
+  if (target.is_user_target) return;
+
   const metrics = {
     is_alive:         pingResult.is_alive ? 1 : 0,
     packet_loss:      pingResult.packet_loss      ?? 100,
@@ -106,6 +109,9 @@ async function processAlerts(target, pingResult) {
  */
 async function checkRecovery(target, pingResult) {
   if (!_db) return;
+
+  // Skip user-defined temporary targets — no alerts applied to them
+  if (target.is_user_target) return;
 
   const metrics = {
     is_alive:         pingResult.is_alive ? 1 : 0,

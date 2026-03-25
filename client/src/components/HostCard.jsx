@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { cn, formatMs, formatPercent } from '../lib/utils';
 import SparklineChart from './SparklineChart';
 import UptimeCircle from './UptimeCircle';
 
-export default function HostCard({ target, lastPingResult, sparklineData = [], isSelected = false, onTargetClick }) {
+export default function HostCard({ target, lastPingResult, sparklineData = [], isSelected = false, onTargetClick, onDelete }) {
   const navigate = useNavigate();
   const result = lastPingResult || target;
 
@@ -13,21 +14,25 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
   const packetLoss = result?.packet_loss ?? null;
   const uptime_overall = target?.uptime_overall ?? null;
   const group = target?.group || null;
+  const isUserTarget = !!target?.is_user_target;
 
   function handleClick() {
     if (onTargetClick) {
-      // Filter mode: toggle this target in the chart selection
       onTargetClick(target.id);
     } else {
-      // Fallback: navigate to history for this target
       navigate(`/history?target=${target.id}`);
     }
+  }
+
+  function handleDelete(e) {
+    e.stopPropagation();
+    if (onDelete) onDelete(target);
   }
 
   return (
     <div
       className={cn(
-        'bg-gray-900 border rounded-xl p-4 cursor-pointer transition-colors',
+        'bg-gray-900 border rounded-xl p-4 cursor-pointer transition-colors relative',
         isSelected
           ? 'border-blue-500 ring-1 ring-blue-500/40'
           : 'border-gray-800 hover:border-blue-700'
@@ -35,12 +40,21 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
       onClick={handleClick}
       title={isSelected ? 'Click to deselect (remove from chart filter)' : 'Click to filter chart to this host'}
     >
+      {isUserTarget && onDelete && (
+        <button
+          onClick={handleDelete}
+          className="absolute top-2 right-2 p-1 rounded text-gray-600 hover:text-red-400 hover:bg-gray-800 transition-colors"
+          title="Remove this temporary target"
+        >
+          <X size={14} />
+        </button>
+      )}
       <div className="flex items-start justify-between mb-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-white truncate">{target.name}</p>
           <p className="text-xs text-gray-500 font-mono truncate">{target.ip}</p>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+        <div className={cn('flex items-center gap-1.5 flex-shrink-0 ml-2', isUserTarget && onDelete ? 'pr-5' : '')}>
           <span
             className={cn(
               'w-2.5 h-2.5 rounded-full flex-shrink-0',
@@ -60,6 +74,11 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
         </div>
       </div>
 
+      {isUserTarget && (
+        <span className="inline-block text-xs bg-purple-900/50 text-purple-300 border border-purple-800 px-2 py-0.5 rounded-full mb-2 mr-1">
+          Temporary
+        </span>
+      )}
       {group && (
         <span className="inline-block text-xs bg-blue-900/50 text-blue-300 border border-blue-800 px-2 py-0.5 rounded-full mb-2">
           {group}
