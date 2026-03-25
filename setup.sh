@@ -206,6 +206,68 @@ else
   echo "  *** IMPORTANT: Edit config.yaml with your target IPs and SMTP settings ***"
 fi
 
+# ── PM2 startup ───────────────────────────────────────────────────────────────
+echo ""
+echo "─────────────────────────────────────────────────"
+echo "  PM2 — Process Manager (recommended)"
+echo "─────────────────────────────────────────────────"
+echo "Would you like to start n8netwatch with PM2 and enable auto-startup on reboot?"
+echo "  (PM2 keeps the app running and restarts it automatically after a system reboot)"
+printf "  [Y/n]: "
+read -r DO_PM2
+
+if [[ ! "$DO_PM2" =~ ^[Nn]$ ]]; then
+
+  # Install PM2 if not present
+  if ! command -v pm2 &> /dev/null; then
+    echo ""
+    echo "PM2 not found. Installing PM2 globally..."
+    npm install -g pm2
+    echo "✓ PM2 installed"
+  else
+    echo "✓ PM2 already installed ($(pm2 --version))"
+  fi
+
+  # Start / restart the app with PM2
+  echo ""
+  echo "Starting n8netwatch with PM2..."
+  if pm2 start ecosystem.config.js; then
+    echo "✓ n8netwatch started"
+  else
+    echo "  WARNING: pm2 start failed. Check ecosystem.config.js and try again with: npm run pm2:start"
+  fi
+
+  # Persist the process list so PM2 restores it after a reboot
+  echo ""
+  echo "Saving PM2 process list..."
+  if pm2 save; then
+    echo "✓ Process list saved"
+  else
+    echo "  WARNING: pm2 save failed. Run 'npm run pm2:save' manually to persist the process list."
+  fi
+
+  # Configure the system init script for auto-startup.
+  # pm2 startup prints the exact privileged command to run, e.g.:
+  #   sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u user --hp /home/user
+  # We strip ANSI codes and extract that line, then validate and execute it.
+  echo ""
+  echo "Configuring PM2 to auto-start on system reboot..."
+  STARTUP_CMD=$(pm2 startup 2>&1 | sed 's/\x1B\[[0-9;]*[mK]//g' | grep -E "^\s*sudo\s+(env|pm2)\s+" | head -1 | xargs)
+  if [[ "$STARTUP_CMD" =~ ^sudo\ (env|pm2)\  ]]; then
+    echo "Running: $STARTUP_CMD"
+    eval "$STARTUP_CMD" && echo "✓ Auto-startup configured"
+  else
+    echo ""
+    echo "  Could not extract the startup command automatically."
+    echo "  Run the following manually to enable auto-startup:"
+    pm2 startup
+  fi
+
+  PM2_WAS_STARTED=true
+else
+  PM2_WAS_STARTED=false
+fi
+
 echo ""
 echo "=================================="
 echo "  Setup Complete!"
@@ -214,17 +276,28 @@ echo ""
 echo "Next steps:"
 echo "  1. Edit config.yaml with your target IP addresses and SMTP settings"
 echo ""
-echo "  ── Running with Node.js directly ──────────────────────────────────"
-echo "  2a. Start:  npm start"
-echo "      Open:   http://localhost:3000"
-echo "      Stop:   Ctrl+C"
-echo ""
-echo "  ── Running with PM2 (recommended for production) ───────────────────"
-echo "  Install PM2 globally (one-time):  npm install -g pm2"
-echo "  2b. Start:    npm run pm2:start"
-echo "      Logs:     npm run pm2:logs"
-echo "      Status:   npm run pm2:status"
-echo "      Stop:     npm run pm2:stop"
-echo "      Restart:  npm run pm2:restart"
-echo "      Auto-start on boot:  npm run pm2:save && npm run pm2:startup"
+
+if [ "$PM2_WAS_STARTED" = true ]; then
+  echo "  n8netwatch is running via PM2 — open http://localhost:3000"
+  echo ""
+  echo "  Useful PM2 commands:"
+  echo "    Logs:     npm run pm2:logs"
+  echo "    Status:   npm run pm2:status"
+  echo "    Stop:     npm run pm2:stop"
+  echo "    Restart:  npm run pm2:restart"
+else
+  echo "  ── Running with Node.js directly ──────────────────────────────────"
+  echo "  2a. Start:  npm start"
+  echo "      Open:   http://localhost:3000"
+  echo "      Stop:   Ctrl+C"
+  echo ""
+  echo "  ── Running with PM2 (recommended for production) ───────────────────"
+  echo "  Install PM2 globally (one-time):  npm install -g pm2"
+  echo "  2b. Start:    npm run pm2:start"
+  echo "      Logs:     npm run pm2:logs"
+  echo "      Status:   npm run pm2:status"
+  echo "      Stop:     npm run pm2:stop"
+  echo "      Restart:  npm run pm2:restart"
+  echo "      Auto-start on boot:  npm run pm2:save && npm run pm2:startup"
+fi
 echo ""
