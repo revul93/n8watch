@@ -11,7 +11,7 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
   const isUp = rawAlive === null || rawAlive === undefined ? null : !!rawAlive;
   const avgLatency = result?.avg_latency ?? null;
   const packetLoss = result?.packet_loss ?? null;
-  const uptime24h = target?.uptime_24h ?? null;
+  const uptime_overall = target?.uptime_overall ?? null;
   const group = target?.group || null;
 
   function handleClick() {
@@ -77,7 +77,7 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
             {formatPercent(packetLoss)}
           </p>
         </div>
-        <UptimeCircle percent={uptime24h} size={52} />
+        <UptimeCircle percent={uptime_overall} size={52} />
       </div>
 
       <SparklineChart data={sparklineData} />

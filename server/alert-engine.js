@@ -98,22 +98,41 @@ async function processAlerts(target, pingResult) {
 }
 
 /**
- * checkRecovery - if target is now alive, resolve any open "Host Down" alerts.
+ * checkRecovery - re-evaluate conditions for all open alerts on this target.
+ * Clears any alert whose condition is no longer true.
  *
  * @param {{ id: number, name: string, ip: string }} target
  * @param {object} pingResult
  */
 async function checkRecovery(target, pingResult) {
-  if (!_db || !pingResult.is_alive) return;
+  if (!_db) return;
+
+  const metrics = {
+    is_alive:         pingResult.is_alive ? 1 : 0,
+    packet_loss:      pingResult.packet_loss      ?? 100,
+    avg_latency:      pingResult.avg_latency      ?? 0,
+    min_latency:      pingResult.min_latency       ?? 0,
+    max_latency:      pingResult.max_latency       ?? 0,
+    jitter:           pingResult.jitter            ?? 0,
+    packets_sent:     pingResult.packets_sent      ?? 0,
+    packets_received: pingResult.packets_received  ?? 0,
+  };
 
   const activeAlerts = _db.getActiveAlerts().filter(
-    (a) => a.target_id === target.id && a.rule_name === 'Host Down'
+    (a) => a.target_id === target.id
   );
 
   if (activeAlerts.length === 0) return;
 
   const now = Date.now();
   for (const alert of activeAlerts) {
+    // Find the rule that originally triggered this alert
+    const rule = _rules.find(r => r.name === alert.rule_name);
+
+    // If the rule no longer exists OR the condition is no longer triggered, resolve
+    const stillTriggered = rule ? evaluateCondition(rule.condition, metrics) : false;
+    if (stillTriggered) continue;
+
     _db.resolveAlert(alert.id, now);
 
     const downtime = calculateDowntime(alert.created_at);
@@ -134,12 +153,16 @@ async function checkRecovery(target, pingResult) {
     }
 
     if (_emailSvc) {
-      await _emailSvc.sendRecoveryEmail(target, alert, downtime).catch((err) =>
-        console.error('[AlertEngine] Recovery email error:', err.message)
-      );
+      // Only send recovery email if the rule still exists in config; if the rule
+      // was deleted we still resolve the alert but skip the email.
+      if (rule) {
+        await _emailSvc.sendRecoveryEmail(target, alert, downtime).catch((err) =>
+          console.error('[AlertEngine] Recovery email error:', err.message)
+        );
+      }
     }
 
-    console.log(`[AlertEngine] Recovery: ${target.name} (${target.ip}) is back online`);
+    console.log(`[AlertEngine] Recovery: alert "${alert.rule_name}" cleared for ${target.name} (${target.ip})`);
   }
 }
 
