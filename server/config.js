@@ -8,7 +8,12 @@ let _config = null;
 let _configPath = null;
 
 function loadConfig() {
-  const configPath = path.join(__dirname, '..', 'config.yaml');
+  // When running inside Electron, prefer config.yaml from the user-data directory
+  // so users can edit it without touching the installation folder.
+  const baseDir = process.env.N8NETWATCH_DATA_DIR
+    ? path.resolve(process.env.N8NETWATCH_DATA_DIR)
+    : path.join(__dirname, '..');
+  const configPath  = path.join(baseDir, 'config.yaml');
   const examplePath = path.join(__dirname, '..', 'config.example.yaml');
 
   let filePath;
