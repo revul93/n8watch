@@ -9,8 +9,13 @@
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-  - [One-line install](#one-line-install-recommended)
-  - [Manual installation](#manual-installation)
+  - [Linux / macOS](#linux--macos)
+    - [One-line install](#one-line-install-recommended)
+    - [Manual installation](#manual-installation)
+  - [Windows](#windows)
+    - [One-line install (PowerShell)](#one-line-install-powershell)
+    - [Manual installation (Windows)](#manual-installation-windows)
+  - [Desktop App (Electron)](#desktop-app-electron)
 - [Configuration](#configuration)
   - [General Settings](#general-settings)
   - [Targets](#targets)
@@ -20,6 +25,7 @@
 - [Running the Application](#running-the-application)
   - [Development](#development)
   - [Production with PM2](#production-with-pm2)
+  - [Windows](#windows-1)
 - [Web Dashboard](#web-dashboard)
 - [API Reference](#api-reference)
 - [Tech Stack](#tech-stack)
@@ -54,9 +60,13 @@
 
 ## Installation
 
+---
+
+## Linux / macOS
+
 ### One-line install (recommended)
 
-Clone the repository, make the setup script executable, and run the interactive setup — all in a single command:
+Clone the repository and run the interactive setup — all in a single command:
 
 **Using curl:**
 ```bash
@@ -79,14 +89,14 @@ This will clone the repository into an `n8netwatch` directory in your current wo
 
 ### Manual installation
 
-### 1. Clone the repository
+#### 1. Clone the repository
 
 ```bash
 git clone https://github.com/revul93/n8netwatch.git
 cd n8netwatch
 ```
 
-### 2. Run the interactive setup script (recommended)
+#### 2. Run the interactive setup script (recommended)
 
 ```bash
 bash setup.sh
@@ -97,9 +107,9 @@ The script will:
 2. Install backend dependencies (`npm install`).
 3. Install and build the frontend (`cd client && npm install && npm run build`).
 4. Copy `config.example.yaml` to `config.yaml`.
-5. Optionally guide you through configuring targets, SMTP, and alert rules.
+5. Optionally configure PM2 for production use.
 
-### 3. Manual setup (alternative)
+#### 3. Manual setup (alternative)
 
 ```bash
 # Install backend dependencies
@@ -111,6 +121,159 @@ cd client && npm install && npm run build && cd ..
 # Copy and edit the configuration file
 cp config.example.yaml config.yaml
 ```
+
+---
+
+## Windows
+
+### Prerequisites (Windows)
+
+| Requirement | Notes |
+|-------------|-------|
+| Node.js 18+ | [nodejs.org](https://nodejs.org) — choose the Windows Installer (.msi) |
+| Git          | [git-scm.com](https://git-scm.com/download/win) |
+| Build Tools  | Run `npm install -g windows-build-tools` **as Administrator** (needed to compile native modules) |
+
+> **Build Tools note:** `better-sqlite3` contains a native Node.js add-on and must be compiled on first install.
+> The recommended way to obtain the required compiler toolchain on Windows is:
+> ```powershell
+> # Run as Administrator in PowerShell
+> npm install -g windows-build-tools
+> ```
+> Alternatively, install **Visual Studio Build Tools** (C++ workload) from [visualstudio.microsoft.com](https://visualstudio.microsoft.com/downloads/).
+
+> **`prebuild-install` deprecation notice:** During `npm install` you may see a warning:
+> ```
+> npm warn deprecated prebuild-install@7.1.3: No longer maintained.
+> ```
+> This is a known upstream issue in the `better-sqlite3` dependency. The package continues to work
+> correctly. The warning will be resolved when `better-sqlite3` migrates its install mechanism. When
+> building the Electron desktop app, `electron-rebuild` compiles `better-sqlite3` from source and
+> the `prebuild-install` binary download is bypassed entirely.
+
+---
+
+### One-line install (PowerShell)
+
+Open **PowerShell** (Windows Terminal or the built-in PowerShell app) and run:
+
+```powershell
+Invoke-Expression (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/revul93/n8netwatch/main/install.ps1" -UseBasicParsing).Content
+```
+
+This will clone the repository and launch the interactive `setup.ps1` automatically.
+
+> **Security note:** You can review the script before running it:
+> ```powershell
+> Invoke-WebRequest -Uri "https://raw.githubusercontent.com/revul93/n8netwatch/main/install.ps1" -UseBasicParsing | Select-Object -ExpandProperty Content
+> ```
+
+---
+
+### Manual installation (Windows)
+
+#### 1. Clone the repository
+
+```powershell
+git clone https://github.com/revul93/n8netwatch.git
+cd n8netwatch
+```
+
+#### 2. Run the interactive setup script
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup.ps1
+```
+
+The script will:
+1. Verify Node.js is installed (v18+).
+2. Install backend dependencies (`npm install`).
+3. Install and build the frontend.
+4. Copy `config.example.yaml` to `config.yaml`.
+5. Optionally start the application via PM2.
+
+#### 3. Manual setup (alternative)
+
+```powershell
+# Install backend dependencies
+npm install
+
+# Install and build the React frontend
+cd client; npm install; npm run build; cd ..
+
+# Copy and edit the configuration file
+Copy-Item config.example.yaml config.yaml
+```
+
+#### 4. Start the application
+
+```cmd
+# Option A — CMD double-click or command prompt
+start.cmd
+
+# Option B — PowerShell / Node.js directly
+node server\index.js
+
+# Option C — PM2 (recommended for production)
+npm run pm2:start
+```
+
+Open `http://localhost:3000` in your browser.
+
+---
+
+## Desktop App (Electron)
+
+n8netwatch can be run as a standalone Windows (or macOS/Linux) desktop application using [Electron](https://electronjs.org). The Electron wrapper embeds the Express server and opens the web dashboard in a native application window — no browser or separate server setup required.
+
+### Run the desktop app in development
+
+```bash
+# 1. Build the frontend first (if not already done)
+cd client && npm install && npm run build && cd ..
+
+# 2. Install all dependencies (including Electron dev-deps)
+npm install
+
+# 3. Rebuild native modules for Electron's Node.js version
+npm run electron:rebuild
+
+# 4. Launch the desktop app
+npm run electron
+```
+
+### Build a distributable installer
+
+> **Requirements:** On Windows you need the same build tools as for the server install.
+
+```bash
+# Build for the current platform
+npm run electron:build
+
+# Build specifically for Windows (creates NSIS installer + portable .exe in dist-electron/)
+npm run electron:build:win
+
+# Build for macOS
+npm run electron:build:mac
+
+# Build for Linux
+npm run electron:build:linux
+```
+
+The Windows installer (`dist-electron/n8netwatch Setup *.exe`) is a standard NSIS installer with a Start Menu shortcut and an optional desktop shortcut.
+
+### Data directory (Electron)
+
+When running as an Electron desktop app, n8netwatch stores its database and configuration in the OS user-data directory instead of the application bundle:
+
+| Platform | Path |
+|----------|------|
+| Windows  | `%APPDATA%
+8netwatch` |
+| macOS    | `~/Library/Application Support/n8netwatch` |
+| Linux    | `~/.config/n8netwatch` |
+
+Edit `config.yaml` in that directory to change targets, SMTP settings, or alert rules while the app is running.
 
 ---
 
@@ -267,6 +430,34 @@ Application logs are written to `logs/out.log` (stdout) and `logs/error.log` (st
 
 ---
 
+### Windows
+
+```cmd
+REM Option A — CMD (double-click or command prompt)
+start.cmd
+
+REM Option B — Node.js directly
+node server\index.js
+```
+
+```powershell
+# Option C — PM2 (recommended)
+npm run pm2:start
+```
+
+PM2 is supported on Windows. To enable auto-start on system boot, run:
+
+```powershell
+npm run pm2:startup
+npm run pm2:save
+```
+
+> **PM2 on Windows:** If `pm2 startup` does not configure a Windows Service automatically,
+> install the optional [pm2-installer](https://github.com/jessety/pm2-installer) package for
+> native Windows Service support.
+
+---
+
 ## Web Dashboard
 
 Once the application is running, open `http://<host>:3000` in your browser.
@@ -348,6 +539,14 @@ Connect to `ws://<host>:3000` to receive real-time push events (use `wss://` if 
 | [Tailwind CSS](https://tailwindcss.com) | Utility-first styling |
 | [Lucide React](https://lucide.dev) | Icon library |
 | [date-fns](https://date-fns.org) | Date formatting utilities |
+
+### Desktop (Electron)
+
+| Package | Purpose |
+|---------|---------|
+| [Electron](https://electronjs.org) | Cross-platform desktop shell |
+| [electron-builder](https://www.electron.build) | Packaging and installer generation |
+| [@electron/rebuild](https://github.com/electron/rebuild) | Recompiles native modules for Electron |
 
 ---
 

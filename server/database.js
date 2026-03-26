@@ -11,7 +11,15 @@ function getDb() {
 }
 
 function initDatabase() {
-  const dbPath = path.join(__dirname, '..', 'data', 'n8netwatch.db');
+  // When running inside Electron the main process sets N8NETWATCH_DATA_DIR to
+  // app.getPath('userData') so data is stored in the OS user-data directory
+  // instead of the application bundle (e.g. %APPDATA%\n8netwatch on Windows).
+  const dataDir = process.env.N8NETWATCH_DATA_DIR
+    ? require('path').resolve(process.env.N8NETWATCH_DATA_DIR)
+    : path.join(__dirname, '..', 'data');
+
+  require('fs').mkdirSync(dataDir, { recursive: true });
+  const dbPath = path.join(dataDir, 'n8netwatch.db');
   _db = new Database(dbPath);
 
   // Enable WAL mode for better concurrent read performance
