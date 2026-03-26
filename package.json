@@ -19,7 +19,8 @@
     "electron:build": "npm run electron:rebuild && electron-builder",
     "electron:build:win": "npm run electron:rebuild && electron-builder --win",
     "electron:build:mac": "npm run electron:rebuild && electron-builder --mac",
-    "electron:build:linux": "npm run electron:rebuild && electron-builder --linux"
+    "electron:build:linux": "npm run electron:rebuild && electron-builder --linux",
+    "db:flush": "node scripts/flush-db.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",

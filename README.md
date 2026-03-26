@@ -26,6 +26,8 @@
   - [Development](#development)
   - [Production with PM2](#production-with-pm2)
   - [Windows](#windows-1)
+- [Maintenance](#maintenance)
+  - [Flushing the database](#flushing-the-database)
 - [Web Dashboard](#web-dashboard)
 - [API Reference](#api-reference)
 - [Tech Stack](#tech-stack)
@@ -256,11 +258,33 @@ npm run electron:build:win
 # Build for macOS
 npm run electron:build:mac
 
-# Build for Linux
+# Build for Linux (creates AppImage + .deb in dist-electron/)
 npm run electron:build:linux
 ```
 
 The Windows installer (`dist-electron/n8netwatch Setup *.exe`) is a standard NSIS installer with a Start Menu shortcut and an optional desktop shortcut.
+
+### Automated builds with GitHub Actions
+
+The repository ships a workflow (`.github/workflows/electron-build.yml`) that builds distributable packages for **Windows** and **Linux** automatically.
+
+**Triggers:**
+- **On tag push** — any tag matching `v*` (e.g. `v1.2.0`) triggers a full Windows + Linux build.
+- **Manual dispatch** — run the workflow from the *Actions* tab and choose which platform to build for (`all`, `windows`, or `linux`).
+
+**Artifacts** are uploaded after each run and can be downloaded from the workflow run page:
+
+| Platform | Files |
+|----------|-------|
+| Windows  | `n8netwatch Setup <version>.exe`, `n8netwatch <version>.exe` (portable) |
+| Linux    | `n8netwatch-<version>.AppImage`, `n8netwatch_<version>.deb` |
+
+To trigger a release build locally:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ### Data directory (Electron)
 
@@ -268,8 +292,7 @@ When running as an Electron desktop app, n8netwatch stores its database and conf
 
 | Platform | Path |
 |----------|------|
-| Windows  | `%APPDATA%
-8netwatch` |
+| Windows  | `%APPDATA%\n8netwatch` |
 | macOS    | `~/Library/Application Support/n8netwatch` |
 | Linux    | `~/.config/n8netwatch` |
 
@@ -455,6 +478,26 @@ npm run pm2:save
 > **PM2 on Windows:** If `pm2 startup` does not configure a Windows Service automatically,
 > install the optional [pm2-installer](https://github.com/jessety/pm2-installer) package for
 > native Windows Service support.
+
+---
+
+## Maintenance
+
+### Flushing the database
+
+The `db:flush` script permanently deletes **all** data (ping results, alerts, and targets) from the SQLite database and resets the auto-increment counters.  Use it to start fresh without reinstalling the application.
+
+```bash
+# Interactive — prompts for confirmation before deleting
+npm run db:flush
+
+# Skip the confirmation prompt (useful in automation / CI)
+node scripts/flush-db.js --yes
+```
+
+> ⚠️ **This action is irreversible.** All historical ping results, stored alerts, and target records will be removed.  Back up `data/n8netwatch.db` first if you want to preserve the data.
+>
+> The running server process does not need to be stopped first — the script opens its own connection to the database.  However, after flushing you should restart the server so that it re-syncs targets from `config.yaml`.
 
 ---
 

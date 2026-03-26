@@ -60,7 +60,15 @@ echo "────────────────────────�
 echo "Would you like to start n8netwatch with PM2 and enable auto-startup on reboot?"
 echo "  (PM2 keeps the app running and restarts it automatically after a system reboot)"
 printf "  [Y/n]: "
-read -r DO_PM2
+# When setup.sh is invoked via a pipe (e.g. curl | bash) stdin is not a
+# terminal.  Try /dev/tty so the user can still type a response; if that
+# is unavailable (fully non-interactive environment) default to "n".
+DO_PM2="n"
+if [ -t 0 ]; then
+  read -r DO_PM2
+elif [ -e /dev/tty ]; then
+  read -r DO_PM2 </dev/tty
+fi
 
 if [[ ! "$DO_PM2" =~ ^[Nn]$ ]]; then
 
