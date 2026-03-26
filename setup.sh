@@ -68,6 +68,9 @@ if [ -t 0 ]; then
   read -r DO_PM2
 elif [ -e /dev/tty ]; then
   read -r DO_PM2 </dev/tty
+else
+  echo ""
+  echo "  (non-interactive session detected — skipping PM2 setup)"
 fi
 
 if [[ ! "$DO_PM2" =~ ^[Nn]$ ]]; then

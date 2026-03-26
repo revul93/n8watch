@@ -83,7 +83,20 @@ Write-Host "  PM2 — Process Manager (recommended)" -ForegroundColor Cyan
 Write-Host "-------------------------------------------------" -ForegroundColor Cyan
 Write-Host "Would you like to start n8netwatch with PM2 and enable auto-startup on reboot?"
 Write-Host "  (PM2 keeps the app running and restarts it automatically)"
-$dopm2 = Read-Host "  [Y/n]"
+# When the script is invoked non-interactively (e.g. via Invoke-Expression in a
+# pipeline, or in a CI/headless session) Read-Host throws an exception which
+# $ErrorActionPreference = "Stop" turns into a script-terminating error.
+# Guard against that by defaulting to "n" when the session is not interactive.
+$dopm2 = "n"
+if ([Environment]::UserInteractive) {
+    try {
+        $dopm2 = Read-Host "  [Y/n]"
+    } catch {
+        Write-Host "  (non-interactive session detected — skipping PM2 setup)" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  (non-interactive session detected — skipping PM2 setup)" -ForegroundColor Yellow
+}
 
 $pm2WasStarted = $false
 
