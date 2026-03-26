@@ -60,7 +60,15 @@ echo "────────────────────────�
 echo "Would you like to start n8netwatch with PM2 and enable auto-startup on reboot?"
 echo "  (PM2 keeps the app running and restarts it automatically after a system reboot)"
 printf "  [Y/n]: "
-read -r DO_PM2
+# Read from /dev/tty so the prompt works even when stdin is a pipe (e.g. curl | bash).
+# If no terminal is available (fully non-interactive), default to "n".
+if [ -e /dev/tty ]; then
+  read -r DO_PM2 < /dev/tty
+else
+  DO_PM2="n"
+  echo ""
+  echo "  (Non-interactive mode detected — skipping PM2 auto-start)"
+fi
 
 if [[ ! "$DO_PM2" =~ ^[Nn]$ ]]; then
 

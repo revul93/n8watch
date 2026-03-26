@@ -26,6 +26,7 @@
   - [Development](#development)
   - [Production with PM2](#production-with-pm2)
   - [Windows](#windows-1)
+- [Flushing Database Data](#flushing-database-data)
 - [Web Dashboard](#web-dashboard)
 - [API Reference](#api-reference)
 - [Tech Stack](#tech-stack)
@@ -427,6 +428,41 @@ npm run pm2:save      # Saves the current process list
 ```
 
 Application logs are written to `logs/out.log` (stdout) and `logs/error.log` (stderr).
+
+---
+
+## Flushing Database Data
+
+Use the built-in flush script to clear stored data from the SQLite database without deleting the database file itself.
+
+> **Stop the application before flushing** to avoid conflicts.
+
+```bash
+# Flush ping results only (default)
+npm run db:flush
+
+# Flush alert records only
+node scripts/flush-data.js --alerts
+
+# Flush both ping results and alerts
+node scripts/flush-data.js --ping-results --alerts
+
+# Flush everything — ping results, alerts, and all targets
+npm run db:flush:all
+
+# Skip the confirmation prompt (useful in scripts)
+node scripts/flush-data.js --all --yes
+```
+
+| Flag | What is deleted |
+|------|----------------|
+| *(none)* or `--ping-results` | All rows in `ping_results` |
+| `--alerts` | All alert records |
+| `--ping-results --alerts` | Ping results **and** alert records |
+| `--all` | Ping results, alerts, and all targets |
+| `--yes` | Suppresses the confirmation prompt |
+
+After flushing, restart the application normally — targets defined in `config.yaml` will be re-created on the next ping cycle.
 
 ---
 
