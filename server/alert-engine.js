@@ -11,6 +11,13 @@ let _rules       = [];
 // cooldownMap: "targetId-ruleName" -> timestamp of last alert sent
 const cooldownMap = new Map();
 
+// Severity ordering — higher number = higher priority
+const SEVERITY_ORDER = { critical: 3, warning: 2, info: 1, low: 0 };
+
+function getSeverityLevel(severity) {
+  return SEVERITY_ORDER[String(severity).toLowerCase()] ?? 0;
+}
+
 function initAlertEngine(db, wss, emailService, config) {
   _db       = db;
   _wss      = wss;
@@ -43,6 +50,8 @@ async function processAlerts(target, pingResult) {
     packets_received: pingResult.packets_received ?? 0,
   };
 
+  // Collect all applicable rules that are triggered for this target
+  const triggeredRules = [];
   for (const rule of _rules) {
     // If the rule has a targets list, skip targets not in that list
     if (Array.isArray(rule.targets) && rule.targets.length > 0) {
@@ -51,14 +60,30 @@ async function processAlerts(target, pingResult) {
       );
       if (!targetMatch) continue;
     }
+    if (evaluateCondition(rule.condition, metrics)) {
+      triggeredRules.push(rule);
+    }
+  }
 
-    const triggered = evaluateCondition(rule.condition, metrics);
-    if (!triggered) continue;
+  if (triggeredRules.length === 0) return;
 
+  // Determine the highest severity level among all triggered rules
+  const highestLevel = triggeredRules.reduce(
+    (max, rule) => Math.max(max, getSeverityLevel(rule.severity)),
+    -1
+  );
+
+  // Only process rules at the highest severity — lower-severity rules are suppressed
+  const rulesAtHighestSeverity = triggeredRules.filter(
+    rule => getSeverityLevel(rule.severity) === highestLevel
+  );
+
+  const now = Date.now();
+
+  for (const rule of rulesAtHighestSeverity) {
     const cooldownKey = `${target.id}-${rule.name}`;
     const cooldownSec = rule.cooldown || 300;
     const lastAlerted = cooldownMap.get(cooldownKey) || 0;
-    const now = Date.now();
 
     if (now - lastAlerted < cooldownSec * 1000) continue;
 

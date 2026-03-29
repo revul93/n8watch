@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useApi } from '../hooks/useApi';
-import { getTargets, getPingResults, addUserTarget, deleteUserTarget } from '../lib/api';
+import { getTargets, getPingResults, addUserTarget, deleteUserTarget, getReportData } from '../lib/api';
+import { generatePDFReport, generateCSVReport } from '../lib/reportGenerator';
 import SummaryCards from '../components/SummaryCards';
 import UnifiedChart, { buildColorMap } from '../components/UnifiedChart';
 import HostGrid from '../components/HostGrid';
 import FullscreenChartModal from '../components/FullscreenChartModal';
-import { RefreshCw, Maximize2, Plus, X } from 'lucide-react';
+import { RefreshCw, Maximize2, Plus, X, FileText, FileDown } from 'lucide-react';
 
 export default function Dashboard() {
   const { lastPingResults, configReloadedAt } = useWebSocket();
@@ -23,6 +24,8 @@ export default function Dashboard() {
 
   // Confirmation dialog state
   const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [deleteStep, setDeleteStep] = useState('confirm'); // 'confirm' | 'report'
+  const [reportDownloading, setReportDownloading] = useState(null);
 
   const fetchSparklines = useCallback(async (targetList) => {
     if (!targetList?.length) return;
@@ -104,9 +107,42 @@ export default function Dashboard() {
   // Show confirmation dialog before deleting a user target
   const handleDeleteRequest = useCallback((target) => {
     setDeleteCandidate(target);
+    setDeleteStep('confirm');
   }, []);
 
-  // Confirmed deletion
+  // After first confirmation, ask about report download
+  const handleDeleteFirstConfirm = useCallback(() => {
+    setDeleteStep('report');
+  }, []);
+
+  // Download report then delete
+  const handleDownloadThenDelete = useCallback(async (format) => {
+    if (!deleteCandidate) return;
+    setReportDownloading(format);
+    try {
+      const data = await getReportData(deleteCandidate.id);
+      if (format === 'pdf') {
+        generatePDFReport(data);
+      } else {
+        generateCSVReport(data);
+      }
+    } catch (err) {
+      console.error('Failed to generate report before delete:', err);
+    } finally {
+      setReportDownloading(null);
+    }
+    // Proceed with deletion after download
+    try {
+      await deleteUserTarget(deleteCandidate.id);
+      setDeleteCandidate(null);
+      await refetch();
+    } catch (err) {
+      console.error('Failed to delete user target:', err);
+      setDeleteCandidate(null);
+    }
+  }, [deleteCandidate, refetch]);
+
+  // Confirmed deletion (no report)
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteCandidate) return;
     try {
@@ -224,30 +260,79 @@ export default function Dashboard() {
       {deleteCandidate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="text-base font-semibold text-white">Remove Temporary Target</h3>
-              <button onClick={() => setDeleteCandidate(null)} className="text-gray-500 hover:text-white">
-                <X size={18} />
-              </button>
-            </div>
-            <p className="text-sm text-gray-400 mb-6">
-              Are you sure you want to remove <span className="font-semibold text-white">{deleteCandidate.name}</span> ({deleteCandidate.ip})?
-              This will delete all monitoring data for this target.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteCandidate(null)}
-                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-sm text-white transition-colors"
-              >
-                Remove
-              </button>
-            </div>
+            {deleteStep === 'confirm' ? (
+              <>
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="text-base font-semibold text-white">Remove Temporary Target</h3>
+                  <button onClick={() => setDeleteCandidate(null)} className="text-gray-500 hover:text-white">
+                    <X size={18} />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-400 mb-6">
+                  Are you sure you want to remove <span className="font-semibold text-white">{deleteCandidate.name}</span> ({deleteCandidate.ip})?
+                  This will delete all monitoring data for this target.
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setDeleteCandidate(null)}
+                    className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteFirstConfirm}
+                    className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-sm text-white transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="text-base font-semibold text-white">Download Report?</h3>
+                  <button onClick={() => setDeleteCandidate(null)} className="text-gray-500 hover:text-white">
+                    <X size={18} />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-400 mb-5">
+                  Would you like to download a report for <span className="font-semibold text-white">{deleteCandidate.name}</span> before removing it?
+                </p>
+                <div className="flex flex-col gap-2 mb-4">
+                  <button
+                    onClick={() => handleDownloadThenDelete('pdf')}
+                    disabled={!!reportDownloading}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 disabled:opacity-60 rounded-lg text-sm text-white transition-colors"
+                  >
+                    <FileText size={14} />
+                    {reportDownloading === 'pdf' ? 'Generating…' : 'Download PDF & Remove'}
+                  </button>
+                  <button
+                    onClick={() => handleDownloadThenDelete('csv')}
+                    disabled={!!reportDownloading}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-green-700 hover:bg-green-600 disabled:opacity-60 rounded-lg text-sm text-white transition-colors"
+                  >
+                    <FileDown size={14} />
+                    {reportDownloading === 'csv' ? 'Generating…' : 'Download CSV & Remove'}
+                  </button>
+                </div>
+                <div className="flex gap-3 justify-end border-t border-gray-800 pt-4">
+                  <button
+                    onClick={() => setDeleteCandidate(null)}
+                    className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteConfirm}
+                    disabled={!!reportDownloading}
+                    className="px-4 py-2 bg-red-700 hover:bg-red-600 disabled:opacity-60 rounded-lg text-sm text-white transition-colors"
+                  >
+                    Remove Without Report
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

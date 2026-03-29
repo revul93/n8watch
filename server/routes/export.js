@@ -46,4 +46,48 @@ router.get('/:id/export', (req, res) => {
   }
 });
 
+// GET /api/targets/:id/report  (comprehensive report data as JSON)
+router.get('/:id/report', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid target id' });
+
+    const target = db.getTargetById(id);
+    if (!target) return res.status(404).json({ error: 'Target not found' });
+
+    // Uptime statistics
+    const uptime = db.getUptime(id);
+
+    // Metrics over the past 24 hours (5-minute buckets)
+    const metricsFrom = Date.now() - 86400000;
+    const metrics = db.getMetrics(id, metricsFrom, Date.now(), 300);
+
+    // Recent ping results (last 200 samples)
+    const { rows: pingRows } = db.getPingResults(id, metricsFrom, Date.now(), 200, 0);
+
+    // Alert history for this target (last 100)
+    const { rows: alertRows } = db.getAlerts({ target_id: id, limit: 100 });
+
+    res.json({
+      generated_at: new Date().toISOString(),
+      target: {
+        id:     target.id,
+        name:   target.name,
+        ip:     target.ip,
+        group:  target.group,
+        is_alive:    target.is_alive,
+        avg_latency: target.avg_latency,
+        packet_loss: target.packet_loss,
+      },
+      uptime,
+      metrics,
+      ping_results: pingRows,
+      alerts: alertRows,
+    });
+  } catch (err) {
+    console.error('[Routes/export] GET /:id/report:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

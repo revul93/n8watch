@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, FileText, FileDown } from 'lucide-react';
 import { cn, formatMs, formatPercent } from '../lib/utils';
 import SparklineChart from './SparklineChart';
 import UptimeCircle from './UptimeCircle';
+import { getReportData } from '../lib/api';
+import { generatePDFReport, generateCSVReport } from '../lib/reportGenerator';
 
 export default function HostCard({ target, lastPingResult, sparklineData = [], isSelected = false, onTargetClick, onDelete }) {
   const navigate = useNavigate();
@@ -16,6 +19,8 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
   const group = target?.group || null;
   const isUserTarget = !!target?.is_user_target;
 
+  const [reportLoading, setReportLoading] = useState(null); // 'pdf' | 'csv' | null
+
   function handleClick() {
     if (onTargetClick) {
       onTargetClick(target.id);
@@ -27,6 +32,24 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
   function handleDelete(e) {
     e.stopPropagation();
     if (onDelete) onDelete(target);
+  }
+
+  async function handleReport(e, format) {
+    e.stopPropagation();
+    if (reportLoading) return;
+    setReportLoading(format);
+    try {
+      const data = await getReportData(target.id);
+      if (format === 'pdf') {
+        generatePDFReport(data);
+      } else {
+        generateCSVReport(data);
+      }
+    } catch (err) {
+      console.error('Failed to generate report:', err);
+    } finally {
+      setReportLoading(null);
+    }
   }
 
   return (
@@ -100,6 +123,28 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
       </div>
 
       <SparklineChart data={sparklineData} />
+
+      {/* Report download buttons */}
+      <div className="flex gap-1.5 mt-3 pt-2 border-t border-gray-800">
+        <button
+          onClick={(e) => handleReport(e, 'pdf')}
+          disabled={!!reportLoading}
+          className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-blue-600 transition-colors disabled:opacity-50"
+          title="Download PDF report"
+        >
+          <FileText size={11} />
+          {reportLoading === 'pdf' ? 'Generating…' : 'PDF'}
+        </button>
+        <button
+          onClick={(e) => handleReport(e, 'csv')}
+          disabled={!!reportLoading}
+          className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-green-600 transition-colors disabled:opacity-50"
+          title="Download CSV report"
+        >
+          <FileDown size={11} />
+          {reportLoading === 'csv' ? 'Generating…' : 'CSV'}
+        </button>
+      </div>
     </div>
   );
 }

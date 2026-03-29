@@ -6,6 +6,11 @@ const { broadcast }      = require('./websocket');
 
 let _activeTasks = [];
 
+// Connectivity state: track whether all non-user targets were unreachable
+let _disconnected     = false;
+let _disconnectedAt   = null;
+let _emailSvcRef      = null;
+
 /**
  * initScheduler - registers cron jobs for ping cycles and data retention cleanup.
  *
@@ -13,10 +18,13 @@ let _activeTasks = [];
  * @param {object} db         - database module
  * @param {object} wss        - WebSocket server (unused directly, broadcast is used)
  * @param {object} alertEngine
+ * @param {object} [emailSvc] - optional email service for connectivity notifications
  */
-function initScheduler(config, db, wss, alertEngine) {
+function initScheduler(config, db, wss, alertEngine, emailSvc) {
   const interval       = config.general.ping_interval || 30;
   const retentionDays  = config.general.data_retention_days || 90;
+
+  if (emailSvc) _emailSvcRef = emailSvc;
 
   // ── Ping cycle ───────────────────────────────────────────────────────────────
   // node-cron seconds field only supports 1–59; warn if the configured interval
@@ -38,6 +46,31 @@ function initScheduler(config, db, wss, alertEngine) {
       if (targets.length === 0) return;
 
       const results = await pingAllTargets(targets, config.general);
+
+      // Detect connectivity changes: check if all non-user targets are down
+      const nonUserResults = results.filter(r => !r.target.is_user_target);
+      const anyAlive = nonUserResults.some(r => r.metrics.is_alive);
+
+      if (nonUserResults.length > 0) {
+        if (!anyAlive && !_disconnected) {
+          // Transition: connected → disconnected
+          _disconnected   = true;
+          _disconnectedAt = Date.now();
+          console.log('[Scheduler] All targets unreachable — marking as disconnected');
+        } else if (anyAlive && _disconnected) {
+          // Transition: disconnected → reconnected
+          _disconnected = false;
+          console.log('[Scheduler] Network connectivity restored — sending reconnect email');
+          if (_emailSvcRef) {
+            _emailSvcRef.sendReconnectEmail(_disconnectedAt).catch((err) =>
+              console.error('[Scheduler] Reconnect email error:', err.message)
+            );
+          }
+          _disconnectedAt = null;
+        }
+      } else {
+        // No non-user targets exist; connectivity tracking is not active
+      }
 
       for (const { target, metrics } of results) {
         const rowId = db.insertPingResult({
