@@ -3,9 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
+const crypto = require('crypto');
 
 let _config = null;
 let _configPath = null;
+let _lastContentHash = null;
 
 function loadConfig() {
   // When running inside Electron, prefer config.yaml from the user-data directory
@@ -28,6 +30,7 @@ function loadConfig() {
 
   _configPath = filePath;
   const raw = fs.readFileSync(filePath, 'utf8');
+  _lastContentHash = crypto.createHash('md5').update(raw).digest('hex');
   const config = yaml.load(raw);
 
   if (!config.general) throw new Error('Config missing: general section');
@@ -59,35 +62,56 @@ function getConfig() {
   return _config;
 }
 
+// Track watchers so watchConfig can only be registered once
+let _watchActive = false;
+
 /**
  * watchConfig - watch config.yaml for changes and invoke callback on reload.
  * Uses fs.watch with a 500ms debounce to absorb the duplicate/spurious events
  * that many editors and platforms emit for a single save. For production systems
  * on network drives, consider replacing with the chokidar package.
  *
+ * Additionally, a 5-second polling interval is used as a fallback to catch
+ * changes that fs.watch may miss (e.g. on network drives, certain editors, or
+ * platforms where inotify events are unreliable).
+ *
  * @param {function} onChange  called with the new config object after a successful reload
  */
 function watchConfig(onChange) {
   if (!_configPath) loadConfig();
 
+  // Guard: set up watchers only once to avoid duplicate polling timers
+  if (_watchActive) return;
+  _watchActive = true;
+
   let debounceTimer = null;
 
-  fs.watch(_configPath, (eventType) => {
-    if (eventType !== 'change') return;
-
+  function tryReload(source) {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       try {
-        const newConfig = loadConfig();
-        console.log('[Config] Reloaded config.yaml');
+        const raw = fs.readFileSync(_configPath, 'utf8');
+        const hash = crypto.createHash('md5').update(raw).digest('hex');
+        if (hash === _lastContentHash) return;   // content unchanged
+        const newConfig = loadConfig();           // updates _lastContentHash
+        console.log(`[Config] Reloaded config.yaml (detected by ${source})`);
         onChange(newConfig);
       } catch (err) {
         console.error('[Config] Failed to reload config.yaml:', err.message);
       }
     }, 500);
+  }
+
+  // Primary: inotify / kqueue / FSEvents-based watch
+  fs.watch(_configPath, (eventType) => {
+    if (eventType !== 'change') return;
+    tryReload('fs.watch');
   });
 
-  console.log(`[Config] Watching ${_configPath} for changes`);
+  // Fallback: poll every 5 seconds for environments where fs.watch is unreliable
+  setInterval(() => tryReload('poll'), 5000);
+
+  console.log(`[Config] Watching ${_configPath} for changes (fs.watch + 5s poll)`);
 }
 
 module.exports = { loadConfig, getConfig, watchConfig };

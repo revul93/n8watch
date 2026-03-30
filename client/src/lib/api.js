@@ -76,6 +76,10 @@ export function getExportUrl(targetId, from, to) {
   return url.toString();
 }
 
+export function getReportData(targetId) {
+  return request(`/targets/${targetId}/report`);
+}
+
 export function addUserTarget(name, ip) {
   return fetch(`${BASE}/targets/user-targets`, {
     method: 'POST',

@@ -81,11 +81,14 @@ async function main() {
   // 8. Init email service
   emailSvc.initEmail(resolveEmailConfig(config));
 
+  // Send system start notification
+  emailSvc.sendSystemStartEmail().catch(() => {});
+
   // 9. Init alert engine
   alertEngine.initAlertEngine(db, wss, emailSvc, config);
 
   // 10. Init scheduler (ping + cleanup jobs)
-  initScheduler(config, db, wss, alertEngine);
+  initScheduler(config, db, wss, alertEngine, emailSvc);
 
   // 11. Watch config.yaml for live reload
   watchConfig((newConfig) => {
@@ -95,7 +98,7 @@ async function main() {
 
     // Restart scheduler with potentially updated interval
     stopScheduler();
-    initScheduler(newConfig, db, wss, alertEngine);
+    initScheduler(newConfig, db, wss, alertEngine, emailSvc);
 
     // Reinitialize email service and alert engine with updated rules
     emailSvc.initEmail(resolveEmailConfig(newConfig));
@@ -139,6 +142,9 @@ function shutdown(server) {
 
   // Stop scheduler so no new work is started during shutdown
   stopScheduler();
+
+  // Send system shutdown notification (best-effort, fire-and-forget)
+  emailSvc.sendSystemShutdownEmail().catch(() => {});
 
   // Force exit if graceful shutdown stalls beyond the timeout
   const timer = setTimeout(() => {
