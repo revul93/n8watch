@@ -18,6 +18,7 @@
   - [Desktop App (Electron)](#desktop-app-electron)
 - [Configuration](#configuration)
   - [General Settings](#general-settings)
+  - [Interfaces](#interfaces)
   - [Targets](#targets)
   - [Server](#server)
   - [Alerts & Email Notifications](#alerts--email-notifications)
@@ -44,6 +45,7 @@
 - 🔄 **Live Config Reload** — Edit `config.yaml` while the application is running; changes to targets, intervals, and rules are applied automatically without a restart.
 - 🔌 **WebSocket Push** — Real-time metric updates are pushed to all connected browser clients the moment each ping cycle completes.
 - 📤 **CSV Export** — Download raw metrics data for any time range from the History page.
+- 🌐 **Multi-Interface Support** — Define named network interfaces in `config.yaml`; assign a specific outgoing interface to any target and select it from a drop-down when adding temporary targets in the dashboard.
 
 ---
 
@@ -294,6 +296,32 @@ general:
   data_retention_days: 90 # Days to keep historical ping results
 ```
 
+### Interfaces
+
+The optional `interfaces` section enumerates the network interfaces available on the monitoring host. Each entry has three fields:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name`  | yes | Machine name used by the OS / `ping -I` (e.g. `eth0`, `ens3`) |
+| `alias` | yes | Human-readable label shown in the dashboard (e.g. `Primary LAN`) |
+| `ipv4`  | yes | IPv4 address bound to this interface |
+
+```yaml
+interfaces:
+  - name: "eth0"
+    alias: "Primary LAN"
+    ipv4: "192.168.1.100"
+  - name: "eth1"
+    alias: "Management NIC"
+    ipv4: "10.0.0.1"
+```
+
+When this section is present, the dashboard displays a drop-down in the **Add Temporary Target** form that lists every interface as `name | alias | IP`. Picking an interface records it with the temporary target so the correct outgoing path is used during pings.
+
+The interface alias is also shown as a teal badge on each target card in the dashboard, and is included in PDF and CSV reports.
+
+> **Linux / macOS note:** The `name` value is passed to `ping -I` to bind the outgoing socket to that interface. This option is silently ignored on Windows.
+
 ### Targets
 
 ```yaml
@@ -301,10 +329,14 @@ targets:
   - name: "Google DNS"        # Display name shown in the dashboard
     ip: "8.8.8.8"             # IP address or resolvable hostname
     group: "DNS Servers"      # Optional group label for filtering
+    interface: "eth0"         # Optional: outgoing interface name (must match an entry in interfaces)
   - name: "Core Router"
     ip: "192.168.1.1"
     group: "Local Network"
+    # interface: "eth1"       # Omit to use the default system interface
 ```
+
+The `interface` field is optional. When set, it must match the `name` of an entry in the `interfaces` section. The corresponding `alias` is looked up automatically and stored alongside the target so the dashboard and reports can display it without the raw interface name.
 
 ### Server
 
@@ -518,6 +550,14 @@ All endpoints are prefixed with `/api` and return JSON.
 | `GET` | `/api/targets/:id` | Get details for a specific target |
 | `GET` | `/api/targets/:id/metrics` | Get aggregated metrics for a target |
 | `GET` | `/api/targets/:id/ping-results` | Get ping history for a target |
+| `POST` | `/api/targets/user-targets` | Add a temporary user-defined target |
+| `DELETE` | `/api/targets/user-targets/:id` | Remove a temporary user-defined target |
+
+### Interfaces
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/interfaces` | List the network interfaces defined in `config.yaml` |
 
 ### Ping Results
 

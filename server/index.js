@@ -19,6 +19,7 @@ const metricsRouter     = require('./routes/metrics');
 const alertsRouter      = require('./routes/alerts');
 const dashboardRouter   = require('./routes/dashboard');
 const exportRouter      = require('./routes/export');
+const interfacesRouter  = require('./routes/interfaces');
 
 // Maximum time (ms) to wait for in-flight requests during graceful shutdown
 const SHUTDOWN_TIMEOUT_MS = 5000;
@@ -33,6 +34,33 @@ function resolveEmailConfig(config) {
   return config.alerts.smtp || null;
 }
 
+/**
+ * Build a map of interface name -> interface entry from config.interfaces.
+ */
+function buildInterfaceMap(config) {
+  if (!Array.isArray(config.interfaces)) return {};
+  return Object.fromEntries(
+    config.interfaces
+      .filter(i => i && typeof i.name === 'string')
+      .map(i => [i.name, i])
+  );
+}
+
+/**
+ * Enrich each target with interface_alias derived from config.interfaces
+ * when the target specifies an interface name.
+ */
+function enrichTargets(targets, config) {
+  const ifaceMap = buildInterfaceMap(config);
+  return targets.map(t => {
+    if (t.interface && ifaceMap[t.interface]) {
+      return { ...t, interface_alias: ifaceMap[t.interface].alias || null };
+    }
+    // Keep any explicit interface_alias already on the target
+    return t;
+  });
+}
+
 async function main() {
   // 1. Load config
   const config = loadConfig();
@@ -43,7 +71,7 @@ async function main() {
   console.log('[App] Database initialized');
 
   // 3. Sync targets from config
-  db.syncTargets(config.targets);
+  db.syncTargets(enrichTargets(config.targets, config));
   console.log(`[App] Synced ${config.targets.length} target(s) from config`);
 
   // 4. Create Express app
@@ -73,6 +101,7 @@ async function main() {
   app.use('/api',              pingResultsRouter);
   app.use('/api/alerts',       alertsRouter);
   app.use('/api/dashboard',    dashboardRouter);
+  app.use('/api/interfaces',   interfacesRouter);
 
   // 7. Create HTTP server and init WebSocket
   const server = http.createServer(app);
@@ -93,7 +122,7 @@ async function main() {
   // 11. Watch config.yaml for live reload
   watchConfig((newConfig) => {
     // Re-sync targets (adds new, removes deleted)
-    db.syncTargets(newConfig.targets);
+    db.syncTargets(enrichTargets(newConfig.targets, newConfig));
     console.log(`[App] Live reload: synced ${newConfig.targets.length} target(s)`);
 
     // Restart scheduler with potentially updated interval

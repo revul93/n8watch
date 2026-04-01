@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useApi } from '../hooks/useApi';
-import { getTargets, getPingResults, addUserTarget, deleteUserTarget, getReportData } from '../lib/api';
+import { getTargets, getPingResults, addUserTarget, deleteUserTarget, getReportData, getInterfaces } from '../lib/api';
 import { generatePDFReport, generateCSVReport } from '../lib/reportGenerator';
 import SummaryCards from '../components/SummaryCards';
 import UnifiedChart, { buildColorMap } from '../components/UnifiedChart';
@@ -19,8 +19,12 @@ export default function Dashboard() {
   // User target form state
   const [newTargetName, setNewTargetName] = useState('');
   const [newTargetIp, setNewTargetIp] = useState('');
+  const [newTargetIface, setNewTargetIface] = useState('');
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
+
+  // Available interfaces from config
+  const { data: interfaces } = useApi(getInterfaces, []);
 
   // Confirmation dialog state
   const [deleteCandidate, setDeleteCandidate] = useState(null);
@@ -93,16 +97,24 @@ export default function Dashboard() {
     setAddError('');
     setAddLoading(true);
     try {
-      await addUserTarget(name, ip);
+      const ifaceList = interfaces || [];
+      const selectedIface = ifaceList.find(i => i.name === newTargetIface) || null;
+      await addUserTarget(
+        name,
+        ip,
+        selectedIface ? selectedIface.name  : undefined,
+        selectedIface ? selectedIface.alias : undefined,
+      );
       setNewTargetName('');
       setNewTargetIp('');
+      setNewTargetIface('');
       await refetch();
     } catch (err) {
       setAddError(err.message || 'Failed to add target.');
     } finally {
       setAddLoading(false);
     }
-  }, [newTargetName, newTargetIp, refetch]);
+  }, [newTargetName, newTargetIp, newTargetIface, interfaces, refetch]);
 
   // Show confirmation dialog before deleting a user target
   const handleDeleteRequest = useCallback((target) => {
@@ -201,6 +213,21 @@ export default function Dashboard() {
             maxLength={253}
             className="flex-1 min-w-[180px] px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-600"
           />
+          {interfaces && interfaces.length > 0 && (
+            <select
+              value={newTargetIface}
+              onChange={e => setNewTargetIface(e.target.value)}
+              className="flex-1 min-w-[200px] px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-600"
+              title="Outgoing network interface (optional)"
+            >
+              <option value="">Interface — default</option>
+              {interfaces.map(iface => (
+                <option key={iface.name} value={iface.name}>
+                  {iface.name}{iface.alias ? ` | ${iface.alias}` : ''}{iface.ipv4 ? ` | ${iface.ipv4}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             type="submit"
             disabled={addLoading}
