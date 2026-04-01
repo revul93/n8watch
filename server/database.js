@@ -32,6 +32,8 @@ function initDatabase() {
       name            TEXT    NOT NULL,
       ip              TEXT    NOT NULL UNIQUE,
       grp             TEXT,
+      interface       TEXT,
+      interface_alias TEXT,
       is_user_target  INTEGER NOT NULL DEFAULT 0,
       expires_at      INTEGER,
       created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
@@ -82,6 +84,12 @@ function initDatabase() {
   if (!targetCols.includes('expires_at')) {
     _db.exec('ALTER TABLE targets ADD COLUMN expires_at INTEGER');
   }
+  if (!targetCols.includes('interface')) {
+    _db.exec('ALTER TABLE targets ADD COLUMN interface TEXT');
+  }
+  if (!targetCols.includes('interface_alias')) {
+    _db.exec('ALTER TABLE targets ADD COLUMN interface_alias TEXT');
+  }
 
   return _db;
 }
@@ -91,20 +99,29 @@ function syncTargets(targets) {
   const now = Date.now();
 
   const upsert = db.prepare(`
-    INSERT INTO targets (name, ip, grp, is_user_target, created_at, updated_at)
-    VALUES (@name, @ip, @grp, 0, @now, @now)
+    INSERT INTO targets (name, ip, grp, interface, interface_alias, is_user_target, created_at, updated_at)
+    VALUES (@name, @ip, @grp, @interface, @interface_alias, 0, @now, @now)
     ON CONFLICT(ip) DO UPDATE SET
-      name           = excluded.name,
-      grp            = excluded.grp,
-      is_user_target = 0,
-      expires_at     = NULL,
-      updated_at     = excluded.updated_at
+      name            = excluded.name,
+      grp             = excluded.grp,
+      interface       = excluded.interface,
+      interface_alias = excluded.interface_alias,
+      is_user_target  = 0,
+      expires_at      = NULL,
+      updated_at      = excluded.updated_at
     WHERE is_user_target = 0
   `);
 
   const syncAll = db.transaction((targets) => {
     for (const t of targets) {
-      upsert.run({ name: t.name, ip: t.ip, grp: t.group || null, now });
+      upsert.run({
+        name:            t.name,
+        ip:              t.ip,
+        grp:             t.group || null,
+        interface:       t.interface || null,
+        interface_alias: t.interface_alias || null,
+        now,
+      });
     }
 
     // Remove config targets that are no longer in the config (preserve user targets).
@@ -162,6 +179,7 @@ function getAllTargetsWithLatest() {
   return db.prepare(`
     SELECT
       t.id, t.name, t.ip, t.grp AS "group",
+      t.interface, t.interface_alias,
       t.is_user_target, t.expires_at,
       t.created_at, t.updated_at,
       pr.id           AS latest_ping_id,
@@ -192,7 +210,9 @@ function getTargetById(id) {
   const db = getDb();
   return db.prepare(`
     SELECT
-      t.id, t.name, t.ip, t.grp AS "group", t.created_at, t.updated_at,
+      t.id, t.name, t.ip, t.grp AS "group",
+      t.interface, t.interface_alias,
+      t.created_at, t.updated_at,
       pr.id           AS latest_ping_id,
       pr.is_alive,
       pr.min_latency,
@@ -436,14 +456,14 @@ function resolveAlert(alertId, resolvedAt) {
   `).run(resolvedAt || Date.now(), alertId);
 }
 
-function addUserTarget(name, ip) {
+function addUserTarget(name, ip, iface, ifaceAlias) {
   const db = getDb();
   const now = Date.now();
   const expiresAt = now + 5 * 86400000; // 5 days
   const result = db.prepare(`
-    INSERT INTO targets (name, ip, grp, is_user_target, expires_at, created_at, updated_at)
-    VALUES (@name, @ip, NULL, 1, @expires_at, @now, @now)
-  `).run({ name, ip, expires_at: expiresAt, now });
+    INSERT INTO targets (name, ip, grp, interface, interface_alias, is_user_target, expires_at, created_at, updated_at)
+    VALUES (@name, @ip, NULL, @interface, @interface_alias, 1, @expires_at, @now, @now)
+  `).run({ name, ip, interface: iface || null, interface_alias: ifaceAlias || null, expires_at: expiresAt, now });
   return result.lastInsertRowid;
 }
 
@@ -459,7 +479,8 @@ function getUserTargets() {
   const db = getDb();
   return db.prepare(`
     SELECT
-      t.id, t.name, t.ip, t.is_user_target, t.expires_at,
+      t.id, t.name, t.ip, t.interface, t.interface_alias,
+      t.is_user_target, t.expires_at,
       t.created_at, t.updated_at,
       pr.is_alive,
       pr.min_latency,

@@ -8,12 +8,18 @@ targets:
   - name: "Google DNS"
     ip: "8.8.8.8"
     group: "DNS Servers"
+    # interface: "eth0"          # optional: outgoing network interface name or source IP
+    # interface_alias: "Primary LAN"  # optional: human-readable label for the interface
   - name: "Cloudflare DNS"
     ip: "1.1.1.1"
     group: "DNS Servers"
+    # interface: "eth0"
+    # interface_alias: "Primary LAN"
   - name: "Core Router"
     ip: "192.168.1.1"
     group: "Local Network"
+    # interface: "eth1"          # use a specific interface when multiple NICs are present
+    # interface_alias: "Management NIC"
 
 alerts:
   email_notifications: true

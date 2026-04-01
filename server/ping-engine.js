@@ -5,7 +5,7 @@ const ping = require('ping');
 /**
  * pingTarget - pings a single target and returns a metrics object.
  *
- * @param {{ name: string, ip: string }} target
+ * @param {{ name: string, ip: string, interface?: string }} target
  * @param {{ ping_count?: number, ping_timeout?: number }} config
  * @returns {Promise<object>}
  */
@@ -13,11 +13,20 @@ async function pingTarget(target, config) {
   const count   = config.ping_count   || 5;
   const timeout = config.ping_timeout || 5;
 
+  // Build extra ping arguments
+  const extra = ['-c', String(count)];
+  // On Linux/macOS, -I binds the outgoing socket to a specific network interface
+  // or source address. This option is not supported on Windows.
+  if (target.interface && typeof target.interface === 'string' && target.interface.trim() &&
+      process.platform !== 'win32') {
+    extra.push('-I', target.interface.trim());
+  }
+
   let response;
   try {
     response = await ping.promise.probe(target.ip, {
       timeout,
-      extra: ['-c', String(count)],
+      extra,
       // On Linux, min/avg/max/stddev are parsed from the summary line
     });
   } catch (err) {

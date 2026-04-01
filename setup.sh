@@ -5,15 +5,90 @@ echo "=================================="
 echo "  n8netwatch — Setup"
 echo "=================================="
 
-if ! command -v node &> /dev/null; then
-    echo "ERROR: Node.js is not installed."
+# ── Node.js + npm installation helper ────────────────────────────────────────
+# Tries to install Node.js v24 LTS using nvm (cross-platform) with a fallback
+# to native package managers (apt/dnf/yum) on Linux.
+install_nodejs_and_npm() {
+  echo ""
+  echo "Node.js (v18+ required, v24 LTS recommended) and npm are needed to run n8netwatch."
+  echo "Would you like to install Node.js v24 LTS and npm automatically?"
+  printf "  [Y/n]: "
+  if [ -e /dev/tty ]; then
+    read -r INSTALL_NODE < /dev/tty
+  else
+    INSTALL_NODE="y"
+    echo ""
+    echo "  (Non-interactive mode — proceeding with Node.js v24 installation)"
+  fi
+
+  if [[ "$INSTALL_NODE" =~ ^[Nn]$ ]]; then
+    echo ""
+    echo "ERROR: Node.js is required. Install it from https://nodejs.org/ and re-run setup.sh"
     exit 1
+  fi
+
+  # ── Try nvm first (works on Linux and macOS) ────────────────────────────────
+  if command -v curl &> /dev/null; then
+    echo ""
+    echo "Installing nvm (Node Version Manager)..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    # shellcheck source=/dev/null
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    echo "Installing Node.js v24 LTS via nvm..."
+    nvm install 24 && nvm use 24 && nvm alias default 24
+  # ── Debian / Ubuntu fallback ────────────────────────────────────────────────
+  elif command -v apt-get &> /dev/null && command -v sudo &> /dev/null; then
+    echo ""
+    echo "Installing Node.js v24 via NodeSource (Debian/Ubuntu)..."
+    sudo apt-get update -qq
+    sudo apt-get install -y curl
+    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+  # ── Fedora / RHEL (dnf) fallback ────────────────────────────────────────────
+  elif command -v dnf &> /dev/null && command -v sudo &> /dev/null; then
+    echo ""
+    echo "Installing Node.js v24 via NodeSource (Fedora/RHEL)..."
+    curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
+    sudo dnf install -y nodejs
+  # ── CentOS / older RHEL (yum) fallback ─────────────────────────────────────
+  elif command -v yum &> /dev/null && command -v sudo &> /dev/null; then
+    echo ""
+    echo "Installing Node.js v24 via NodeSource (CentOS)..."
+    curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
+    sudo yum install -y nodejs
+  else
+    echo ""
+    echo "ERROR: Cannot auto-install Node.js. Please install it manually from https://nodejs.org/"
+    exit 1
+  fi
+
+  if ! command -v node &> /dev/null; then
+    echo ""
+    echo "ERROR: Node.js installation failed. Please install it manually from https://nodejs.org/"
+    exit 1
+  fi
+  echo "✓ Node.js $(node -v) installed"
+}
+
+# ── Check Node.js ─────────────────────────────────────────────────────────────
+if ! command -v node &> /dev/null; then
+  install_nodejs_and_npm
 fi
 
 NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
 if [ "$NODE_VERSION" -lt 18 ]; then
     echo "ERROR: Node.js 18+ is required. Current version: $(node -v)"
+    echo "Please update Node.js and re-run setup.sh"
     exit 1
+fi
+
+# ── Check npm ─────────────────────────────────────────────────────────────────
+if ! command -v npm &> /dev/null; then
+  echo ""
+  echo "ERROR: npm is not found. It is normally bundled with Node.js."
+  echo "Try reinstalling Node.js from https://nodejs.org/ and re-run setup.sh"
+  exit 1
 fi
 
 if ! command -v ping &> /dev/null; then
@@ -22,11 +97,14 @@ if ! command -v ping &> /dev/null; then
 fi
 
 echo "✓ Node.js $(node -v) detected"
+echo "✓ npm $(npm --version) detected"
 echo "✓ ping binary found at $(which ping)"
 
 echo ""
 echo "Installing backend dependencies..."
-npm install
+# Use --omit=dev to skip Electron build tools (electron, electron-builder) which
+# are not needed for the server and pull in deprecated transitive dependencies.
+npm install --omit=dev
 
 echo ""
 echo "Installing frontend dependencies..."

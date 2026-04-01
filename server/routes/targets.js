@@ -34,7 +34,7 @@ router.get('/:id', (req, res) => {
 // POST /api/user-targets — add a temporary user-defined target
 router.post('/user-targets', (req, res) => {
   try {
-    const { name, ip } = req.body || {};
+    const { name, ip, interface: iface, interface_alias: ifaceAlias } = req.body || {};
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'name is required' });
     }
@@ -42,10 +42,12 @@ router.post('/user-targets', (req, res) => {
       return res.status(400).json({ error: 'ip is required' });
     }
 
-    const trimmedName = name.trim().slice(0, 100);
-    const trimmedIp   = ip.trim().slice(0, 253);
+    const trimmedName       = name.trim().slice(0, 100);
+    const trimmedIp         = ip.trim().slice(0, 253);
+    const trimmedIface      = (iface && typeof iface === 'string' && iface.trim()) ? iface.trim().slice(0, 64) : null;
+    const trimmedIfaceAlias = (ifaceAlias && typeof ifaceAlias === 'string' && ifaceAlias.trim()) ? ifaceAlias.trim().slice(0, 100) : null;
 
-    const id = db.addUserTarget(trimmedName, trimmedIp);
+    const id = db.addUserTarget(trimmedName, trimmedIp, trimmedIface, trimmedIfaceAlias);
     const targets = db.getAllTargetsWithLatest();
     const target  = targets.find(t => t.id === id) || { id, name: trimmedName, ip: trimmedIp, is_user_target: 1 };
     res.status(201).json({ target });
