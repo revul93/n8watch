@@ -48,7 +48,9 @@ function buildInterfaceMap(config) {
 
 /**
  * Enrich each target with interface_alias derived from config.interfaces
- * when the target specifies an interface name.
+ * when the target specifies an interface name that matches a known entry.
+ * If the interface name is not found in the map, the target is returned
+ * unchanged (any existing interface_alias is preserved).
  */
 function enrichTargets(targets, config) {
   const ifaceMap = buildInterfaceMap(config);
@@ -56,7 +58,7 @@ function enrichTargets(targets, config) {
     if (t.interface && ifaceMap[t.interface]) {
       return { ...t, interface_alias: ifaceMap[t.interface].alias || null };
     }
-    // Keep any explicit interface_alias already on the target
+    // interface not in map (or no interface set): return target as-is
     return t;
   });
 }

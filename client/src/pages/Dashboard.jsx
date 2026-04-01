@@ -223,7 +223,7 @@ export default function Dashboard() {
               <option value="">Interface — default</option>
               {interfaces.map(iface => (
                 <option key={iface.name} value={iface.name}>
-                  {iface.name}{iface.alias ? ` | ${iface.alias}` : ''}{iface.ipv4 ? ` | ${iface.ipv4}` : ''}
+                  {[iface.name, iface.alias, iface.ipv4].filter(Boolean).join(' | ')}
                 </option>
               ))}
             </select>

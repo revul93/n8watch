@@ -303,8 +303,8 @@ The optional `interfaces` section enumerates the network interfaces available on
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name`  | yes | Machine name used by the OS / `ping -I` (e.g. `eth0`, `ens3`) |
-| `alias` | yes | Human-readable label shown in the dashboard (e.g. `Primary LAN`) |
-| `ipv4`  | yes | IPv4 address bound to this interface |
+| `alias` | no  | Human-readable label shown in the dashboard (e.g. `Primary LAN`) |
+| `ipv4`  | no  | IPv4 address bound to this interface |
 
 ```yaml
 interfaces:
