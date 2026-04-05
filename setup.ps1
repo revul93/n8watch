@@ -1,11 +1,11 @@
-# n8netwatch — Windows Setup Script
+# n8watch — Windows Setup Script
 # Run with: powershell -ExecutionPolicy Bypass -File setup.ps1
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "  n8netwatch — Setup (Windows)" -ForegroundColor Cyan
+Write-Host "  n8watch — Setup (Windows)" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -81,7 +81,7 @@ Write-Host ""
 Write-Host "-------------------------------------------------" -ForegroundColor Cyan
 Write-Host "  PM2 — Process Manager (recommended)" -ForegroundColor Cyan
 Write-Host "-------------------------------------------------" -ForegroundColor Cyan
-Write-Host "Would you like to start n8netwatch with PM2 and enable auto-startup on reboot?"
+Write-Host "Would you like to start n8watch with PM2 and enable auto-startup on reboot?"
 Write-Host "  (PM2 keeps the app running and restarts it automatically)"
 $dopm2 = Read-Host "  [Y/n]"
 
@@ -103,10 +103,10 @@ if ($dopm2 -notmatch "^[Nn]$") {
     }
 
     Write-Host ""
-    Write-Host "Starting n8netwatch with PM2..."
+    Write-Host "Starting n8watch with PM2..."
     pm2 start ecosystem.config.js
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "[OK] n8netwatch started" -ForegroundColor Green
+        Write-Host "[OK] n8watch started" -ForegroundColor Green
         pm2 save
         $pm2WasStarted = $true
     } else {
@@ -126,7 +126,7 @@ Write-Host "  1. Edit config.yaml with your target IP addresses and SMTP setting
 Write-Host ""
 
 if ($pm2WasStarted) {
-    Write-Host "  n8netwatch is running via PM2 — open http://localhost:3000"
+    Write-Host "  n8watch is running via PM2 — open http://localhost:3000"
     Write-Host ""
     Write-Host "  Useful PM2 commands:"
     Write-Host "    Logs:     npm run pm2:logs"

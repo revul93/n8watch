@@ -1,5 +1,5 @@
 {
-  "name": "n8netwatch",
+  "name": "n8watch",
   "version": "1.0.0",
   "description": "Real-time IP monitoring system",
   "main": "server/index.js",
@@ -7,10 +7,10 @@
     "start": "node server/index.js",
     "dev": "node server/index.js",
     "pm2:start": "pm2 start ecosystem.config.js",
-    "pm2:stop": "pm2 stop n8netwatch",
-    "pm2:restart": "pm2 restart n8netwatch",
-    "pm2:reload": "pm2 reload n8netwatch",
-    "pm2:logs": "pm2 logs n8netwatch",
+    "pm2:stop": "pm2 stop n8watch",
+    "pm2:restart": "pm2 restart n8watch",
+    "pm2:reload": "pm2 reload n8watch",
+    "pm2:logs": "pm2 logs n8watch",
     "pm2:status": "pm2 status",
     "pm2:save": "pm2 save",
     "pm2:startup": "pm2 startup",
@@ -38,9 +38,9 @@
     "electron-builder": "^26.8.1"
   },
   "build": {
-    "appId": "com.n8netwatch.app",
-    "productName": "n8netwatch",
-    "copyright": "Copyright © 2024 n8netwatch contributors",
+    "appId": "com.n8watch.app",
+    "productName": "n8watch",
+    "copyright": "Copyright © 2024 n8watch contributors",
     "files": [
       "server/**/*",
       "electron/**/*",
@@ -57,21 +57,47 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "electron/icons/icon.ico"
     },
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "electron/icons/icon.icns"
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "electron/icons/icon.png"
     },
@@ -80,7 +106,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "n8netwatch"
+      "shortcutName": "n8watch"
     },
     "directories": {
       "output": "dist-electron"

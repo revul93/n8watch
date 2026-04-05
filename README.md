@@ -1,4 +1,4 @@
-# n8netwatch
+# n8watch
 
 **Night Network Watch** — A real-time IP and network host monitoring system with a web dashboard, historical metrics, and configurable email alerting.
 
@@ -51,11 +51,11 @@
 
 ## Prerequisites
 
-| Requirement | Minimum Version | Notes |
-|-------------|----------------|-------|
-| Node.js     | 18+            | [nodejs.org](https://nodejs.org) |
-| `ping`      | System binary  | Pre-installed on Linux, macOS, Windows |
-| npm         | Bundled with Node.js | |
+| Requirement | Minimum Version      | Notes                                  |
+| ----------- | -------------------- | -------------------------------------- |
+| Node.js     | 18+                  | [nodejs.org](https://nodejs.org)       |
+| `ping`      | System binary        | Pre-installed on Linux, macOS, Windows |
+| npm         | Bundled with Node.js |                                        |
 
 > **Linux note:** If `ping` is not available, install it with `sudo apt install iputils-ping` (Debian/Ubuntu) or the equivalent for your distribution.
 
@@ -72,20 +72,23 @@
 Clone the repository and run the interactive setup — all in a single command:
 
 **Using curl:**
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/revul93/n8netwatch/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/revul93/n8watch/main/install.sh | bash
 ```
 
 **Using wget:**
+
 ```bash
-wget -qO- https://raw.githubusercontent.com/revul93/n8netwatch/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/revul93/n8watch/main/install.sh | bash
 ```
 
-This will clone the repository into an `n8netwatch` directory in your current working directory, then launch the interactive setup automatically.
+This will clone the repository into an `n8watch` directory in your current working directory, then launch the interactive setup automatically.
 
 > **Security note:** As with any install-from-pipe command, you can review the script before running it:
+>
 > ```bash
-> curl -fsSL https://raw.githubusercontent.com/revul93/n8netwatch/main/install.sh
+> curl -fsSL https://raw.githubusercontent.com/revul93/n8watch/main/install.sh
 > ```
 
 ---
@@ -95,8 +98,8 @@ This will clone the repository into an `n8netwatch` directory in your current wo
 #### 1. Clone the repository
 
 ```bash
-git clone https://github.com/revul93/n8netwatch.git
-cd n8netwatch
+git clone https://github.com/revul93/n8watch.git
+cd n8watch
 ```
 
 #### 2. Run the interactive setup script (recommended)
@@ -106,6 +109,7 @@ bash setup.sh
 ```
 
 The script will:
+
 1. Verify Node.js and `ping` are available.
 2. Install backend dependencies (`npm install`).
 3. Install and build the frontend (`cd client && npm install && npm run build`).
@@ -131,24 +135,28 @@ cp config.example.yaml config.yaml
 
 ### Prerequisites (Windows)
 
-| Requirement | Notes |
-|-------------|-------|
-| Node.js 18+ | [nodejs.org](https://nodejs.org) — choose the Windows Installer (.msi) |
-| Git          | [git-scm.com](https://git-scm.com/download/win) |
-| Build Tools  | Run `npm install -g windows-build-tools` **as Administrator** (needed to compile native modules) |
+| Requirement | Notes                                                                                            |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| Node.js 18+ | [nodejs.org](https://nodejs.org) — choose the Windows Installer (.msi)                           |
+| Git         | [git-scm.com](https://git-scm.com/download/win)                                                  |
+| Build Tools | Run `npm install -g windows-build-tools` **as Administrator** (needed to compile native modules) |
 
 > **Build Tools note:** `better-sqlite3` contains a native Node.js add-on and must be compiled on first install.
 > The recommended way to obtain the required compiler toolchain on Windows is:
+>
 > ```powershell
 > # Run as Administrator in PowerShell
 > npm install -g windows-build-tools
 > ```
+>
 > Alternatively, install **Visual Studio Build Tools** (C++ workload) from [visualstudio.microsoft.com](https://visualstudio.microsoft.com/downloads/).
 
 > **`prebuild-install` deprecation notice:** During `npm install` you may see a warning:
+>
 > ```
 > npm warn deprecated prebuild-install@7.1.3: No longer maintained.
 > ```
+>
 > This is a known upstream issue in the `better-sqlite3` dependency. The package continues to work
 > correctly. The warning will be resolved when `better-sqlite3` migrates its install mechanism. When
 > building the Electron desktop app, `electron-rebuild` compiles `better-sqlite3` from source and
@@ -161,14 +169,15 @@ cp config.example.yaml config.yaml
 Open **PowerShell** (Windows Terminal or the built-in PowerShell app) and run:
 
 ```powershell
-Invoke-Expression (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/revul93/n8netwatch/main/install.ps1" -UseBasicParsing).Content
+Invoke-Expression (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/revul93/n8watch/main/install.ps1" -UseBasicParsing).Content
 ```
 
 This will clone the repository and launch the interactive `setup.ps1` automatically.
 
 > **Security note:** You can review the script before running it:
+>
 > ```powershell
-> Invoke-WebRequest -Uri "https://raw.githubusercontent.com/revul93/n8netwatch/main/install.ps1" -UseBasicParsing | Select-Object -ExpandProperty Content
+> Invoke-WebRequest -Uri "https://raw.githubusercontent.com/revul93/n8watch/main/install.ps1" -UseBasicParsing | Select-Object -ExpandProperty Content
 > ```
 
 ---
@@ -178,8 +187,8 @@ This will clone the repository and launch the interactive `setup.ps1` automatica
 #### 1. Clone the repository
 
 ```powershell
-git clone https://github.com/revul93/n8netwatch.git
-cd n8netwatch
+git clone https://github.com/revul93/n8watch.git
+cd n8watch
 ```
 
 #### 2. Run the interactive setup script
@@ -189,6 +198,7 @@ powershell -ExecutionPolicy Bypass -File setup.ps1
 ```
 
 The script will:
+
 1. Verify Node.js is installed (v18+).
 2. Install backend dependencies (`npm install`).
 3. Install and build the frontend.
@@ -227,7 +237,7 @@ Open `http://localhost:3000` in your browser.
 
 ## Desktop App (Electron)
 
-n8netwatch can be run as a standalone Windows (or macOS/Linux) desktop application using [Electron](https://electronjs.org). The Electron wrapper embeds the Express server and opens the web dashboard in a native application window — no browser or separate server setup required.
+n8watch can be run as a standalone Windows (or macOS/Linux) desktop application using [Electron](https://electronjs.org). The Electron wrapper embeds the Express server and opens the web dashboard in a native application window — no browser or separate server setup required.
 
 ### Run the desktop app in development
 
@@ -263,18 +273,18 @@ npm run electron:build:mac
 npm run electron:build:linux
 ```
 
-The Windows installer (`dist-electron/n8netwatch Setup *.exe`) is a standard NSIS installer with a Start Menu shortcut and an optional desktop shortcut.
+The Windows installer (`dist-electron/n8watch Setup *.exe`) is a standard NSIS installer with a Start Menu shortcut and an optional desktop shortcut.
 
 ### Data directory (Electron)
 
-When running as an Electron desktop app, n8netwatch stores its database and configuration in the OS user-data directory instead of the application bundle:
+When running as an Electron desktop app, n8watch stores its database and configuration in the OS user-data directory instead of the application bundle:
 
-| Platform | Path |
-|----------|------|
-| Windows  | `%APPDATA%
-8netwatch` |
-| macOS    | `~/Library/Application Support/n8netwatch` |
-| Linux    | `~/.config/n8netwatch` |
+| Platform   | Path                                    |
+| ---------- | --------------------------------------- |
+| Windows    | `%APPDATA%                              |
+| 8netwatch` |
+| macOS      | `~/Library/Application Support/n8watch` |
+| Linux      | `~/.config/n8watch`                     |
 
 Edit `config.yaml` in that directory to change targets, SMTP settings, or alert rules while the app is running.
 
@@ -290,9 +300,9 @@ See [`config.example.yaml`](config.example.yaml) for a fully annotated example.
 
 ```yaml
 general:
-  ping_interval: 30       # Seconds between ping cycles (integer, 1–59)
-  ping_count: 5           # Packets sent per ping
-  ping_timeout: 5         # Timeout in seconds per ping attempt
+  ping_interval: 30 # Seconds between ping cycles (integer, 1–59)
+  ping_count: 5 # Packets sent per ping
+  ping_timeout: 5 # Timeout in seconds per ping attempt
   data_retention_days: 90 # Days to keep historical ping results
 ```
 
@@ -300,11 +310,11 @@ general:
 
 The optional `interfaces` section enumerates the network interfaces available on the monitoring host. Each entry has three fields:
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name`  | yes | Machine name used by the OS / `ping -I` (e.g. `eth0`, `ens3`) |
-| `alias` | no  | Human-readable label shown in the dashboard (e.g. `Primary LAN`) |
-| `ipv4`  | no  | IPv4 address bound to this interface |
+| Field   | Required | Description                                                      |
+| ------- | -------- | ---------------------------------------------------------------- |
+| `name`  | yes      | Machine name used by the OS / `ping -I` (e.g. `eth0`, `ens3`)    |
+| `alias` | no       | Human-readable label shown in the dashboard (e.g. `Primary LAN`) |
+| `ipv4`  | no       | IPv4 address bound to this interface                             |
 
 ```yaml
 interfaces:
@@ -326,10 +336,10 @@ The interface alias is also shown as a teal badge on each target card in the das
 
 ```yaml
 targets:
-  - name: "Google DNS"        # Display name shown in the dashboard
-    ip: "8.8.8.8"             # IP address or resolvable hostname
-    group: "DNS Servers"      # Optional group label for filtering
-    interface: "eth0"         # Optional: outgoing interface name (must match an entry in interfaces)
+  - name: "Google DNS" # Display name shown in the dashboard
+    ip: "8.8.8.8" # IP address or resolvable hostname
+    group: "DNS Servers" # Optional group label for filtering
+    interface: "eth0" # Optional: outgoing interface name (must match an entry in interfaces)
   - name: "Core Router"
     ip: "192.168.1.1"
     group: "Local Network"
@@ -342,39 +352,40 @@ The `interface` field is optional. When set, it must match the `name` of an entr
 
 ```yaml
 server:
-  port: 3000          # HTTP port the application listens on
-  host: "0.0.0.0"    # Bind address (0.0.0.0 = all interfaces)
+  port: 3000 # HTTP port the application listens on
+  host: "0.0.0.0" # Bind address (0.0.0.0 = all interfaces)
 ```
 
 ### Alerts & Email Notifications
 
 ```yaml
 alerts:
-  email_notifications: true   # Set to false to disable all email alerts
+  email_notifications: true # Set to false to disable all email alerts
 
   smtp:
     host: "smtp.gmail.com"
     port: 587
-    secure: false             # true for port 465, false for STARTTLS (587)
+    secure: false # true for port 465, false for STARTTLS (587)
     user: "you@gmail.com"
-    pass: "app-password"      # Use an app-specific password, not your account password
-                              # Avoid committing config.yaml with real credentials
-    from: "n8netwatch <monitor@yourdomain.com>"
+    pass:
+      "app-password" # Use an app-specific password, not your account password
+      # Avoid committing config.yaml with real credentials
+    from: "n8watch <monitor@yourdomain.com>"
     to:
       - "admin@yourdomain.com"
 
   rules:
     - name: "Host Down"
       condition: "packet_loss == 100"
-      severity: "critical"     # critical | warning
-      cooldown: 300            # Minimum seconds between repeated alerts for the same target
+      severity: "critical" # critical | warning
+      cooldown: 300 # Minimum seconds between repeated alerts for the same target
       # targets: []            # Omit or leave empty to apply the rule to all targets
 
     - name: "High Latency"
       condition: "avg_latency > 200"
       severity: "warning"
       cooldown: 600
-      targets:                 # Restrict rule to specific targets (name, IP, or numeric ID)
+      targets: # Restrict rule to specific targets (name, IP, or numeric ID)
         - "Core Router"
 ```
 
@@ -382,16 +393,16 @@ alerts:
 
 Conditions are evaluated as JavaScript expressions. The following variables are available:
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `is_alive` | `0` or `1` | Whether the host responded |
-| `packet_loss` | `0`–`100` | Percentage of lost packets |
-| `avg_latency` | number (ms) | Average round-trip time |
-| `min_latency` | number (ms) | Minimum round-trip time |
-| `max_latency` | number (ms) | Maximum round-trip time |
-| `jitter` | number (ms) | `(max_latency - min_latency) / 2` |
-| `packets_sent` | integer | Total packets sent |
-| `packets_received` | integer | Total packets received |
+| Variable           | Type        | Description                       |
+| ------------------ | ----------- | --------------------------------- |
+| `is_alive`         | `0` or `1`  | Whether the host responded        |
+| `packet_loss`      | `0`–`100`   | Percentage of lost packets        |
+| `avg_latency`      | number (ms) | Average round-trip time           |
+| `min_latency`      | number (ms) | Minimum round-trip time           |
+| `max_latency`      | number (ms) | Maximum round-trip time           |
+| `jitter`           | number (ms) | `(max_latency - min_latency) / 2` |
+| `packets_sent`     | integer     | Total packets sent                |
+| `packets_received` | integer     | Total packets received            |
 
 **Examples:**
 
@@ -486,13 +497,13 @@ npm run db:flush:all
 node scripts/flush-data.js --all --yes
 ```
 
-| Flag | What is deleted |
-|------|----------------|
-| *(none)* or `--ping-results` | All rows in `ping_results` |
-| `--alerts` | All alert records |
-| `--ping-results --alerts` | Ping results **and** alert records |
-| `--all` | Ping results, alerts, and all targets |
-| `--yes` | Suppresses the confirmation prompt |
+| Flag                         | What is deleted                       |
+| ---------------------------- | ------------------------------------- |
+| _(none)_ or `--ping-results` | All rows in `ping_results`            |
+| `--alerts`                   | All alert records                     |
+| `--ping-results --alerts`    | Ping results **and** alert records    |
+| `--all`                      | Ping results, alerts, and all targets |
+| `--yes`                      | Suppresses the confirmation prompt    |
 
 After flushing, restart the application normally — targets defined in `config.yaml` will be re-created on the next ping cycle.
 
@@ -530,11 +541,11 @@ npm run pm2:save
 
 Once the application is running, open `http://<host>:3000` in your browser.
 
-| Page | URL | Description |
-|------|-----|-------------|
-| Dashboard | `/` | Live grid of all monitored hosts with status, latency, jitter, and uptime |
-| History | `/history` | Paginated table of historical ping results with filters and CSV export |
-| Alerts | `/alerts` | Active and historical alerts with acknowledgement support; view configured rules |
+| Page      | URL        | Description                                                                      |
+| --------- | ---------- | -------------------------------------------------------------------------------- |
+| Dashboard | `/`        | Live grid of all monitored hosts with status, latency, jitter, and uptime        |
+| History   | `/history` | Paginated table of historical ping results with filters and CSV export           |
+| Alerts    | `/alerts`  | Active and historical alerts with acknowledgement support; view configured rules |
 
 ---
 
@@ -544,40 +555,40 @@ All endpoints are prefixed with `/api` and return JSON.
 
 ### Targets
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/targets` | List all targets with their latest metrics |
-| `GET` | `/api/targets/:id` | Get details for a specific target |
-| `GET` | `/api/targets/:id/metrics` | Get aggregated metrics for a target |
-| `GET` | `/api/targets/:id/ping-results` | Get ping history for a target |
-| `POST` | `/api/targets/user-targets` | Add a temporary user-defined target |
-| `DELETE` | `/api/targets/user-targets/:id` | Remove a temporary user-defined target |
+| Method   | Endpoint                        | Description                                |
+| -------- | ------------------------------- | ------------------------------------------ |
+| `GET`    | `/api/targets`                  | List all targets with their latest metrics |
+| `GET`    | `/api/targets/:id`              | Get details for a specific target          |
+| `GET`    | `/api/targets/:id/metrics`      | Get aggregated metrics for a target        |
+| `GET`    | `/api/targets/:id/ping-results` | Get ping history for a target              |
+| `POST`   | `/api/targets/user-targets`     | Add a temporary user-defined target        |
+| `DELETE` | `/api/targets/user-targets/:id` | Remove a temporary user-defined target     |
 
 ### Interfaces
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/interfaces` | List the network interfaces defined in `config.yaml` |
+| Method | Endpoint          | Description                                          |
+| ------ | ----------------- | ---------------------------------------------------- |
+| `GET`  | `/api/interfaces` | List the network interfaces defined in `config.yaml` |
 
 ### Ping Results
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/ping-results` | Get historical results (supports filtering) |
+| Method | Endpoint            | Description                                 |
+| ------ | ------------------- | ------------------------------------------- |
+| `GET`  | `/api/ping-results` | Get historical results (supports filtering) |
 
 ### Alerts
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/alerts` | List alert events |
+| Method | Endpoint                      | Description                  |
+| ------ | ----------------------------- | ---------------------------- |
+| `GET`  | `/api/alerts`                 | List alert events            |
 | `POST` | `/api/alerts/:id/acknowledge` | Acknowledge a specific alert |
 
 ### Dashboard & Export
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/dashboard` | Summary statistics (overall uptime, average latency, active alerts) |
-| `GET` | `/api/export` | Export metrics to CSV |
+| Method | Endpoint         | Description                                                         |
+| ------ | ---------------- | ------------------------------------------------------------------- |
+| `GET`  | `/api/dashboard` | Summary statistics (overall uptime, average latency, active alerts) |
+| `GET`  | `/api/export`    | Export metrics to CSV                                               |
 
 ### WebSocket
 
@@ -593,35 +604,35 @@ Connect to `ws://<host>:3000` to receive real-time push events (use `wss://` if 
 
 ### Backend
 
-| Package | Purpose |
-|---------|---------|
-| [Express](https://expressjs.com) | HTTP server and REST API |
-| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | High-performance SQLite database |
-| [ws](https://github.com/websockets/ws) | WebSocket server |
-| [node-cron](https://github.com/node-cron/node-cron) | Ping cycle scheduling |
-| [ping](https://github.com/danielzzz/node-ping) | ICMP ping wrapper |
-| [nodemailer](https://nodemailer.com) | SMTP email delivery |
-| [js-yaml](https://github.com/nodeca/js-yaml) | YAML configuration parsing |
-| [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | API rate limiting |
+| Package                                                                        | Purpose                          |
+| ------------------------------------------------------------------------------ | -------------------------------- |
+| [Express](https://expressjs.com)                                               | HTTP server and REST API         |
+| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)                   | High-performance SQLite database |
+| [ws](https://github.com/websockets/ws)                                         | WebSocket server                 |
+| [node-cron](https://github.com/node-cron/node-cron)                            | Ping cycle scheduling            |
+| [ping](https://github.com/danielzzz/node-ping)                                 | ICMP ping wrapper                |
+| [nodemailer](https://nodemailer.com)                                           | SMTP email delivery              |
+| [js-yaml](https://github.com/nodeca/js-yaml)                                   | YAML configuration parsing       |
+| [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | API rate limiting                |
 
 ### Frontend
 
-| Package | Purpose |
-|---------|---------|
-| [React 18](https://react.dev) | UI framework |
-| [Vite](https://vitejs.dev) | Build tool and dev server |
-| [React Router](https://reactrouter.com) | Client-side routing |
-| [Recharts](https://recharts.org) | Charts and sparklines |
-| [Tailwind CSS](https://tailwindcss.com) | Utility-first styling |
-| [Lucide React](https://lucide.dev) | Icon library |
-| [date-fns](https://date-fns.org) | Date formatting utilities |
+| Package                                 | Purpose                   |
+| --------------------------------------- | ------------------------- |
+| [React 18](https://react.dev)           | UI framework              |
+| [Vite](https://vitejs.dev)              | Build tool and dev server |
+| [React Router](https://reactrouter.com) | Client-side routing       |
+| [Recharts](https://recharts.org)        | Charts and sparklines     |
+| [Tailwind CSS](https://tailwindcss.com) | Utility-first styling     |
+| [Lucide React](https://lucide.dev)      | Icon library              |
+| [date-fns](https://date-fns.org)        | Date formatting utilities |
 
 ### Desktop (Electron)
 
-| Package | Purpose |
-|---------|---------|
-| [Electron](https://electronjs.org) | Cross-platform desktop shell |
-| [electron-builder](https://www.electron.build) | Packaging and installer generation |
+| Package                                                  | Purpose                                |
+| -------------------------------------------------------- | -------------------------------------- |
+| [Electron](https://electronjs.org)                       | Cross-platform desktop shell           |
+| [electron-builder](https://www.electron.build)           | Packaging and installer generation     |
 | [@electron/rebuild](https://github.com/electron/rebuild) | Recompiles native modules for Electron |
 
 ---

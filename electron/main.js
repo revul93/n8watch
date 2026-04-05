@@ -1,26 +1,33 @@
-'use strict';
+"use strict";
 
-const { app, BrowserWindow, shell, Menu, Tray, nativeImage } = require('electron');
-const path = require('path');
-const { fork } = require('child_process');
-const http = require('http');
+const {
+  app,
+  BrowserWindow,
+  shell,
+  Menu,
+  Tray,
+  nativeImage,
+} = require("electron");
+const path = require("path");
+const { fork } = require("child_process");
+const http = require("http");
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
 const SERVER_PORT = process.env.PORT || 3000;
-const SERVER_URL  = `http://localhost:${SERVER_PORT}`;
+const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 
-// Store data in the OS user-data directory (e.g. %APPDATA%\n8netwatch on Windows)
-const DATA_DIR = app.getPath('userData');
-process.env.N8NETWATCH_DATA_DIR = DATA_DIR;
+// Store data in the OS user-data directory (e.g. %APPDATA%\n8watch on Windows)
+const DATA_DIR = app.getPath("userData");
+process.env.n8watch_DATA_DIR = DATA_DIR;
 
 // ── First-run: copy config.example.yaml → user-data dir ──────────────────────
 
 function ensureConfig() {
-  const fs  = require('fs');
-  const dst = path.join(DATA_DIR, 'config.yaml');
+  const fs = require("fs");
+  const dst = path.join(DATA_DIR, "config.yaml");
   if (!fs.existsSync(dst)) {
-    const src = path.join(__dirname, '..', 'config.example.yaml');
+    const src = path.join(__dirname, "..", "config.example.yaml");
     if (fs.existsSync(src)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       fs.copyFileSync(src, dst);
@@ -32,30 +39,30 @@ function ensureConfig() {
 // ── Server process ────────────────────────────────────────────────────────────
 
 let serverProcess = null;
-let mainWindow    = null;
-let tray          = null;
+let mainWindow = null;
+let tray = null;
 
 function startServer() {
-  const serverEntry = path.join(__dirname, '..', 'server', 'index.js');
+  const serverEntry = path.join(__dirname, "..", "server", "index.js");
 
   serverProcess = fork(serverEntry, [], {
     env: {
       ...process.env,
       PORT: String(SERVER_PORT),
-      ELECTRON: '1',
+      ELECTRON: "1",
     },
-    stdio: 'pipe',
+    stdio: "pipe",
   });
 
-  serverProcess.stdout.on('data', (data) => {
+  serverProcess.stdout.on("data", (data) => {
     process.stdout.write(`[server] ${data}`);
   });
 
-  serverProcess.stderr.on('data', (data) => {
+  serverProcess.stderr.on("data", (data) => {
     process.stderr.write(`[server] ${data}`);
   });
 
-  serverProcess.on('exit', (code) => {
+  serverProcess.on("exit", (code) => {
     if (code !== 0) {
       console.error(`[electron] Server process exited with code ${code}`);
     }
@@ -64,7 +71,7 @@ function startServer() {
 
 function stopServer() {
   if (serverProcess) {
-    serverProcess.kill('SIGTERM');
+    serverProcess.kill("SIGTERM");
     serverProcess = null;
   }
 }
@@ -77,15 +84,17 @@ function waitForServer(url, retries = 30, delay = 500) {
 
     const check = () => {
       attempts++;
-      http.get(url, (res) => {
-        resolve();
-      }).on('error', () => {
-        if (attempts >= retries) {
-          reject(new Error(`Server did not start after ${retries} attempts`));
-        } else {
-          setTimeout(check, delay);
-        }
-      });
+      http
+        .get(url, (res) => {
+          resolve();
+        })
+        .on("error", () => {
+          if (attempts >= retries) {
+            reject(new Error(`Server did not start after ${retries} attempts`));
+          } else {
+            setTimeout(check, delay);
+          }
+        });
     };
 
     check();
@@ -100,11 +109,11 @@ function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    title: 'n8netwatch',
+    title: "n8watch",
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, "preload.js"),
     },
   });
 
@@ -113,10 +122,10 @@ function createWindow() {
   // Open external links in the default browser, not in the app window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
-    return { action: 'deny' };
+    return { action: "deny" };
   });
 
-  mainWindow.on('closed', () => {
+  mainWindow.on("closed", () => {
     mainWindow = null;
   });
 
@@ -128,21 +137,21 @@ function createWindow() {
 // ── Tray icon ─────────────────────────────────────────────────────────────────
 
 function createTray() {
-  const iconPath = path.join(__dirname, 'icons', 'tray.png');
-  const icon     = nativeImage.createFromPath(iconPath);
+  const iconPath = path.join(__dirname, "icons", "tray.png");
+  const icon = nativeImage.createFromPath(iconPath);
 
   // Skip tray creation if no icon file is present (e.g. development without icons)
   if (icon.isEmpty()) {
-    console.log('[electron] Tray icon not found — skipping tray creation');
+    console.log("[electron] Tray icon not found — skipping tray creation");
     return;
   }
 
   tray = new Tray(icon);
-  tray.setToolTip('n8netwatch');
+  tray.setToolTip("n8watch");
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open n8netwatch',
+      label: "Open n8watch",
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -152,9 +161,9 @@ function createTray() {
         }
       },
     },
-    { type: 'separator' },
+    { type: "separator" },
     {
-      label: 'Quit',
+      label: "Quit",
       click: () => {
         app.quit();
       },
@@ -162,7 +171,7 @@ function createTray() {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.on('double-click', () => {
+  tray.on("double-click", () => {
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
@@ -177,38 +186,38 @@ function createTray() {
 function buildMenuTemplate() {
   return [
     {
-      label: 'File',
+      label: "File",
       submenu: [
         {
-          label: 'Open Dashboard',
-          accelerator: 'CmdOrCtrl+O',
+          label: "Open Dashboard",
+          accelerator: "CmdOrCtrl+O",
           click: () => mainWindow && mainWindow.loadURL(SERVER_URL),
         },
-        { type: 'separator' },
-        { role: 'quit' },
+        { type: "separator" },
+        { role: "quit" },
       ],
     },
     {
-      label: 'View',
+      label: "View",
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { type: 'separator' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
+        { role: "reload" },
+        { role: "forceReload" },
+        { type: "separator" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
       ],
     },
     {
-      label: 'Help',
+      label: "Help",
       submenu: [
         {
-          label: 'View on GitHub',
-          click: () => shell.openExternal('https://github.com/revul93/n8netwatch'),
+          label: "View on GitHub",
+          click: () => shell.openExternal("https://github.com/revul93/n8watch"),
         },
       ],
     },
@@ -224,14 +233,14 @@ app.whenReady().then(async () => {
   try {
     await waitForServer(SERVER_URL);
   } catch (err) {
-    console.error('[electron] Could not connect to server:', err.message);
+    console.error("[electron] Could not connect to server:", err.message);
     // Still attempt to open the window — the page will show an error and can be reloaded
   }
 
   createWindow();
   createTray();
 
-  app.on('activate', () => {
+  app.on("activate", () => {
     // macOS: re-create the window when the dock icon is clicked
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -239,17 +248,17 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('window-all-closed', () => {
+app.on("window-all-closed", () => {
   // On macOS keep the app running in the tray when all windows are closed
-  if (process.platform !== 'darwin') {
+  if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
-app.on('before-quit', () => {
+app.on("before-quit", () => {
   stopServer();
 });
 
-app.on('will-quit', () => {
+app.on("will-quit", () => {
   stopServer();
 });

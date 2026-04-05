@@ -2,7 +2,7 @@
 set -e
 
 echo "=================================="
-echo "  n8netwatch — Setup"
+echo "  n8watch — Setup"
 echo "=================================="
 
 # ── Node.js + npm installation helper ────────────────────────────────────────
@@ -10,7 +10,7 @@ echo "=================================="
 # to native package managers (apt/dnf/yum) on Linux.
 install_nodejs_and_npm() {
   echo ""
-  echo "Node.js (v18+ required, v24 LTS recommended) and npm are needed to run n8netwatch."
+  echo "Node.js (v18+ required, v24 LTS recommended) and npm are needed to run n8watch."
   echo "Would you like to install Node.js v24 LTS and npm automatically?"
   printf "  [Y/n]: "
   if [ -e /dev/tty ]; then
@@ -135,7 +135,7 @@ echo ""
 echo "─────────────────────────────────────────────────"
 echo "  PM2 — Process Manager (recommended)"
 echo "─────────────────────────────────────────────────"
-echo "Would you like to start n8netwatch with PM2 and enable auto-startup on reboot?"
+echo "Would you like to start n8watch with PM2 and enable auto-startup on reboot?"
 echo "  (PM2 keeps the app running and restarts it automatically after a system reboot)"
 printf "  [Y/n]: "
 # Read from /dev/tty so the prompt works even when stdin is a pipe (e.g. curl | bash).
@@ -162,9 +162,9 @@ if [[ ! "$DO_PM2" =~ ^[Nn]$ ]]; then
 
   # Start / restart the app with PM2
   echo ""
-  echo "Starting n8netwatch with PM2..."
+  echo "Starting n8watch with PM2..."
   if pm2 start ecosystem.config.js; then
-    echo "✓ n8netwatch started"
+    echo "✓ n8watch started"
   else
     echo "  WARNING: pm2 start failed. Check ecosystem.config.js and try again with: npm run pm2:start"
   fi
@@ -210,7 +210,7 @@ echo "  1. Edit config.yaml with your target IP addresses and SMTP settings"
 echo ""
 
 if [ "$PM2_WAS_STARTED" = true ]; then
-  echo "  n8netwatch is running via PM2 — open http://localhost:3000"
+  echo "  n8watch is running via PM2 — open http://localhost:3000"
   echo ""
   echo "  Useful PM2 commands:"
   echo "    Logs:     npm run pm2:logs"

@@ -1,17 +1,17 @@
-# n8netwatch — Windows One-Line Installer
+# n8watch — Windows One-Line Installer
 # Run with:
-#   Invoke-Expression (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/revul93/n8netwatch/main/install.ps1" -UseBasicParsing).Content
+#   Invoke-Expression (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/revul93/n8watch/main/install.ps1" -UseBasicParsing).Content
 # Or download and run locally:
 #   powershell -ExecutionPolicy Bypass -File install.ps1
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$RepoUrl = "https://github.com/revul93/n8netwatch.git"
-$RepoDir = "n8netwatch"
+$RepoUrl = "https://github.com/revul93/n8watch.git"
+$RepoDir = "n8watch"
 
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "  n8netwatch — Installer (Windows)" -ForegroundColor Cyan
+Write-Host "  n8watch — Installer (Windows)" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 

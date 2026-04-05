@@ -1,30 +1,31 @@
-'use strict';
+"use strict";
 
-const path = require('path');
-const Database = require('better-sqlite3');
+const path = require("path");
+const Database = require("better-sqlite3");
 
 let _db = null;
 
 function getDb() {
-  if (!_db) throw new Error('Database not initialized. Call initDatabase() first.');
+  if (!_db)
+    throw new Error("Database not initialized. Call initDatabase() first.");
   return _db;
 }
 
 function initDatabase() {
-  // When running inside Electron the main process sets N8NETWATCH_DATA_DIR to
+  // When running inside Electron the main process sets n8watch_DATA_DIR to
   // app.getPath('userData') so data is stored in the OS user-data directory
-  // instead of the application bundle (e.g. %APPDATA%\n8netwatch on Windows).
-  const dataDir = process.env.N8NETWATCH_DATA_DIR
-    ? require('path').resolve(process.env.N8NETWATCH_DATA_DIR)
-    : path.join(__dirname, '..', 'data');
+  // instead of the application bundle (e.g. %APPDATA%\n8watch on Windows).
+  const dataDir = process.env.n8watch_DATA_DIR
+    ? require("path").resolve(process.env.n8watch_DATA_DIR)
+    : path.join(__dirname, "..", "data");
 
-  require('fs').mkdirSync(dataDir, { recursive: true });
-  const dbPath = path.join(dataDir, 'n8netwatch.db');
+  require("fs").mkdirSync(dataDir, { recursive: true });
+  const dbPath = path.join(dataDir, "n8watch.db");
   _db = new Database(dbPath);
 
   // Enable WAL mode for better concurrent read performance
-  _db.pragma('journal_mode = WAL');
-  _db.pragma('foreign_keys = ON');
+  _db.pragma("journal_mode = WAL");
+  _db.pragma("foreign_keys = ON");
 
   _db.exec(`
     CREATE TABLE IF NOT EXISTS targets (
@@ -77,18 +78,23 @@ function initDatabase() {
   `);
 
   // Migrate existing databases: add columns if they don't exist yet
-  const targetCols = _db.prepare("PRAGMA table_info(targets)").all().map(c => c.name);
-  if (!targetCols.includes('is_user_target')) {
-    _db.exec('ALTER TABLE targets ADD COLUMN is_user_target INTEGER NOT NULL DEFAULT 0');
+  const targetCols = _db
+    .prepare("PRAGMA table_info(targets)")
+    .all()
+    .map((c) => c.name);
+  if (!targetCols.includes("is_user_target")) {
+    _db.exec(
+      "ALTER TABLE targets ADD COLUMN is_user_target INTEGER NOT NULL DEFAULT 0",
+    );
   }
-  if (!targetCols.includes('expires_at')) {
-    _db.exec('ALTER TABLE targets ADD COLUMN expires_at INTEGER');
+  if (!targetCols.includes("expires_at")) {
+    _db.exec("ALTER TABLE targets ADD COLUMN expires_at INTEGER");
   }
-  if (!targetCols.includes('interface')) {
-    _db.exec('ALTER TABLE targets ADD COLUMN interface TEXT');
+  if (!targetCols.includes("interface")) {
+    _db.exec("ALTER TABLE targets ADD COLUMN interface TEXT");
   }
-  if (!targetCols.includes('interface_alias')) {
-    _db.exec('ALTER TABLE targets ADD COLUMN interface_alias TEXT');
+  if (!targetCols.includes("interface_alias")) {
+    _db.exec("ALTER TABLE targets ADD COLUMN interface_alias TEXT");
   }
 
   return _db;
@@ -115,10 +121,10 @@ function syncTargets(targets) {
   const syncAll = db.transaction((targets) => {
     for (const t of targets) {
       upsert.run({
-        name:            t.name,
-        ip:              t.ip,
-        grp:             t.group || null,
-        interface:       t.interface || null,
+        name: t.name,
+        ip: t.ip,
+        grp: t.group || null,
+        interface: t.interface || null,
         interface_alias: t.interface_alias || null,
         now,
       });
@@ -128,11 +134,13 @@ function syncTargets(targets) {
     // Placeholders (e.g. "?,?,?") are built from the array length, not user data,
     // so this is not a SQL injection risk; actual IP values are passed as bound parameters.
     if (targets.length > 0) {
-      const placeholders = targets.map(() => '?').join(', ');
-      const ips = targets.map(t => t.ip);
-      db.prepare(`DELETE FROM targets WHERE ip NOT IN (${placeholders}) AND is_user_target = 0`).run(...ips);
+      const placeholders = targets.map(() => "?").join(", ");
+      const ips = targets.map((t) => t.ip);
+      db.prepare(
+        `DELETE FROM targets WHERE ip NOT IN (${placeholders}) AND is_user_target = 0`,
+      ).run(...ips);
     } else {
-      db.prepare('DELETE FROM targets WHERE is_user_target = 0').run();
+      db.prepare("DELETE FROM targets WHERE is_user_target = 0").run();
     }
   });
 
@@ -150,33 +158,41 @@ function insertPingResult(data) {
        @packet_loss, @packets_sent, @packets_received, @created_at)
   `);
   const result = stmt.run({
-    target_id:        data.target_id,
-    is_alive:         data.is_alive ? 1 : 0,
-    min_latency:      data.min_latency ?? null,
-    avg_latency:      data.avg_latency ?? null,
-    max_latency:      data.max_latency ?? null,
-    jitter:           data.jitter ?? null,
-    packet_loss:      data.packet_loss ?? 100,
-    packets_sent:     data.packets_sent ?? 0,
+    target_id: data.target_id,
+    is_alive: data.is_alive ? 1 : 0,
+    min_latency: data.min_latency ?? null,
+    avg_latency: data.avg_latency ?? null,
+    max_latency: data.max_latency ?? null,
+    jitter: data.jitter ?? null,
+    packet_loss: data.packet_loss ?? 100,
+    packets_sent: data.packets_sent ?? 0,
     packets_received: data.packets_received ?? 0,
-    created_at:       data.created_at ?? Date.now(),
+    created_at: data.created_at ?? Date.now(),
   });
   return result.lastInsertRowid;
 }
 
 function getLatestPingResult(targetId) {
   const db = getDb();
-  return db.prepare(`
+  return (
+    db
+      .prepare(
+        `
     SELECT * FROM ping_results
     WHERE target_id = ?
     ORDER BY created_at DESC
     LIMIT 1
-  `).get(targetId) || null;
+  `,
+      )
+      .get(targetId) || null
+  );
 }
 
 function getAllTargetsWithLatest() {
   const db = getDb();
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT
       t.id, t.name, t.ip, t.grp AS "group",
       t.interface, t.interface_alias,
@@ -203,12 +219,17 @@ function getAllTargetsWithLatest() {
     )
     WHERE (t.is_user_target = 0) OR (t.is_user_target = 1 AND (t.expires_at IS NULL OR t.expires_at > ?))
     ORDER BY t.name ASC
-  `).all(Date.now());
+  `,
+    )
+    .all(Date.now());
 }
 
 function getTargetById(id) {
   const db = getDb();
-  return db.prepare(`
+  return (
+    db
+      .prepare(
+        `
     SELECT
       t.id, t.name, t.ip, t.grp AS "group",
       t.interface, t.interface_alias,
@@ -228,7 +249,10 @@ function getTargetById(id) {
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
     )
     WHERE t.id = ?
-  `).get(id) || null;
+  `,
+      )
+      .get(id) || null
+  );
 }
 
 function parseMs(val, defaultVal) {
@@ -243,25 +267,33 @@ function parseMs(val, defaultVal) {
 function getPingResults(targetId, from, to, limit = 100, offset = 0) {
   const db = getDb();
   const fromMs = parseMs(from, 0);
-  const toMs   = parseMs(to, Date.now());
-  const lim    = Math.min(Number(limit) || 100, 1000);
-  const off    = Number(offset) || 0;
+  const toMs = parseMs(to, Date.now());
+  const lim = Math.min(Number(limit) || 100, 1000);
+  const off = Number(offset) || 0;
 
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT * FROM ping_results
     WHERE target_id = ?
       AND created_at >= ?
       AND created_at <= ?
     ORDER BY created_at DESC
     LIMIT ? OFFSET ?
-  `).all(targetId, fromMs, toMs, lim, off);
+  `,
+    )
+    .all(targetId, fromMs, toMs, lim, off);
 
-  const total = db.prepare(`
+  const total = db
+    .prepare(
+      `
     SELECT COUNT(*) AS cnt FROM ping_results
     WHERE target_id = ?
       AND created_at >= ?
       AND created_at <= ?
-  `).get(targetId, fromMs, toMs).cnt;
+  `,
+    )
+    .get(targetId, fromMs, toMs).cnt;
 
   return { rows, total, limit: lim, offset: off };
 }
@@ -269,10 +301,12 @@ function getPingResults(targetId, from, to, limit = 100, offset = 0) {
 function getMetrics(targetId, from, to, intervalSeconds = 300) {
   const db = getDb();
   const fromMs = parseMs(from, Date.now() - 86400000);
-  const toMs   = parseMs(to, Date.now());
+  const toMs = parseMs(to, Date.now());
   const bucketMs = intervalSeconds * 1000;
 
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT
       (created_at / @bucket) * @bucket AS bucket,
       AVG(avg_latency)       AS avg_latency,
@@ -288,7 +322,9 @@ function getMetrics(targetId, from, to, intervalSeconds = 300) {
       AND created_at <= @to
     GROUP BY bucket
     ORDER BY bucket ASC
-  `).all({ bucket: bucketMs, target_id: targetId, from: fromMs, to: toMs });
+  `,
+    )
+    .all({ bucket: bucketMs, target_id: targetId, from: fromMs, to: toMs });
 }
 
 function getUptime(targetId) {
@@ -318,15 +354,16 @@ function getUptime(targetId) {
   };
 
   const rowAll = queryAll.get(targetId);
-  const uptime_overall = (!rowAll || rowAll.total === 0)
-    ? null
-    : Math.round(rowAll.uptime_pct * 100) / 100;
+  const uptime_overall =
+    !rowAll || rowAll.total === 0
+      ? null
+      : Math.round(rowAll.uptime_pct * 100) / 100;
 
   return {
-    uptime_1h:      calc(3600000),
-    uptime_24h:     calc(86400000),
-    uptime_7d:      calc(604800000),
-    uptime_30d:     calc(2592000000),
+    uptime_1h: calc(3600000),
+    uptime_24h: calc(86400000),
+    uptime_7d: calc(604800000),
+    uptime_30d: calc(2592000000),
     uptime_overall,
   };
 }
@@ -334,7 +371,9 @@ function getUptime(targetId) {
 function getDashboardSummary() {
   const db = getDb();
 
-  const counts = db.prepare(`
+  const counts = db
+    .prepare(
+      `
     SELECT
       COUNT(*) AS total,
       SUM(CASE WHEN pr.is_alive = 1 THEN 1 ELSE 0 END) AS up,
@@ -344,9 +383,13 @@ function getDashboardSummary() {
     LEFT JOIN ping_results pr ON pr.id = (
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
     )
-  `).get();
+  `,
+    )
+    .get();
 
-  const latency = db.prepare(`
+  const latency = db
+    .prepare(
+      `
     SELECT
       AVG(pr.avg_latency)  AS avg_latency,
       AVG(pr.packet_loss)  AS avg_packet_loss
@@ -355,20 +398,26 @@ function getDashboardSummary() {
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
     )
     WHERE pr.is_alive = 1
-  `).get();
+  `,
+    )
+    .get();
 
-  const activeAlerts = db.prepare(`
+  const activeAlerts = db
+    .prepare(
+      `
     SELECT COUNT(*) AS cnt FROM alerts WHERE resolved = 0
-  `).get();
+  `,
+    )
+    .get();
 
   return {
-    total:           counts.total || 0,
-    up:              counts.up    || 0,
-    down:            counts.down  || 0,
-    unknown:         counts.unknown || 0,
-    avg_latency:     latency ? (latency.avg_latency   || null) : null,
-    avg_packet_loss: latency ? (latency.avg_packet_loss || null) : null,
-    active_alerts:   activeAlerts.cnt || 0,
+    total: counts.total || 0,
+    up: counts.up || 0,
+    down: counts.down || 0,
+    unknown: counts.unknown || 0,
+    avg_latency: latency ? latency.avg_latency || null : null,
+    avg_packet_loss: latency ? latency.avg_packet_loss || null : null,
+    active_alerts: activeAlerts.cnt || 0,
   };
 }
 
@@ -379,11 +428,11 @@ function insertAlert(data) {
     VALUES (@target_id, @rule_name, @severity, @condition, @message, @created_at)
   `);
   const result = stmt.run({
-    target_id:  data.target_id,
-    rule_name:  data.rule_name,
-    severity:   data.severity,
-    condition:  data.condition,
-    message:    data.message || null,
+    target_id: data.target_id,
+    rule_name: data.rule_name,
+    severity: data.severity,
+    condition: data.condition,
+    message: data.message || null,
     created_at: data.created_at || Date.now(),
   });
   return result.lastInsertRowid;
@@ -395,89 +444,117 @@ function getAlerts(filters = {}) {
   const params = {};
 
   if (filters.severity) {
-    conditions.push('a.severity = @severity');
+    conditions.push("a.severity = @severity");
     params.severity = filters.severity;
   }
   if (filters.target_id) {
-    conditions.push('a.target_id = @target_id');
+    conditions.push("a.target_id = @target_id");
     params.target_id = Number(filters.target_id);
   }
-  if (filters.resolved !== undefined && filters.resolved !== '') {
-    conditions.push('a.resolved = @resolved');
-    params.resolved = filters.resolved === 'true' || filters.resolved === '1' ? 1 : 0;
+  if (filters.resolved !== undefined && filters.resolved !== "") {
+    conditions.push("a.resolved = @resolved");
+    params.resolved =
+      filters.resolved === "true" || filters.resolved === "1" ? 1 : 0;
   }
   if (filters.from) {
-    conditions.push('a.created_at >= @from');
+    conditions.push("a.created_at >= @from");
     params.from = parseMs(filters.from, 0);
   }
   if (filters.to) {
-    conditions.push('a.created_at <= @to');
+    conditions.push("a.created_at <= @to");
     params.to = parseMs(filters.to, Date.now());
   }
 
-  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
-  const limit  = Math.min(Number(filters.limit)  || 50, 500);
+  const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+  const limit = Math.min(Number(filters.limit) || 50, 500);
   const offset = Number(filters.offset) || 0;
 
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT a.*, t.name AS target_name, t.ip AS target_ip
     FROM alerts a
     JOIN targets t ON t.id = a.target_id
     ${where}
     ORDER BY a.created_at DESC
     LIMIT @limit OFFSET @offset
-  `).all({ ...params, limit, offset });
+  `,
+    )
+    .all({ ...params, limit, offset });
 
-  const total = db.prepare(`
+  const total = db
+    .prepare(
+      `
     SELECT COUNT(*) AS cnt
     FROM alerts a
     JOIN targets t ON t.id = a.target_id
     ${where}
-  `).get(params).cnt;
+  `,
+    )
+    .get(params).cnt;
 
   return { rows, total, limit, offset };
 }
 
 function getActiveAlerts() {
   const db = getDb();
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT a.*, t.name AS target_name, t.ip AS target_ip
     FROM alerts a
     JOIN targets t ON t.id = a.target_id
     WHERE a.resolved = 0
     ORDER BY a.created_at DESC
-  `).all();
+  `,
+    )
+    .all();
 }
 
 function resolveAlert(alertId, resolvedAt) {
   const db = getDb();
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE alerts SET resolved = 1, resolved_at = ? WHERE id = ?
-  `).run(resolvedAt || Date.now(), alertId);
+  `,
+  ).run(resolvedAt || Date.now(), alertId);
 }
 
 function addUserTarget(name, ip, iface, ifaceAlias) {
   const db = getDb();
   const now = Date.now();
   const expiresAt = now + 5 * 86400000; // 5 days
-  const result = db.prepare(`
+  const result = db
+    .prepare(
+      `
     INSERT INTO targets (name, ip, grp, interface, interface_alias, is_user_target, expires_at, created_at, updated_at)
     VALUES (@name, @ip, NULL, @interface, @interface_alias, 1, @expires_at, @now, @now)
-  `).run({ name, ip, interface: iface || null, interface_alias: ifaceAlias || null, expires_at: expiresAt, now });
+  `,
+    )
+    .run({
+      name,
+      ip,
+      interface: iface || null,
+      interface_alias: ifaceAlias || null,
+      expires_at: expiresAt,
+      now,
+    });
   return result.lastInsertRowid;
 }
 
 function deleteUserTarget(id) {
   const db = getDb();
-  const info = db.prepare(
-    'DELETE FROM targets WHERE id = ? AND is_user_target = 1'
-  ).run(id);
+  const info = db
+    .prepare("DELETE FROM targets WHERE id = ? AND is_user_target = 1")
+    .run(id);
   return info.changes > 0;
 }
 
 function getUserTargets() {
   const db = getDb();
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT
       t.id, t.name, t.ip, t.interface, t.interface_alias,
       t.is_user_target, t.expires_at,
@@ -503,14 +580,18 @@ function getUserTargets() {
     WHERE t.is_user_target = 1
       AND (t.expires_at IS NULL OR t.expires_at > ?)
     ORDER BY t.created_at DESC
-  `).all(Date.now());
+  `,
+    )
+    .all(Date.now());
 }
 
 function cleanupExpiredUserTargets() {
   const db = getDb();
-  const info = db.prepare(
-    'DELETE FROM targets WHERE is_user_target = 1 AND expires_at IS NOT NULL AND expires_at <= ?'
-  ).run(Date.now());
+  const info = db
+    .prepare(
+      "DELETE FROM targets WHERE is_user_target = 1 AND expires_at IS NOT NULL AND expires_at <= ?",
+    )
+    .run(Date.now());
   return info.changes;
 }
 
@@ -518,16 +599,26 @@ function deleteOldData(retentionDays) {
   const db = getDb();
   const cutoff = Date.now() - retentionDays * 86400000;
 
-  const delPings = db.prepare('DELETE FROM ping_results WHERE created_at < ?').run(cutoff);
-  const delAlerts = db.prepare('DELETE FROM alerts WHERE created_at < ? AND resolved = 1').run(cutoff);
+  const delPings = db
+    .prepare("DELETE FROM ping_results WHERE created_at < ?")
+    .run(cutoff);
+  const delAlerts = db
+    .prepare("DELETE FROM alerts WHERE created_at < ? AND resolved = 1")
+    .run(cutoff);
   const delUserTargets = cleanupExpiredUserTargets();
 
-  return { deletedPings: delPings.changes, deletedAlerts: delAlerts.changes, deletedUserTargets: delUserTargets };
+  return {
+    deletedPings: delPings.changes,
+    deletedAlerts: delAlerts.changes,
+    deletedUserTargets: delUserTargets,
+  };
 }
 
 function getLatestPingResultForAll() {
   const db = getDb();
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT pr.*
     FROM ping_results pr
     INNER JOIN (
@@ -535,7 +626,9 @@ function getLatestPingResultForAll() {
       FROM ping_results
       GROUP BY target_id
     ) latest ON pr.target_id = latest.target_id AND pr.created_at = latest.max_ts
-  `).all();
+  `,
+    )
+    .all();
 }
 
 module.exports = {

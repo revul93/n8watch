@@ -1,17 +1,23 @@
-import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Activity, History, Bell, Menu, X, RefreshCw } from 'lucide-react';
-import ConnectionStatus from './ConnectionStatus';
-import ThemeToggle from './ThemeToggle';
-import { cn } from '../lib/utils';
+import { useState, useEffect } from "react";
+import { NavLink } from "react-router-dom";
+import { Activity, History, Bell, Menu, X, RefreshCw } from "lucide-react";
+import ConnectionStatus from "./ConnectionStatus";
+import ThemeToggle from "./ThemeToggle";
+import { cn } from "../lib/utils";
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: Activity, exact: true },
-  { to: '/history', label: 'History', icon: History },
-  { to: '/alerts', label: 'Alerts', icon: Bell },
+  { to: "/", label: "Dashboard", icon: Activity, exact: true },
+  { to: "/history", label: "History", icon: History },
+  { to: "/alerts", label: "Alerts", icon: Bell },
 ];
 
-export default function Layout({ children, darkMode, setDarkMode, configReloadedAt, lastConfigData }) {
+export default function Layout({
+  children,
+  darkMode,
+  setDarkMode,
+  configReloadedAt,
+  lastConfigData,
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notification, setNotification] = useState(null);
 
@@ -19,9 +25,10 @@ export default function Layout({ children, darkMode, setDarkMode, configReloaded
   useEffect(() => {
     if (!configReloadedAt) return;
     const count = lastConfigData?.targets_count;
-    const message = count != null
-      ? `config.yaml reloaded — ${count} target${count !== 1 ? 's' : ''} synced`
-      : 'config.yaml reloaded — targets synced';
+    const message =
+      count != null
+        ? `config.yaml reloaded — ${count} target${count !== 1 ? "s" : ""} synced`
+        : "config.yaml reloaded — targets synced";
     setNotification(message);
     const timer = setTimeout(() => setNotification(null), 6000);
     return () => clearTimeout(timer);
@@ -40,9 +47,9 @@ export default function Layout({ children, darkMode, setDarkMode, configReloaded
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 w-56 flex-shrink-0 flex flex-col bg-gray-900 border-r border-gray-800 transition-transform duration-200',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          'lg:relative lg:translate-x-0'
+          "fixed inset-y-0 left-0 z-30 w-56 flex-shrink-0 flex flex-col bg-gray-900 border-r border-gray-800 transition-transform duration-200",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          "lg:relative lg:translate-x-0",
         )}
       >
         {/* Logo */}
@@ -50,7 +57,9 @@ export default function Layout({ children, darkMode, setDarkMode, configReloaded
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
             <Activity size={16} className="text-white" />
           </div>
-          <span className="text-lg font-bold text-white tracking-tight">n8netwatch</span>
+          <span className="text-lg font-bold text-white tracking-tight">
+            n8watch
+          </span>
           <button
             className="ml-auto lg:hidden text-gray-400 hover:text-white"
             onClick={() => setSidebarOpen(false)}
@@ -69,10 +78,10 @@ export default function Layout({ children, darkMode, setDarkMode, configReloaded
               onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-white",
                 )
               }
             >
@@ -83,7 +92,7 @@ export default function Layout({ children, darkMode, setDarkMode, configReloaded
         </nav>
 
         <div className="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
-          n8netwatch v1.0
+          n8watch v1.0
         </div>
       </aside>
 
@@ -118,16 +127,16 @@ export default function Layout({ children, darkMode, setDarkMode, configReloaded
           >
             <Menu size={20} />
           </button>
-          <span className="text-base font-semibold text-white lg:hidden">n8netwatch</span>
+          <span className="text-base font-semibold text-white lg:hidden">
+            n8watch
+          </span>
           <div className="flex-1" />
           <ConnectionStatus />
           <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
     </div>
   );

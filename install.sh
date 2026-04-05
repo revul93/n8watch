@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-REPO_URL="https://github.com/revul93/n8netwatch.git"
-REPO_DIR="n8netwatch"
+REPO_URL="https://github.com/revul93/n8watch.git"
+REPO_DIR="n8watch"
 
 echo "=================================="
-echo "  n8netwatch — Installer"
+echo "  n8watch — Installer"
 echo "=================================="
 
 if ! command -v git &> /dev/null; then

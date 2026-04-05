@@ -24,7 +24,7 @@ targets:
   - name: "Google DNS"
     ip: "8.8.8.8"
     group: "DNS Servers"
-    interface: "eth0"            # optional: outgoing interface name (must match an entry in interfaces above)
+    interface: "eth0" # optional: outgoing interface name (must match an entry in interfaces above)
   - name: "Cloudflare DNS"
     ip: "1.1.1.1"
     group: "DNS Servers"
@@ -42,7 +42,7 @@ alerts:
     secure: false
     user: "you@gmail.com"
     pass: "app-password"
-    from: "n8netwatch <monitor@yourdomain.com>"
+    from: "n8watch <monitor@yourdomain.com>"
     to:
       - "admin@yourdomain.com"
 
