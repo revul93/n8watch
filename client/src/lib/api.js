@@ -80,11 +80,15 @@ export function getReportData(targetId) {
   return request(`/targets/${targetId}/report`);
 }
 
-export function addUserTarget(name, ip) {
+export function getInterfaces() {
+  return request('/interfaces').then(res => res.interfaces || []);
+}
+
+export function addUserTarget(name, ip, iface, ifaceAlias) {
   return fetch(`${BASE}/targets/user-targets`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, ip }),
+    body: JSON.stringify({ name, ip, interface: iface || undefined, interface_alias: ifaceAlias || undefined }),
   }).then(async res => {
     if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
     return res.json();

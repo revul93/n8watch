@@ -141,7 +141,12 @@ export function generatePDFReport(reportData) {
   doc.text(target.name, margin, curY);
   doc.setFontSize(9);
   doc.setTextColor(148, 163, 184);
-  doc.text(`${target.ip}${target.group ? '  ·  Group: ' + target.group : ''}`, margin, curY + 5);
+  const targetMeta = [
+    `${target.ip}`,
+    target.group  ? `Group: ${target.group}`           : null,
+    target.interface_alias ? `Interface: ${target.interface_alias}` : null,
+  ].filter(Boolean).join('  ·  ');
+  doc.text(targetMeta, margin, curY + 5);
 
   curY += 14;
 
@@ -330,6 +335,9 @@ export function generateCSVReport(reportData) {
   lines.push(`# Target,${target.name}`);
   lines.push(`# IP,${target.ip}`);
   lines.push(`# Group,${target.group || ''}`);
+  if (target.interface_alias) {
+    lines.push(`# Interface,${target.interface_alias}${target.interface ? ` (${target.interface})` : ''}`);
+  }
   lines.push('');
 
   // Availability

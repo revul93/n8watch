@@ -17,6 +17,7 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
   const packetLoss = result?.packet_loss ?? null;
   const uptime_overall = target?.uptime_overall ?? null;
   const group = target?.group || null;
+  const ifaceAlias = target?.interface_alias || null;
   const isUserTarget = !!target?.is_user_target;
 
   const [reportLoading, setReportLoading] = useState(null); // 'pdf' | 'csv' | null
@@ -103,8 +104,13 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
         </span>
       )}
       {group && (
-        <span className="inline-block text-xs bg-blue-900/50 text-blue-300 border border-blue-800 px-2 py-0.5 rounded-full mb-2">
+        <span className="inline-block text-xs bg-blue-900/50 text-blue-300 border border-blue-800 px-2 py-0.5 rounded-full mb-2 mr-1">
           {group}
+        </span>
+      )}
+      {ifaceAlias && (
+        <span className="inline-block text-xs bg-teal-900/50 text-teal-300 border border-teal-800 px-2 py-0.5 rounded-full mb-2" title="Outgoing interface">
+          ↑ {ifaceAlias}
         </span>
       )}
 
