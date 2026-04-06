@@ -117,11 +117,83 @@ cd ..
 mkdir -p data
 mkdir -p logs
 
+# ── Network interface detection ───────────────────────────────────────────────
+# Outputs "ifname ipv4" pairs (one per line) for every non-loopback interface
+# that has a globally-scoped IPv4 address.  Tries 'ip' first (Linux), then
+# falls back to 'ifconfig' (macOS / BSD).
+detect_interfaces() {
+  if command -v ip &>/dev/null; then
+    ip -4 addr show | awk '
+      /^[0-9]+:/ { iface = $2; sub(/:$/, "", iface) }
+      /inet .* scope global/ {
+        ip = $2; sub(/\/.*/, "", ip)
+        print iface " " ip
+      }
+    '
+  elif command -v ifconfig &>/dev/null; then
+    ifconfig | awk '
+      /^[a-zA-Z]/ { iface = $1; sub(/:$/, "", iface) }
+      /inet / && iface != "lo" && iface != "lo0" && $2 !~ /^127\./ {
+        print iface " " $2
+      }
+    '
+  fi
+}
+
+# Builds the YAML block that replaces the interfaces: section in config.yaml.
+build_interfaces_yaml() {
+  local lines
+  lines=$(detect_interfaces)
+
+  if [ -z "$lines" ]; then
+    printf 'interfaces: []\n'
+    return
+  fi
+
+  printf 'interfaces:\n'
+  local index=0
+  while IFS=' ' read -r name ip; do
+    [ -z "$name" ] && continue
+    local alias
+    case $index in
+      0) alias="Primary LAN" ;;
+      1) alias="Secondary LAN" ;;
+      *) alias="Interface $((index + 1))" ;;
+    esac
+    printf '  - name: "%s"\n' "$name"
+    printf '    alias: "%s"\n' "$alias"
+    printf '    ipv4: "%s"\n' "$ip"
+    index=$((index + 1))
+  done <<< "$lines"
+  printf '\n'
+}
+
 # ── Create config.yaml ────────────────────────────────────────────────────────
 if [ ! -f config.yaml ]; then
-    cp config.example.yaml config.yaml
-    echo ""
-    echo "✓ Created config.yaml from config.example.yaml"
+    IFACES_TMP=$(mktemp)
+    build_interfaces_yaml > "$IFACES_TMP"
+
+    if grep -q '^[[:space:]]*- name:' "$IFACES_TMP" 2>/dev/null; then
+        # Detected real interfaces — replace the example interfaces block with them
+        awk -v ifaces_file="$IFACES_TMP" '
+            BEGIN { in_ifaces = 0 }
+            /^interfaces:/ {
+                in_ifaces = 1
+                while ((getline line < ifaces_file) > 0) print line
+                close(ifaces_file)
+                next
+            }
+            in_ifaces && /^[a-zA-Z]/ { in_ifaces = 0 }
+            !in_ifaces { print }
+        ' config.example.yaml > config.yaml
+        echo ""
+        echo "✓ Created config.yaml with detected network interfaces"
+    else
+        cp config.example.yaml config.yaml
+        echo ""
+        echo "✓ Created config.yaml from config.example.yaml (no interfaces detected)"
+    fi
+    rm -f "$IFACES_TMP"
 else
     echo ""
     echo "✓ config.yaml already exists (not overwritten)"
