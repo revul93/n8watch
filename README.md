@@ -28,6 +28,7 @@
   - [Production with PM2](#production-with-pm2)
   - [Windows](#windows-1)
 - [Flushing Database Data](#flushing-database-data)
+- [Nuking the Database](#nuking-the-database)
 - [Web Dashboard](#web-dashboard)
 - [API Reference](#api-reference)
 - [Tech Stack](#tech-stack)
@@ -113,7 +114,7 @@ The script will:
 1. Verify Node.js and `ping` are available.
 2. Install backend dependencies (`npm install`).
 3. Install and build the frontend (`cd client && npm install && npm run build`).
-4. Copy `config.example.yaml` to `config.yaml`.
+4. Detect real network interfaces via `ip addr` (Linux) or `ifconfig` (macOS) and write them into `config.yaml`; falls back to copying `config.example.yaml` unchanged when no interfaces are detected.
 5. Optionally configure PM2 for production use.
 
 #### 3. Manual setup (alternative)
@@ -202,7 +203,7 @@ The script will:
 1. Verify Node.js is installed (v18+).
 2. Install backend dependencies (`npm install`).
 3. Install and build the frontend.
-4. Copy `config.example.yaml` to `config.yaml`.
+4. Detect real network interfaces via `Get-NetIPAddress` / `Get-NetAdapter` and write them into `config.yaml`; falls back to copying `config.example.yaml` unchanged when no interfaces are detected.
 5. Optionally start the application via PM2.
 
 #### 3. Manual setup (alternative)
@@ -506,6 +507,26 @@ node scripts/flush-data.js --all --yes
 | `--yes`                      | Suppresses the confirmation prompt    |
 
 After flushing, restart the application normally — targets defined in `config.yaml` will be re-created on the next ping cycle.
+
+---
+
+## Nuking the Database
+
+Use the nuke script to **completely wipe** the database and start from scratch. Unlike the flush script (which only deletes rows), `nuke-db` deletes the database file itself — including any WAL and SHM sidecar files — and then recreates an empty schema. Auto-increment counters are reset and no data survives.
+
+> **Stop the application before nuking** to avoid conflicts.
+
+```bash
+# Interactive — prompts you to type YES before proceeding
+npm run db:nuke
+
+# Non-interactive (CI / automated scripts)
+node scripts/nuke-db.js --yes
+```
+
+The confirmation prompt requires you to type `YES` (uppercase) to prevent accidental runs.
+
+After nuking, start the application normally. Targets defined in `config.yaml` will be loaded on the next ping cycle and the database will be populated from scratch.
 
 ---
 
