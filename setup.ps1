@@ -61,12 +61,84 @@ Set-Location ..
 New-Item -ItemType Directory -Force -Path "data"  | Out-Null
 New-Item -ItemType Directory -Force -Path "logs"  | Out-Null
 
+# ── Network interface detection ───────────────────────────────────────────────
+# Returns an array of objects with Name and IPAddress, excluding loopback.
+function Get-NonLoopbackInterfaces {
+    $result = @()
+    try {
+        $addresses = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.IPAddress -notlike '127.*' -and
+                $_.IPAddress -ne '0.0.0.0' -and
+                $_.PrefixOrigin -ne 'WellKnown'
+            } | Sort-Object InterfaceIndex
+        foreach ($addr in $addresses) {
+            $adapter = Get-NetAdapter -InterfaceIndex $addr.InterfaceIndex -ErrorAction SilentlyContinue
+            if ($adapter -and $adapter.Status -eq 'Up') {
+                $result += [PSCustomObject]@{
+                    Name      = $adapter.Name
+                    IPAddress = $addr.IPAddress
+                }
+            }
+        }
+    } catch {
+        # Return empty on any error; caller will fall back to example config
+    }
+    return $result
+}
+
+# Replaces the interfaces: section in $sourcePath with $interfaceYaml lines.
+function Set-InterfacesSection {
+    param (
+        [string]   $sourcePath,
+        [string[]] $interfaceYaml
+    )
+    $lines    = Get-Content $sourcePath
+    $result   = [System.Collections.Generic.List[string]]::new()
+    $inIfaces = $false
+    foreach ($line in $lines) {
+        if ($line -match '^interfaces:') {
+            $inIfaces = $true
+            foreach ($ifLine in $interfaceYaml) { $result.Add($ifLine) }
+            $result.Add('')
+        } elseif ($inIfaces -and $line -match '^[a-zA-Z]') {
+            $inIfaces = $false
+            $result.Add($line)
+        } elseif (-not $inIfaces) {
+            $result.Add($line)
+        }
+        # Lines inside the example interfaces block are intentionally skipped
+    }
+    return $result
+}
+
 # ── Create config.yaml ────────────────────────────────────────────────────────
 
 if (-not (Test-Path "config.yaml")) {
-    Copy-Item "config.example.yaml" "config.yaml"
-    Write-Host ""
-    Write-Host "[OK] Created config.yaml from config.example.yaml" -ForegroundColor Green
+    $ifaces = Get-NonLoopbackInterfaces
+    if ($ifaces.Count -gt 0) {
+        $yamlLines = @('interfaces:')
+        $index = 0
+        foreach ($iface in $ifaces) {
+            $alias = switch ($index) {
+                0       { 'Primary LAN' }
+                1       { 'Secondary LAN' }
+                default { "Interface $($index + 1)" }
+            }
+            $yamlLines += "  - name: `"$($iface.Name)`""
+            $yamlLines += "    alias: `"$alias`""
+            $yamlLines += "    ipv4: `"$($iface.IPAddress)`""
+            $index++
+        }
+        $configLines = Set-InterfacesSection -sourcePath "config.example.yaml" -interfaceYaml $yamlLines
+        $configLines | Set-Content "config.yaml"
+        Write-Host ""
+        Write-Host "[OK] Created config.yaml with detected network interfaces" -ForegroundColor Green
+    } else {
+        Copy-Item "config.example.yaml" "config.yaml"
+        Write-Host ""
+        Write-Host "[OK] Created config.yaml from config.example.yaml (no interfaces detected)" -ForegroundColor Green
+    }
 } else {
     Write-Host ""
     Write-Host "[OK] config.yaml already exists (not overwritten)" -ForegroundColor Green
