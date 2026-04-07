@@ -9,14 +9,18 @@ general:
 # alias shown in the dashboard, and the IPv4 address bound to that interface.
 # This section is optional. When present, the dashboard offers a drop-down
 # so users can choose which interface to use for each monitored target.
+# NOTE: interface names below (e.g. "eth0") are placeholders — replace them
+# with the actual interface names on your system. Run `ip link` (Linux) or
+# `ifconfig` (macOS/BSD) to list your interfaces (common names: eth0, enp3s0,
+# ens3, en0, wlan0, etc.).
 interfaces:
-  - name: "eth0"
+  - name: "eth0"         # replace with your actual interface name
     alias: "Primary LAN"
     ipv4: "192.168.1.100"
-  # - name: "eth1"
+  # - name: "eth1"       # replace with your actual interface name
   #   alias: "Management NIC"
   #   ipv4: "10.0.0.1"
-  # - name: "wlan0"
+  # - name: "wlan0"      # replace with your actual interface name
   #   alias: "Wi-Fi"
   #   ipv4: "192.168.1.150"
 
@@ -24,7 +28,7 @@ targets:
   - name: "Google DNS"
     ip: "8.8.8.8"
     group: "DNS Servers"
-    interface: "eth0" # optional: outgoing interface name (must match an entry in interfaces above)
+    interface: "eth0" # optional: outgoing interface name — must match a 'name' entry in the interfaces section above (replace "eth0" with your real interface name)
   - name: "Cloudflare DNS"
     ip: "1.1.1.1"
     group: "DNS Servers"
