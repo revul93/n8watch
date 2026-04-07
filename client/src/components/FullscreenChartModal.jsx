@@ -1,10 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Minimize2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
 
+const CHART_TYPES = [
+  { key: 'latency', label: 'Latency' },
+  { key: 'jitter', label: 'Jitter' },
+  { key: 'packet_loss', label: 'Packet Loss' },
+  { key: 'uptime', label: 'Uptime' },
+];
+
 export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose, colorMap = {} }) {
   const [selectedIds, setSelectedIds] = useState([]);
+  const [activeCharts, setActiveCharts] = useState(['latency']);
   const containerRef = useRef(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
@@ -73,20 +82,31 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     );
   }, []);
 
+  const toggleChart = useCallback((key) => {
+    setActiveCharts(prev => {
+      if (prev.includes(key)) {
+        // Keep at least one chart active
+        return prev.length > 1 ? prev.filter(k => k !== key) : prev;
+      }
+      return [...prev, key];
+    });
+  }, []);
+
   const filteredTargets = selectedIds.length > 0
     ? targets.filter(t => selectedIds.includes(t.id))
     : targets;
 
-  return (
+  const content = (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-50 bg-gray-950 flex flex-col"
+      className="fixed z-[9999] bg-gray-950 flex flex-col"
+      style={{ top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="fullscreen-chart-title"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-800 flex-shrink-0">
         <h2 id="fullscreen-chart-title" className="text-lg font-semibold text-white">Live Metrics — Fullscreen</h2>
         <button
           onClick={handleClose}
@@ -98,22 +118,27 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         </button>
       </div>
 
-      {/* Target filter bar */}
+      {/* Legend / Target filter bar */}
       <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-gray-800 flex-shrink-0">
-        <span className="text-xs text-gray-500 mr-1">Filter targets:</span>
+        <span className="text-xs text-gray-500 mr-1">Targets:</span>
         {targets.map(t => {
           const active = selectedIds.length === 0 || selectedIds.includes(t.id);
+          const color = colorMap[t.id] || '#60a5fa';
           return (
             <button
               key={t.id}
               onClick={() => toggleTarget(t.id)}
               className={cn(
-                'px-3 py-1 rounded-lg text-xs font-medium transition-colors border',
+                'flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors border',
                 active
                   ? 'bg-blue-900/50 border-blue-700 text-blue-300'
                   : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300'
               )}
             >
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: active ? color : '#4b5563' }}
+              />
               {t.name}
             </button>
           );
@@ -128,15 +153,44 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         )}
       </div>
 
-      {/* Chart — takes remaining vertical space, stretched to fill */}
-      <div className="flex-1 p-6 min-h-0 flex flex-col overflow-hidden">
-        <UnifiedChart
-          targets={filteredTargets}
-          lastPingResults={lastPingResults}
-          colorMap={colorMap}
-          fillHeight
-        />
+      {/* Chart type selector */}
+      <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-gray-800 flex-shrink-0">
+        <span className="text-xs text-gray-500 mr-1">Charts:</span>
+        {CHART_TYPES.map(ct => {
+          const enabled = activeCharts.includes(ct.key);
+          return (
+            <button
+              key={ct.key}
+              onClick={() => toggleChart(ct.key)}
+              className={cn(
+                'px-3 py-1 rounded-lg text-xs font-medium transition-colors border',
+                enabled
+                  ? 'bg-indigo-900/50 border-indigo-700 text-indigo-300'
+                  : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300'
+              )}
+            >
+              {ct.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Charts — scrollable area with one chart per active type */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
+        {activeCharts.map(chartKey => (
+          <UnifiedChart
+            key={chartKey}
+            targets={filteredTargets}
+            lastPingResults={lastPingResults}
+            colorMap={colorMap}
+            controlledMetric={chartKey}
+            chartHeight={activeCharts.length === 1 ? undefined : 280}
+            fillHeight={activeCharts.length === 1}
+          />
+        ))}
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

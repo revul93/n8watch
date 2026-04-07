@@ -1,5 +1,5 @@
-import { Server, TrendingUp, TrendingDown, Clock } from 'lucide-react';
-import { cn, formatMs } from '../lib/utils';
+import { Server, TrendingUp, TrendingDown } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 function Card({ title, value, icon: Icon, colorClass, pulse }) {
   return (
@@ -22,8 +22,6 @@ export default function SummaryCards({ targets = [], lastPingResults = {} }) {
 
   let up = 0;
   let down = 0;
-  let latencySum = 0;
-  let latencyCount = 0;
 
   targets.forEach(t => {
     const latest = lastPingResults[t.id];
@@ -31,18 +29,10 @@ export default function SummaryCards({ targets = [], lastPingResults = {} }) {
     const isUp = rawAlive === null || rawAlive === undefined ? null : !!rawAlive;
     if (isUp === true) up++;
     else if (isUp === false) down++;
-
-    const lat = latest ? latest.avg_latency : t.avg_latency;
-    if (lat !== null && lat !== undefined) {
-      latencySum += lat;
-      latencyCount++;
-    }
   });
 
-  const avgLatency = latencyCount > 0 ? latencySum / latencyCount : null;
-
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <Card title="Total Hosts" value={total} icon={Server} colorClass="bg-blue-600" />
       <Card title="Hosts Up" value={up} icon={TrendingUp} colorClass="bg-green-600" />
       <Card
@@ -51,12 +41,6 @@ export default function SummaryCards({ targets = [], lastPingResults = {} }) {
         icon={TrendingDown}
         colorClass={down > 0 ? 'bg-red-600' : 'bg-gray-700'}
         pulse={down > 0}
-      />
-      <Card
-        title="Avg Latency"
-        value={formatMs(avgLatency)}
-        icon={Clock}
-        colorClass="bg-purple-600"
       />
     </div>
   );

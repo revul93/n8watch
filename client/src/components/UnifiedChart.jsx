@@ -74,8 +74,9 @@ function UptimeGauge({ name, color, percent }) {
   );
 }
 
-export default function UnifiedChart({ targets = [], lastPingResults = {}, chartHeight = 280, fillHeight = false, colorMap = {} }) {
-  const [metric, setMetric] = useState('latency');
+export default function UnifiedChart({ targets = [], lastPingResults = {}, chartHeight = 280, fillHeight = false, colorMap = {}, controlledMetric }) {
+  const [internalMetric, setInternalMetric] = useState('latency');
+  const metric = controlledMetric !== undefined ? controlledMetric : internalMetric;
   const [range, setRange] = useState(RANGES[2]); // 1h default
   const [chartData, setChartData] = useState([]);
   const [uptimeData, setUptimeData] = useState({});
@@ -329,9 +330,17 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
   return (
     <div ref={containerRef} className={`bg-gray-900 border border-gray-800 rounded-xl p-4 ${fillHeight ? 'flex-1 flex flex-col overflow-hidden' : ''}`}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 flex-shrink-0">
-        <h2 className="text-sm font-semibold text-gray-200">Live Metrics</h2>
+        <h2 className="text-sm font-semibold text-gray-200">
+          {controlledMetric === 'latency' ? 'Latency'
+            : controlledMetric === 'jitter' ? 'Jitter'
+            : controlledMetric === 'packet_loss' ? 'Packet Loss'
+            : controlledMetric === 'uptime' ? 'Uptime'
+            : 'Live Metrics'}
+        </h2>
         <div className="flex flex-wrap gap-2">
-          <MetricToggle value={metric} onChange={setMetric} />
+          {controlledMetric === undefined && (
+            <MetricToggle value={metric} onChange={setInternalMetric} />
+          )}
           {metric !== 'uptime' && (
             <TimeRangeSelector value={range.key} onChange={handleRangeChange} />
           )}
