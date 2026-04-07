@@ -96,6 +96,11 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     ? targets.filter(t => selectedIds.includes(t.id))
     : targets;
 
+  // Split active charts: latency always goes on the top row alone;
+  // all other charts share the bottom row side-by-side.
+  const latencyActive = activeCharts.includes('latency');
+  const nonLatencyCharts = activeCharts.filter(k => k !== 'latency');
+
   const content = (
     <div
       ref={containerRef}
@@ -175,19 +180,37 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         })}
       </div>
 
-      {/* Charts — scrollable area with one chart per active type */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
-        {activeCharts.map(chartKey => (
-          <UnifiedChart
-            key={chartKey}
-            targets={filteredTargets}
-            lastPingResults={lastPingResults}
-            colorMap={colorMap}
-            controlledMetric={chartKey}
-            chartHeight={activeCharts.length === 1 ? undefined : 280}
-            fillHeight={activeCharts.length === 1}
-          />
-        ))}
+      {/* Charts — no-scroll layout: latency on top full-width, others side-by-side below */}
+      <div className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col gap-4">
+        {/* Latency row — full width, takes more vertical space when others are present */}
+        {latencyActive && (
+          <div className={cn('min-h-0', nonLatencyCharts.length > 0 ? 'flex-[2]' : 'flex-1')}>
+            <UnifiedChart
+              targets={filteredTargets}
+              lastPingResults={lastPingResults}
+              colorMap={colorMap}
+              controlledMetric="latency"
+              fillHeight
+            />
+          </div>
+        )}
+
+        {/* Remaining charts — side by side in one row */}
+        {nonLatencyCharts.length > 0 && (
+          <div className="flex-1 min-h-0 flex gap-4">
+            {nonLatencyCharts.map(chartKey => (
+              <div key={chartKey} className="flex-1 min-h-0">
+                <UnifiedChart
+                  targets={filteredTargets}
+                  lastPingResults={lastPingResults}
+                  colorMap={colorMap}
+                  controlledMetric={chartKey}
+                  fillHeight
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

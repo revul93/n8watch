@@ -102,9 +102,23 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
 
   const effectiveHeight = fillHeight ? dynamicHeight : chartHeight;
 
+  // Track previous parameter values to detect full-reload vs incremental-refresh
+  const prevMetricRef = useRef(metric);
+  const prevRangeRef = useRef(range);
+  const prevTargetIdsRef = useRef(targets.map(t => t.id).join(','));
+
   const fetchData = useCallback(async () => {
     if (!targets.length) return;
     setLoading(true);
+
+    const targetIds = targets.map(t => t.id).join(',');
+    const isParamChange =
+      prevMetricRef.current !== metric ||
+      prevRangeRef.current !== range ||
+      prevTargetIdsRef.current !== targetIds;
+    prevMetricRef.current = metric;
+    prevRangeRef.current = range;
+    prevTargetIdsRef.current = targetIds;
 
     if (metric === 'uptime') {
       try {
@@ -161,7 +175,21 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
       });
 
       const sorted = Array.from(timeMap.values()).sort((a, b) => a.ts - b.ts);
-      setChartData(sorted);
+
+      setChartData(prev => {
+        // Full replace when metric/range/targets change — intentional user action
+        if (isParamChange || !prev.length) return sorted;
+
+        // Incremental update: merge only new time-buckets to keep the chart visually stable.
+        // Returning the same `prev` reference skips the React re-render entirely.
+        const prevTsSet = new Set(prev.map(d => d.ts));
+        const newPoints = sorted.filter(d => !prevTsSet.has(d.ts));
+        if (!newPoints.length) return prev; // nothing new — no re-render
+
+        const cutoff = Date.now() - range.minutes * 60 * 1000;
+        const combined = [...prev, ...newPoints].sort((a, b) => a.ts - b.ts);
+        return combined.filter(d => d.ts >= cutoff);
+      });
     } catch (e) {
       console.error('Chart fetch error:', e);
     } finally {
