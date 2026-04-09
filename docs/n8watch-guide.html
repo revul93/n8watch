@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>n8watch — System Guide</title>
+  <style>
+    /* ── Base ─────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 0;
+    }
+
+    /* ── Page layout for print ────────────────────────────────────────────── */
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+
+    @media print {
+      .page-break { page-break-before: always; }
+      .no-break   { page-break-inside: avoid; }
+      a           { color: inherit; text-decoration: none; }
+    }
+
+    /* ── Cover page ──────────────────────────────────────────────────────── */
+    .cover {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 60px 40px;
+    }
+
+    .cover-logo {
+      font-size: 72pt;
+      font-weight: 900;
+      color: #0ea5e9;
+      letter-spacing: -3px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .cover-subtitle {
+      font-size: 16pt;
+      font-weight: 300;
+      color: #475569;
+      margin-bottom: 40px;
+    }
+
+    .cover-tagline {
+      font-size: 13pt;
+      color: #64748b;
+      max-width: 520px;
+      line-height: 1.7;
+      margin-bottom: 60px;
+    }
+
+    .cover-meta {
+      font-size: 9pt;
+      color: #94a3b8;
+    }
+
+    .cover-rule {
+      width: 100px;
+      height: 3px;
+      background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+      border: none;
+      margin: 24px auto 32px;
+      border-radius: 2px;
+    }
+
+    /* ── Section headings ────────────────────────────────────────────────── */
+    h1 {
+      font-size: 22pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 32px 0 10px;
+      border-bottom: 2.5px solid #0ea5e9;
+      padding-bottom: 6px;
+    }
+
+    h2 {
+      font-size: 15pt;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin: 24px 0 8px;
+    }
+
+    h3 {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #334155;
+      margin: 18px 0 6px;
+    }
+
+    h4 {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #475569;
+      margin: 14px 0 4px;
+    }
+
+    /* ── Body text ───────────────────────────────────────────────────────── */
+    p { margin: 6px 0 10px; }
+
+    ul, ol {
+      margin: 6px 0 10px 22px;
+    }
+
+    li { margin-bottom: 4px; }
+
+    strong { color: #0f172a; }
+
+    /* ── Inline code ─────────────────────────────────────────────────────── */
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 9.5pt;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* ── Code blocks ─────────────────────────────────────────────────────── */
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 9pt;
+      padding: 12px 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 8px 0 14px;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background: none;
+      color: inherit;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    /* ── Callout / note boxes ────────────────────────────────────────────── */
+    .note {
+      background: #f0f9ff;
+      border-left: 4px solid #0ea5e9;
+      padding: 10px 14px;
+      margin: 10px 0 14px;
+      border-radius: 0 6px 6px 0;
+      font-size: 10pt;
+      color: #0c4a6e;
+    }
+
+    .warning {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      padding: 10px 14px;
+      margin: 10px 0 14px;
+      border-radius: 0 6px 6px 0;
+      font-size: 10pt;
+      color: #78350f;
+    }
+
+    /* ── Tables ──────────────────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      font-size: 10pt;
+    }
+
+    th {
+      background: #1e3a5f;
+      color: #fff;
+      font-weight: 700;
+      padding: 7px 10px;
+      text-align: left;
+    }
+
+    td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    /* ── Section wrapper ─────────────────────────────────────────────────── */
+    .section {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    .footer {
+      font-size: 8pt;
+      color: #94a3b8;
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════ COVER -->
+<div class="cover">
+  <div class="cover-logo">n8watch</div>
+  <div class="cover-subtitle">Night Network Watch</div>
+  <hr class="cover-rule" />
+  <p class="cover-tagline">
+    Real-time IP and network host monitoring with a web dashboard,
+    historical metrics, configurable alert rules, and email notifications.
+  </p>
+  <p class="cover-meta">System Guide · Version 1.0 · Node.js 24.0</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 1 -->
+<div class="section page-break">
+
+  <h1>1 · System Overview</h1>
+
+  <p>
+    <strong>n8watch</strong> is a lightweight, self-hosted network monitoring system that
+    continuously pings a configurable list of hosts, stores historical results in a local
+    SQLite database, and pushes live metrics to a React web dashboard via WebSocket.
+  </p>
+
+  <h2>Key Features</h2>
+  <ul>
+    <li><strong>Real-time ICMP monitoring</strong> — sends configurable ping cycles (count, interval, timeout) to every target.</li>
+    <li><strong>Web dashboard</strong> — live status grid with latency, jitter, packet loss, and uptime badges.</li>
+    <li><strong>Historical data</strong> — SQLite store with configurable retention (default 90 days); CSV export.</li>
+    <li><strong>Alert engine</strong> — JavaScript expression conditions (e.g. <code>packet_loss &gt; 20</code>) with per-rule cooldowns and per-target scoping.</li>
+    <li><strong>Email notifications</strong> — HTML-formatted SMTP alerts with deduplication via cooldown timers.</li>
+    <li><strong>Live config reload</strong> — edit <code>config.yaml</code> while running; targets and rules are applied within one second.</li>
+    <li><strong>WebSocket push</strong> — all connected browsers receive updated metrics immediately after each ping cycle.</li>
+    <li><strong>Multi-interface support</strong> — bind outgoing pings to a specific NIC per target.</li>
+    <li><strong>User-defined targets</strong> — add temporary ad-hoc hosts from the dashboard without editing config.</li>
+    <li><strong>Electron desktop app</strong> — optional standalone application for Windows, macOS, and Linux.</li>
+  </ul>
+
+  <h2>Architecture at a Glance</h2>
+  <table>
+    <tr><th>Layer</th><th>Technology</th><th>Role</th></tr>
+    <tr><td>Backend</td><td>Node.js · Express</td><td>REST API, WebSocket server, ping engine, alert engine, scheduler</td></tr>
+    <tr><td>Database</td><td>SQLite (better-sqlite3)</td><td>Persistent storage for targets, ping results, alerts</td></tr>
+    <tr><td>Frontend</td><td>React 18 · Vite · Tailwind CSS</td><td>Dashboard SPA (served as static files from <code>client/dist</code>)</td></tr>
+    <tr><td>Process mgr</td><td>PM2</td><td>Production process supervision, log rotation, system boot startup</td></tr>
+    <tr><td>Desktop</td><td>Electron (optional)</td><td>Wraps the server + SPA in a native application window</td></tr>
+  </table>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 2 -->
+<div class="section page-break">
+
+  <h1>2 · Prerequisites &amp; Installation</h1>
+
+  <h2>Prerequisites</h2>
+  <table>
+    <tr><th>Requirement</th><th>Version</th><th>Notes</th></tr>
+    <tr><td>Node.js</td><td><strong>24.0</strong> (v18+ minimum)</td><td><a href="https://nodejs.org">nodejs.org</a> — the setup scripts install v24 LTS automatically if Node.js is absent</td></tr>
+    <tr><td>npm</td><td>Bundled with Node.js</td><td>No separate install needed</td></tr>
+    <tr><td><code>ping</code></td><td>System binary</td><td>Pre-installed on Linux, macOS, Windows. On Debian/Ubuntu: <code>sudo apt install iputils-ping</code></td></tr>
+    <tr><td>Git</td><td>Any recent version</td><td>Required for the one-line install scripts</td></tr>
+  </table>
+
+  <div class="note">
+    <strong>Node.js v24 LTS</strong> is strongly recommended. The automated setup scripts
+    (<code>setup.sh</code> / <code>setup.ps1</code>) will install it automatically when Node.js
+    is not already present.
+  </div>
+
+  <h2>One-Line Install (Linux / macOS) — Recommended</h2>
+  <p>Clone the repository and run interactive setup in a single command:</p>
+  <pre><code># Using curl
+curl -fsSL https://raw.githubusercontent.com/revul93/n8watch/main/install.sh | bash
+
+# Using wget
+wget -qO- https://raw.githubusercontent.com/revul93/n8watch/main/install.sh | bash</code></pre>
+
+  <p>The installer clones the repo into an <code>n8watch/</code> directory then calls <code>setup.sh</code>.</p>
+
+  <h2>One-Line Install (Windows — PowerShell)</h2>
+  <pre><code>Invoke-Expression (Invoke-WebRequest `
+  -Uri "https://raw.githubusercontent.com/revul93/n8watch/main/install.ps1" `
+  -UseBasicParsing).Content</code></pre>
+
+  <h2>Manual Installation</h2>
+
+  <h3>Step 1 — Clone the repository</h3>
+  <pre><code>git clone https://github.com/revul93/n8watch.git
+cd n8watch</code></pre>
+
+  <h3>Step 2 — Run the interactive setup script</h3>
+  <pre><code># Linux / macOS
+bash setup.sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -File setup.ps1</code></pre>
+
+  <p>The setup script performs the following steps automatically:</p>
+  <ol>
+    <li>Checks for Node.js v24 LTS and installs it (via <code>nvm</code> or the platform package manager) if missing.</li>
+    <li>Installs backend Node.js dependencies (<code>npm install --omit=dev</code>).</li>
+    <li>Installs and builds the React frontend (<code>cd client &amp;&amp; npm install &amp;&amp; npm run build</code>).</li>
+    <li>Detects real network interfaces on the host and writes them into <code>config.yaml</code>; falls back to copying <code>config.example.yaml</code> unchanged.</li>
+    <li>Optionally installs PM2 globally, starts the application, saves the process list, and configures system-boot auto-startup.</li>
+  </ol>
+
+  <h3>Step 3 — Manual setup (alternative to the script)</h3>
+  <pre><code># Backend dependencies
+npm install
+
+# Frontend build
+cd client &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..
+
+# Configuration
+cp config.example.yaml config.yaml
+# → edit config.yaml with your targets and SMTP settings</code></pre>
+
+  <div class="warning">
+    <strong>After installation</strong>, open <code>config.yaml</code> and set your target IP addresses
+    and SMTP credentials before starting the application.
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 3 -->
+<div class="section page-break">
+
+  <h1>3 · Configuration (config.yaml)</h1>
+
+  <p>
+    All settings live in <code>config.yaml</code> at the project root. The file is watched at runtime —
+    save your changes and they are applied within one second without restarting the process.
+  </p>
+
+  <h2>3.1 General Settings</h2>
+  <pre><code>general:
+  ping_interval: 30        # Seconds between ping cycles (1–59)
+  ping_count: 5            # ICMP packets sent per cycle
+  ping_timeout: 5          # Timeout in seconds per ping attempt
+  data_retention_days: 90  # Days to keep historical ping results</code></pre>
+
+  <table>
+    <tr><th>Key</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>ping_interval</code></td><td>30</td><td>Seconds between each full ping sweep of all targets</td></tr>
+    <tr><td><code>ping_count</code></td><td>5</td><td>Number of ICMP packets sent to each host per cycle</td></tr>
+    <tr><td><code>ping_timeout</code></td><td>5</td><td>Per-packet timeout in seconds</td></tr>
+    <tr><td><code>data_retention_days</code></td><td>90</td><td>Historical ping results older than this are automatically purged</td></tr>
+  </table>
+
+  <h2>3.2 Network Interfaces (optional)</h2>
+  <pre><code>interfaces:
+  - name: "eth0"           # OS interface name (used with ping -I)
+    alias: "Primary LAN"  # Human-readable label shown in the dashboard
+    ipv4: "192.168.1.100" # IPv4 address bound to this interface</code></pre>
+
+  <p>
+    When present, the dashboard shows a drop-down in the <em>Add Target</em> panel and displays
+    a teal interface badge on each target card. The setup script auto-detects interfaces on the host.
+  </p>
+
+  <h2>3.3 System-Defined Targets</h2>
+  <pre><code>targets:
+  - name: "Google DNS"
+    ip: "8.8.8.8"
+    group: "DNS Servers"        # Optional grouping / filter label
+    interface: "eth0"           # Optional: binds outgoing ping to this NIC
+  - name: "Core Router"
+    ip: "192.168.1.1"
+    group: "Local Network"</code></pre>
+
+  <table>
+    <tr><th>Field</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>name</code></td><td>Yes</td><td>Display name in the dashboard and reports</td></tr>
+    <tr><td><code>ip</code></td><td>Yes</td><td>IPv4 address or resolvable hostname</td></tr>
+    <tr><td><code>group</code></td><td>No</td><td>Label used to filter targets in the dashboard</td></tr>
+    <tr><td><code>interface</code></td><td>No</td><td>OS interface name; must match an entry in the <code>interfaces</code> section</td></tr>
+  </table>
+
+  <h2>3.4 Server</h2>
+  <pre><code>server:
+  port: 3000          # HTTP port (default 3000)
+  host: "0.0.0.0"     # Bind address (0.0.0.0 = all network interfaces)
+  # ssl:              # Uncomment to enable HTTPS
+  #   enabled: true
+  #   cert: "/etc/ssl/certs/n8watch.crt"
+  #   key:  "/etc/ssl/private/n8watch.key"</code></pre>
+
+  <h2>3.5 Alerts &amp; Email Notifications</h2>
+  <pre><code>alerts:
+  email_notifications: true   # Set false to disable all email alerts
+
+  smtp:
+    host: "smtp.gmail.com"
+    port: 587
+    secure: false             # true = port 465 (TLS); false = port 587 (STARTTLS)
+    user: "you@gmail.com"
+    pass: "app-password"      # Use an app-specific password, not your account password
+    from: "n8watch &lt;monitor@yourdomain.com&gt;"
+    to:
+      - "admin@yourdomain.com"
+
+  rules:
+    - name: "Host Down"
+      condition: "packet_loss == 100"
+      severity: "critical"    # critical | warning
+      cooldown: 300           # Min seconds between repeated alerts for the same target
+      # targets:              # Omit or leave empty to apply rule to ALL targets
+    - name: "High Latency"
+      condition: "avg_latency > 200"
+      severity: "warning"
+      cooldown: 600
+      targets:                # Restrict to specific targets by name, IP, or numeric ID
+        - "Core Router"</code></pre>
+
+  <h3>Alert Rule Condition Variables</h3>
+  <table>
+    <tr><th>Variable</th><th>Type</th><th>Description</th></tr>
+    <tr><td><code>is_alive</code></td><td>0 or 1</td><td>Whether the host responded</td></tr>
+    <tr><td><code>packet_loss</code></td><td>0–100 (%)</td><td>Percentage of lost packets</td></tr>
+    <tr><td><code>avg_latency</code></td><td>ms</td><td>Average round-trip time</td></tr>
+    <tr><td><code>min_latency</code></td><td>ms</td><td>Minimum round-trip time</td></tr>
+    <tr><td><code>max_latency</code></td><td>ms</td><td>Maximum round-trip time</td></tr>
+    <tr><td><code>jitter</code></td><td>ms</td><td>(max − min) / 2</td></tr>
+    <tr><td><code>packets_sent</code></td><td>integer</td><td>Total packets sent in the cycle</td></tr>
+    <tr><td><code>packets_received</code></td><td>integer</td><td>Total packets received</td></tr>
+  </table>
+
+  <p><strong>Example conditions:</strong></p>
+  <pre><code>condition: "packet_loss == 100"   # Host completely unreachable
+condition: "packet_loss > 20"     # More than 20% packet loss
+condition: "avg_latency > 200"    # Latency exceeds 200 ms
+condition: "jitter > 50"          # Jitter exceeds 50 ms
+condition: "is_alive == 0"        # Host not responding</code></pre>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 4 -->
+<div class="section page-break">
+
+  <h1>4 · How the System Works</h1>
+
+  <h2>4.1 Ping Engine &amp; Scheduler</h2>
+  <p>
+    On startup, <code>server/scheduler.js</code> creates a <code>node-cron</code> job that fires every
+    <code>general.ping_interval</code> seconds. Each tick triggers <code>server/ping-engine.js</code>,
+    which pings all active targets in parallel. Results (min/avg/max latency, jitter, packet loss,
+    alive status) are written to the <code>ping_results</code> SQLite table and immediately broadcast
+    to all connected WebSocket clients.
+  </p>
+
+  <h2>4.2 Alert Engine</h2>
+  <p>
+    After each ping cycle, <code>server/alert-engine.js</code> evaluates every alert rule against
+    the fresh metrics for each in-scope target. If a condition evaluates to <code>true</code> and
+    the rule's cooldown timer has not yet elapsed, an alert record is written to the
+    <code>alerts</code> table, a WebSocket <code>alert</code> event is pushed to the dashboard, and
+    (if SMTP is configured) an HTML email notification is dispatched.
+  </p>
+
+  <h2>4.3 Live Config Reload</h2>
+  <p>
+    <code>server/config.js</code> uses Node.js <code>fs.watch</code> to monitor <code>config.yaml</code>.
+    When a change is detected, the file is re-parsed and the application:
+  </p>
+  <ol>
+    <li>Re-syncs the target list in the database (adds new entries, removes deleted ones).</li>
+    <li>Restarts the ping scheduler with the (possibly new) interval.</li>
+    <li>Reinitialises the email service and alert engine with updated rules.</li>
+    <li>Broadcasts a <code>config_reloaded</code> WebSocket event so connected browsers can refresh.</li>
+  </ol>
+
+  <h2>4.4 System-Defined vs User-Defined Targets</h2>
+
+  <h3>System-Defined Targets</h3>
+  <p>
+    Targets listed in the <code>targets:</code> section of <code>config.yaml</code> are
+    <strong>system-defined</strong>. They are loaded on startup, kept in sync on every live
+    config reload, and persist as long as they appear in the file. They are stored in the
+    database with <code>is_user_target = 0</code>.
+  </p>
+
+  <h3>User-Defined Targets</h3>
+  <p>
+    Any host added via the dashboard's <em>Add Target</em> panel (or via
+    <code>POST /api/targets/user-targets</code>) is a <strong>user-defined target</strong>.
+    These are useful for quick, ad-hoc monitoring without editing config. They are stored
+    with <code>is_user_target = 1</code>, are temporary by default, and can be removed
+    individually from the dashboard or via <code>DELETE /api/targets/user-targets/:id</code>.
+  </p>
+
+  <table>
+    <tr>
+      <th>Feature</th>
+      <th>System-Defined</th>
+      <th>User-Defined</th>
+    </tr>
+    <tr><td>Defined in <code>config.yaml</code></td><td>✅ Yes</td><td>❌ No</td></tr>
+    <tr><td>Persists across restarts</td><td>✅ Yes</td><td>⚠️ Temporary</td></tr>
+    <tr><td>Live-reloaded with config</td><td>✅ Yes</td><td>❌ No</td></tr>
+    <tr><td>Added via dashboard / API</td><td>❌ No</td><td>✅ Yes</td></tr>
+    <tr><td>Subject to alert rules</td><td>✅ Yes</td><td>✅ Yes</td></tr>
+    <tr><td>Manually removable from dashboard</td><td>❌ No</td><td>✅ Yes</td></tr>
+  </table>
+
+  <h2>4.5 WebSocket Events</h2>
+  <p>Connect to <code>ws://&lt;host&gt;:3000</code> to receive real-time events:</p>
+  <table>
+    <tr><th>Event</th><th>Emitted when</th></tr>
+    <tr><td><code>ping_result</code></td><td>After each full ping cycle — contains fresh metrics for all targets</td></tr>
+    <tr><td><code>alert</code></td><td>An alert rule fires for a target</td></tr>
+    <tr><td><code>config_reloaded</code></td><td><code>config.yaml</code> is saved and reloaded</td></tr>
+  </table>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 5 -->
+<div class="section page-break">
+
+  <h1>5 · Running the Application</h1>
+
+  <h2>5.1 Development (Node.js directly)</h2>
+  <pre><code># Start the backend (serves the pre-built frontend from client/dist)
+npm start
+# or
+node server/index.js
+
+# Hot-reload frontend during UI development (separate terminal)
+cd client
+npm run dev    # Vite dev server on http://localhost:5173 — proxies API to :3000</code></pre>
+
+  <p>Open <code>http://localhost:3000</code> (or the configured host/port) in your browser.</p>
+
+  <h2>5.2 Production with PM2</h2>
+
+  <p>PM2 is the recommended process manager — it restarts the app automatically, rotates logs, and can start on system boot.</p>
+
+  <pre><code># Install PM2 globally (one-time)
+npm install -g pm2</code></pre>
+
+  <h3>npm run shortcuts</h3>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>npm run pm2:start</code></td><td>Start n8watch under PM2 using <code>ecosystem.config.js</code></td></tr>
+    <tr><td><code>npm run pm2:stop</code></td><td>Stop the running process</td></tr>
+    <tr><td><code>npm run pm2:restart</code></td><td>Hard restart (brief downtime)</td></tr>
+    <tr><td><code>npm run pm2:reload</code></td><td>Graceful reload (zero-downtime restart)</td></tr>
+    <tr><td><code>npm run pm2:logs</code></td><td>Tail real-time application logs</td></tr>
+    <tr><td><code>npm run pm2:status</code></td><td>Show process status and uptime</td></tr>
+    <tr><td><code>npm run pm2:save</code></td><td>Persist the current process list</td></tr>
+    <tr><td><code>npm run pm2:startup</code></td><td>Generate and run the system-boot startup command</td></tr>
+  </table>
+
+  <h3>Direct PM2 commands (equivalent)</h3>
+  <pre><code>pm2 start ecosystem.config.js   # Start
+pm2 stop n8watch                 # Stop
+pm2 restart n8watch              # Hard restart
+pm2 reload n8watch               # Zero-downtime reload
+pm2 logs n8watch                 # Tail logs
+pm2 status                       # Process list
+pm2 monit                        # Real-time monitor
+pm2 save &amp;&amp; pm2 startup          # Enable auto-start on reboot</code></pre>
+
+  <h3>Log files</h3>
+  <p>Logs are written to:</p>
+  <ul>
+    <li><code>logs/out.log</code> — standard output</li>
+    <li><code>logs/error.log</code> — standard error</li>
+  </ul>
+
+  <h2>5.3 Windows (without PM2)</h2>
+  <pre><code>REM Option A — double-click or CMD
+start.cmd
+
+REM Option B — Node.js directly
+node server\index.js
+
+REM Option C — PM2 (recommended)
+npm run pm2:start</code></pre>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 6 -->
+<div class="section page-break">
+
+  <h1>6 · Database Maintenance Scripts</h1>
+
+  <p>
+    n8watch ships two maintenance scripts in <code>scripts/</code>. Always stop the application
+    before running either script to avoid database conflicts.
+  </p>
+
+  <h2>6.1 flush-data.js — Clear Rows</h2>
+  <p>
+    Deletes rows from the database without removing the database file itself.
+    Useful for freeing disk space or resetting metrics between test runs.
+  </p>
+
+  <pre><code># Via npm shortcut (flushes ping results only — default)
+npm run db:flush
+
+# Via npm shortcut (flushes everything — ping results, alerts, and all targets)
+npm run db:flush:all
+
+# Direct invocation with flags
+node scripts/flush-data.js --ping-results   # ping results only (default)
+node scripts/flush-data.js --alerts         # alert records only
+node scripts/flush-data.js --ping-results --alerts  # both
+node scripts/flush-data.js --all            # ping results + alerts + targets
+node scripts/flush-data.js --all --yes      # non-interactive (skip confirmation)</code></pre>
+
+  <table>
+    <tr><th>Flag</th><th>What is deleted</th></tr>
+    <tr><td>(none) or <code>--ping-results</code></td><td>All rows in <code>ping_results</code></td></tr>
+    <tr><td><code>--alerts</code></td><td>All alert records</td></tr>
+    <tr><td><code>--ping-results --alerts</code></td><td>Ping results <em>and</em> alert records</td></tr>
+    <tr><td><code>--all</code></td><td>Ping results, alerts, and all targets</td></tr>
+    <tr><td><code>--yes</code></td><td>Suppresses the confirmation prompt</td></tr>
+  </table>
+
+  <h2>6.2 nuke-db.js — Complete Wipe &amp; Recreate</h2>
+  <p>
+    Deletes the database <em>file</em> entirely (including WAL and SHM sidecar files)
+    and recreates an empty schema from scratch. Auto-increment counters are reset;
+    no data survives.
+  </p>
+
+  <pre><code># Via npm shortcut (interactive — requires typing YES)
+npm run db:nuke
+
+# Non-interactive (CI / automated scripts)
+node scripts/nuke-db.js --yes</code></pre>
+
+  <div class="warning">
+    <strong>Warning:</strong> <code>nuke-db.js</code> is irreversible. All ping history, alert records,
+    and target entries are permanently deleted. After nuking, start the application normally —
+    targets from <code>config.yaml</code> will be reloaded on the next ping cycle.
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 7 -->
+<div class="section page-break">
+
+  <h1>7 · Web Dashboard</h1>
+
+  <p>Open <code>http://&lt;host&gt;:3000</code> after the application is running.</p>
+
+  <table>
+    <tr><th>Page</th><th>URL</th><th>Description</th></tr>
+    <tr><td>Dashboard</td><td><code>/</code></td><td>Live grid of all monitored hosts — status, latency, jitter, packet loss, uptime</td></tr>
+    <tr><td>History</td><td><code>/history</code></td><td>Paginated historical ping results with date/target filters and CSV export</td></tr>
+    <tr><td>Alerts</td><td><code>/alerts</code></td><td>Active and historical alerts, acknowledgement, and configured rules viewer</td></tr>
+  </table>
+
+  <h2>Adding a Temporary Target</h2>
+  <ol>
+    <li>Click <strong>Add Target</strong> on the Dashboard page.</li>
+    <li>Enter a display name, IP address / hostname, and (optionally) select an interface from the drop-down.</li>
+    <li>Click <strong>Add</strong> — the target appears in the grid and is pinged in the next cycle.</li>
+    <li>Remove it with the <strong>×</strong> button on its card (user-defined targets only).</li>
+  </ol>
+
+  <h1>8 · API Quick Reference</h1>
+
+  <p>All endpoints are prefixed with <code>/api</code> and return JSON.</p>
+
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr><td>GET</td><td><code>/api/targets</code></td><td>List all targets with latest metrics</td></tr>
+    <tr><td>GET</td><td><code>/api/targets/:id/metrics</code></td><td>Aggregated metrics for a target</td></tr>
+    <tr><td>GET</td><td><code>/api/targets/:id/ping-results</code></td><td>Ping history for a target</td></tr>
+    <tr><td>POST</td><td><code>/api/targets/user-targets</code></td><td>Add a temporary user-defined target</td></tr>
+    <tr><td>DELETE</td><td><code>/api/targets/user-targets/:id</code></td><td>Remove a user-defined target</td></tr>
+    <tr><td>GET</td><td><code>/api/alerts</code></td><td>List alert events</td></tr>
+    <tr><td>POST</td><td><code>/api/alerts/:id/acknowledge</code></td><td>Acknowledge an alert</td></tr>
+    <tr><td>GET</td><td><code>/api/dashboard</code></td><td>Summary stats (uptime, avg latency, active alerts)</td></tr>
+    <tr><td>GET</td><td><code>/api/export</code></td><td>Export metrics to CSV</td></tr>
+    <tr><td>GET</td><td><code>/api/interfaces</code></td><td>List interfaces from <code>config.yaml</code></td></tr>
+  </table>
+
+  <div class="footer">
+    n8watch · Night Network Watch · Licensed under GNU GPL v3.0 ·
+    <a href="https://github.com/revul93/n8watch">github.com/revul93/n8watch</a>
+  </div>
+
+</div>
+
+</body>
+</html>
