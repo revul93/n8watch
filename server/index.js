@@ -177,8 +177,7 @@ async function main() {
   });
 
   // 14. Start HTTP/HTTPS server
-  const ssl2 = config.server.ssl;
-  const protocol = ssl2 && ssl2.enabled ? "https" : "http";
+  const protocol = ssl && ssl.enabled ? "https" : "http";
   server.listen(port, host, () => {
     console.log(`[App] n8watch listening on ${protocol}://${host}:${port}`);
   });
