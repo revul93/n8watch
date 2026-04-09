@@ -31,7 +31,7 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS targets (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       name            TEXT    NOT NULL,
-      ip              TEXT    NOT NULL UNIQUE,
+      ip              TEXT    NOT NULL,
       grp             TEXT,
       interface       TEXT,
       interface_alias TEXT,
@@ -40,6 +40,17 @@ function initDatabase() {
       created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
       updated_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
     );
+
+    -- Unique constraint: same IP is only a duplicate when the interface is also
+    -- the same (or both are absent). This allows monitoring the same host via
+    -- multiple outgoing interfaces (e.g. eth0 and eth1) simultaneously.
+    -- Two partial indexes implement NULL-safe equality for the interface column:
+    --   1. Among targets with no interface: at most one entry per IP.
+    --   2. Among targets with an interface: at most one entry per (IP, interface).
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_targets_ip_null_iface
+      ON targets(ip) WHERE interface IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_targets_ip_iface
+      ON targets(ip, interface) WHERE interface IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS ping_results (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,6 +108,56 @@ function initDatabase() {
     _db.exec("ALTER TABLE targets ADD COLUMN interface_alias TEXT");
   }
 
+  // Migrate: if the targets table still has a UNIQUE constraint on the ip column
+  // alone (the old schema), recreate the table without it and add the new
+  // partial unique indexes that allow the same IP with different interfaces.
+  const tableSchema = _db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='targets'",
+    )
+    .get();
+  const hasLegacyUniqueIp =
+    tableSchema &&
+    /ip\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(tableSchema.sql);
+  if (hasLegacyUniqueIp) {
+    _db.exec(`
+      PRAGMA foreign_keys = OFF;
+
+      CREATE TABLE targets_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        name            TEXT    NOT NULL,
+        ip              TEXT    NOT NULL,
+        grp             TEXT,
+        interface       TEXT,
+        interface_alias TEXT,
+        is_user_target  INTEGER NOT NULL DEFAULT 0,
+        expires_at      INTEGER,
+        created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
+        updated_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+      );
+
+      INSERT INTO targets_new
+        SELECT id, name, ip, grp, interface, interface_alias,
+               is_user_target, expires_at, created_at, updated_at
+        FROM targets;
+
+      DROP TABLE targets;
+      ALTER TABLE targets_new RENAME TO targets;
+
+      PRAGMA foreign_keys = ON;
+    `);
+
+    // Re-create the partial unique indexes after the migration
+    _db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_targets_ip_null_iface
+        ON targets(ip) WHERE interface IS NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_targets_ip_iface
+        ON targets(ip, interface) WHERE interface IS NOT NULL;
+    `);
+
+    console.log("[DB] Migrated targets table: replaced UNIQUE(ip) with partial unique indexes");
+  }
+
   return _db;
 }
 
@@ -104,43 +165,57 @@ function syncTargets(targets) {
   const db = getDb();
   const now = Date.now();
 
-  const upsert = db.prepare(`
-    INSERT INTO targets (name, ip, grp, interface, interface_alias, is_user_target, created_at, updated_at)
-    VALUES (@name, @ip, @grp, @interface, @interface_alias, 0, @now, @now)
-    ON CONFLICT(ip) DO UPDATE SET
-      name            = excluded.name,
-      grp             = excluded.grp,
-      interface       = excluded.interface,
-      interface_alias = excluded.interface_alias,
+  const updateStmt = db.prepare(`
+    UPDATE targets
+    SET
+      name            = @name,
+      grp             = @grp,
+      interface_alias = @interface_alias,
       is_user_target  = 0,
       expires_at      = NULL,
-      updated_at      = excluded.updated_at
-    WHERE is_user_target = 0
+      updated_at      = @now
+    WHERE ip = @ip
+      AND COALESCE(interface, '') = COALESCE(@interface, '')
+      AND is_user_target = 0
+  `);
+
+  const insertStmt = db.prepare(`
+    INSERT INTO targets (name, ip, grp, interface, interface_alias, is_user_target, created_at, updated_at)
+    VALUES (@name, @ip, @grp, @interface, @interface_alias, 0, @now, @now)
   `);
 
   const syncAll = db.transaction((targets) => {
+    // Build a set of canonical keys (ip + '|' + interface) for the current config.
+    // This is used to remove config targets that are no longer present.
+    const configKeys = new Set(
+      targets.map((t) => `${t.ip}|${t.interface || ""}`)
+    );
+
     for (const t of targets) {
-      upsert.run({
+      const params = {
         name: t.name,
         ip: t.ip,
         grp: t.group || null,
         interface: t.interface || null,
         interface_alias: t.interface_alias || null,
         now,
-      });
+      };
+      const result = updateStmt.run(params);
+      if (result.changes === 0) {
+        insertStmt.run(params);
+      }
     }
 
-    // Remove config targets that are no longer in the config (preserve user targets).
-    // Placeholders (e.g. "?,?,?") are built from the array length, not user data,
-    // so this is not a SQL injection risk; actual IP values are passed as bound parameters.
-    if (targets.length > 0) {
-      const placeholders = targets.map(() => "?").join(", ");
-      const ips = targets.map((t) => t.ip);
-      db.prepare(
-        `DELETE FROM targets WHERE ip NOT IN (${placeholders}) AND is_user_target = 0`,
-      ).run(...ips);
-    } else {
-      db.prepare("DELETE FROM targets WHERE is_user_target = 0").run();
+    // Remove config targets whose (ip, interface) pair is no longer in config,
+    // while preserving user-added targets.
+    const dbConfigTargets = db
+      .prepare("SELECT id, ip, interface FROM targets WHERE is_user_target = 0")
+      .all();
+    for (const row of dbConfigTargets) {
+      const key = `${row.ip}|${row.interface || ""}`;
+      if (!configKeys.has(key)) {
+        db.prepare("DELETE FROM targets WHERE id = ?").run(row.id);
+      }
     }
   });
 
@@ -524,6 +599,22 @@ function addUserTarget(name, ip, iface, ifaceAlias) {
   const db = getDb();
   const now = Date.now();
   const expiresAt = now + 5 * 86400000; // 5 days
+
+  // Enforce (ip, interface) uniqueness at the application level.
+  // Two NULLs are considered equal here (same host, same default interface).
+  const existing = db
+    .prepare(
+      "SELECT id FROM targets WHERE ip = ? AND COALESCE(interface, '') = COALESCE(?, '')",
+    )
+    .get(ip, iface || null);
+  if (existing) {
+    const err = new Error(
+      "UNIQUE constraint failed: a target with this IP and interface already exists",
+    );
+    err.code = "UNIQUE_IP_INTERFACE";
+    throw err;
+  }
+
   const result = db
     .prepare(
       `

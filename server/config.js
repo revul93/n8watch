@@ -52,6 +52,16 @@ function loadConfig() {
   config.server.port = config.server.port || 3000;
   config.server.host = config.server.host || "0.0.0.0";
 
+  // Validate SSL config when enabled
+  if (config.server.ssl && config.server.ssl.enabled) {
+    if (!config.server.ssl.cert) {
+      throw new Error("SSL enabled but config.server.ssl.cert is missing");
+    }
+    if (!config.server.ssl.key) {
+      throw new Error("SSL enabled but config.server.ssl.key is missing");
+    }
+  }
+
   // Default email_notifications to true if not explicitly set
   if (config.alerts) {
     if (config.alerts.email_notifications === undefined) {

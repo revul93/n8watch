@@ -1,6 +1,8 @@
 "use strict";
 
 const http = require("http");
+const https = require("https");
+const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
@@ -105,8 +107,21 @@ async function main() {
   app.use("/api/dashboard", dashboardRouter);
   app.use("/api/interfaces", interfacesRouter);
 
-  // 7. Create HTTP server and init WebSocket
-  const server = http.createServer(app);
+  // 7. Create HTTP/HTTPS server and init WebSocket
+  let server;
+  const ssl = config.server.ssl;
+  if (ssl && ssl.enabled) {
+    const sslOptions = {
+      cert: fs.readFileSync(ssl.cert),
+      key: fs.readFileSync(ssl.key),
+    };
+    if (ssl.ca) {
+      sslOptions.ca = fs.readFileSync(ssl.ca);
+    }
+    server = https.createServer(sslOptions, app);
+  } else {
+    server = http.createServer(app);
+  }
   const wss = initWebSocket(server);
 
   // 8. Init email service
@@ -161,9 +176,11 @@ async function main() {
     });
   });
 
-  // 14. Start HTTP server
+  // 14. Start HTTP/HTTPS server
+  const ssl2 = config.server.ssl;
+  const protocol = ssl2 && ssl2.enabled ? "https" : "http";
   server.listen(port, host, () => {
-    console.log(`[App] n8watch listening on http://${host}:${port}`);
+    console.log(`[App] n8watch listening on ${protocol}://${host}:${port}`);
   });
 
   // Graceful shutdown

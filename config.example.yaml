@@ -78,3 +78,16 @@ alerts:
 server:
   port: 3000
   host: "0.0.0.0"
+  # ssl:                                   # Uncomment to enable HTTPS
+  #   enabled: true
+  #   cert: "/etc/ssl/certs/n8watch.crt"   # Path to the PEM-encoded certificate
+  #   key:  "/etc/ssl/private/n8watch.key" # Path to the PEM-encoded private key
+  #   # ca: "/etc/ssl/certs/ca-chain.crt"  # Optional: CA bundle for self-signed certs
+  #
+  # Typical HTTPS setup (port 443 requires root or CAP_NET_BIND_SERVICE):
+  # port: 443
+  # host: "0.0.0.0"
+  # ssl:
+  #   enabled: true
+  #   cert: "/etc/letsencrypt/live/yourdomain.com/fullchain.pem"
+  #   key:  "/etc/letsencrypt/live/yourdomain.com/privkey.pem"
