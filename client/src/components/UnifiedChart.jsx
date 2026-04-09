@@ -8,7 +8,12 @@ import MetricToggle from './MetricToggle';
 import TimeRangeSelector, { RANGES } from './TimeRangeSelector';
 import { getMetrics, getUptime } from '../lib/api';
 
-const COLORS = ['#60a5fa', '#34d399', '#f87171', '#fbbf24', '#a78bfa', '#fb923c', '#38bdf8', '#4ade80'];
+const COLORS = [
+  '#60a5fa', '#34d399', '#f87171', '#fbbf24', '#a78bfa', '#fb923c',
+  '#38bdf8', '#4ade80', '#f472b6', '#e879f9', '#2dd4bf', '#facc15',
+  '#818cf8', '#fb7185', '#a3e635', '#22d3ee', '#c084fc', '#fdba74',
+  '#86efac', '#67e8f9',
+];
 
 /**
  * Build a stable color map from an ordered list of all targets (not just the
@@ -84,6 +89,12 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
   const containerRef = useRef(null);
   const [dynamicHeight, setDynamicHeight] = useState(chartHeight);
 
+  // Track whether we have successfully loaded data at least once.
+  // Used to suppress the loading spinner on silent background refreshes so
+  // that the chart doesn't flash "Loading…" every ping cycle (most visible
+  // in fullscreen mode where the chart fills the entire screen).
+  const hasDataRef = useRef(false);
+
   // When fillHeight=true, observe the *parent* element so we don't create a
   // feedback loop where the chart growing causes a re-measure → more growth.
   useEffect(() => {
@@ -109,7 +120,6 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
 
   const fetchData = useCallback(async () => {
     if (!targets.length) return;
-    setLoading(true);
 
     const targetIds = targets.map(t => t.id).join(',');
     const isParamChange =
@@ -119,6 +129,12 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
     prevMetricRef.current = metric;
     prevRangeRef.current = range;
     prevTargetIdsRef.current = targetIds;
+
+    // Only show the loading spinner on the very first load or when the user
+    // explicitly changes metric / range / targets. Background incremental
+    // refreshes (triggered by incoming ping results) should update the chart
+    // silently to avoid a jarring full-screen flash.
+    if (!hasDataRef.current || isParamChange) setLoading(true);
 
     if (metric === 'uptime') {
       try {
@@ -132,6 +148,7 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
           }
         });
         setUptimeData(map);
+        hasDataRef.current = true;
       } catch (e) {
         console.error('Uptime fetch error:', e);
       } finally {
@@ -178,7 +195,10 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
 
       setChartData(prev => {
         // Full replace when metric/range/targets change — intentional user action
-        if (isParamChange || !prev.length) return sorted;
+        if (isParamChange || !prev.length) {
+          hasDataRef.current = true;
+          return sorted;
+        }
 
         // Incremental update: merge only new time-buckets to keep the chart visually stable.
         // Returning the same `prev` reference skips the React re-render entirely.
@@ -186,6 +206,7 @@ export default function UnifiedChart({ targets = [], lastPingResults = {}, chart
         const newPoints = sorted.filter(d => !prevTsSet.has(d.ts));
         if (!newPoints.length) return prev; // nothing new — no re-render
 
+        hasDataRef.current = true;
         const cutoff = Date.now() - range.minutes * 60 * 1000;
         const combined = [...prev, ...newPoints].sort((a, b) => a.ts - b.ts);
         return combined.filter(d => d.ts >= cutoff);

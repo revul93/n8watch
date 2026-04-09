@@ -52,8 +52,8 @@ router.post('/user-targets', (req, res) => {
     const target  = targets.find(t => t.id === id) || { id, name: trimmedName, ip: trimmedIp, is_user_target: 1 };
     res.status(201).json({ target });
   } catch (err) {
-    if (err.message && err.message.includes('UNIQUE constraint')) {
-      return res.status(409).json({ error: 'A target with this IP already exists' });
+    if (err.code === 'UNIQUE_IP_INTERFACE' || (err.message && err.message.includes('UNIQUE constraint'))) {
+      return res.status(409).json({ error: 'A target with this IP and interface combination already exists' });
     }
     console.error('[Routes/targets] POST /user-targets:', err.message);
     res.status(500).json({ error: 'Internal server error' });
