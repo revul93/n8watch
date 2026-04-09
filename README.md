@@ -20,6 +20,7 @@
   - [General Settings](#general-settings)
   - [Interfaces](#interfaces)
   - [Targets](#targets)
+  - [System-Defined Targets vs User-Defined Targets](#system-defined-targets-vs-user-defined-targets)
   - [Server](#server)
   - [Alerts & Email Notifications](#alerts--email-notifications)
   - [Alert Rule Conditions](#alert-rule-conditions)
@@ -54,11 +55,13 @@
 
 | Requirement | Minimum Version      | Notes                                  |
 | ----------- | -------------------- | -------------------------------------- |
-| Node.js     | 18+                  | [nodejs.org](https://nodejs.org)       |
+| Node.js     | **24.0** (recommended) | [nodejs.org](https://nodejs.org) — v18+ minimum, v24 LTS strongly recommended |
 | `ping`      | System binary        | Pre-installed on Linux, macOS, Windows |
 | npm         | Bundled with Node.js |                                        |
 
 > **Linux note:** If `ping` is not available, install it with `sudo apt install iputils-ping` (Debian/Ubuntu) or the equivalent for your distribution.
+
+> **Node.js version note:** The setup scripts (`setup.sh` / `setup.ps1`) will automatically install **Node.js v24 LTS** if Node.js is not already present on your system. If you manage Node.js manually, v24 is strongly recommended for the best performance and long-term support.
 
 ---
 
@@ -136,11 +139,11 @@ cp config.example.yaml config.yaml
 
 ### Prerequisites (Windows)
 
-| Requirement | Notes                                                                                            |
-| ----------- | ------------------------------------------------------------------------------------------------ |
-| Node.js 18+ | [nodejs.org](https://nodejs.org) — choose the Windows Installer (.msi)                           |
-| Git         | [git-scm.com](https://git-scm.com/download/win)                                                  |
-| Build Tools | Run `npm install -g windows-build-tools` **as Administrator** (needed to compile native modules) |
+| Requirement      | Notes                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| Node.js **24.0** | [nodejs.org](https://nodejs.org) — choose the Windows Installer (.msi); v18+ minimum, v24 recommended |
+| Git              | [git-scm.com](https://git-scm.com/download/win)                                                  |
+| Build Tools      | Run `npm install -g windows-build-tools` **as Administrator** (needed to compile native modules) |
 
 > **Build Tools note:** `better-sqlite3` contains a native Node.js add-on and must be compiled on first install.
 > The recommended way to obtain the required compiler toolchain on Windows is:
@@ -200,7 +203,7 @@ powershell -ExecutionPolicy Bypass -File setup.ps1
 
 The script will:
 
-1. Verify Node.js is installed (v18+).
+1. Verify Node.js is installed (v24.0 recommended, v18+ minimum).
 2. Install backend dependencies (`npm install`).
 3. Install and build the frontend.
 4. Detect real network interfaces via `Get-NetIPAddress` / `Get-NetAdapter` and write them into `config.yaml`; falls back to copying `config.example.yaml` unchanged when no interfaces are detected.
@@ -349,7 +352,46 @@ targets:
 
 The `interface` field is optional. When set, it must match the `name` of an entry in the `interfaces` section. The corresponding `alias` is looked up automatically and stored alongside the target so the dashboard and reports can display it without the raw interface name.
 
-### Server
+### System-Defined Targets vs User-Defined Targets
+
+n8watch supports two types of monitored targets:
+
+#### System-Defined Targets (config.yaml)
+
+Targets listed under `targets:` in `config.yaml` are **system-defined**. They are:
+
+- Loaded automatically when the application starts.
+- Kept in sync on every live config reload — new entries are added; removed entries are deleted.
+- **Persistent** — they remain in the database as long as they appear in `config.yaml`.
+- Monitored continuously according to `general.ping_interval`.
+- Subject to all configured alert rules (global and target-specific).
+- Identified in the database with `is_user_target = 0`.
+
+#### User-Defined Targets (dashboard / API)
+
+Users can add **temporary targets** directly from the dashboard (or via `POST /api/targets/user-targets`) without editing `config.yaml`. These targets are:
+
+- Created interactively via the **Add Target** panel in the dashboard.
+- Stored in the database with `is_user_target = 1`.
+- **Temporary by default** — they are automatically removed from the database after a configurable expiry period.
+- Not written back to `config.yaml`; they do not survive a database nuke.
+- Also subject to all alert rules, just like system-defined targets.
+- Removable at any time via the dashboard or `DELETE /api/targets/user-targets/:id`.
+
+> **Tip:** Use system-defined targets for permanent, production-critical hosts and user-defined targets for quick, ad-hoc monitoring (e.g. troubleshooting a transient connectivity issue).
+
+**Comparison summary:**
+
+| Feature                            | System-Defined | User-Defined |
+| ---------------------------------- | -------------- | ------------ |
+| Defined in `config.yaml`           | ✅ Yes          | ❌ No         |
+| Persists across restarts           | ✅ Yes          | ⚠️ Temporary  |
+| Live-reloaded with config          | ✅ Yes          | ❌ No         |
+| Added via dashboard / API          | ❌ No           | ✅ Yes        |
+| Subject to alert rules             | ✅ Yes          | ✅ Yes        |
+| Manually removable from dashboard  | ❌ No           | ✅ Yes        |
+
+
 
 ```yaml
 server:
