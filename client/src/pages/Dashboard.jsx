@@ -13,7 +13,7 @@ import { cn } from '../lib/utils';
 const SECTION_KEYS = ['summary', 'chart', 'hosts'];
 
 export default function Dashboard() {
-  const { lastPingResults, configReloadedAt } = useWebSocket();
+  const { lastPingResults, configReloadedAt, targetsChangedAt } = useWebSocket();
   const { data: targets, loading, refetch } = useApi(getTargets, []);
   const [sparklineData, setSparklineData] = useState({});
   const [selectedTargetIds, setSelectedTargetIds] = useState([]);
@@ -85,6 +85,18 @@ export default function Dashboard() {
   useEffect(() => {
     if (configReloadedAt) refetch();
   }, [configReloadedAt, refetch]);
+
+  // Refetch targets when another client adds or removes a user-defined target (WebSocket push)
+  useEffect(() => {
+    if (targetsChangedAt) refetch();
+  }, [targetsChangedAt, refetch]);
+
+  // 15-second polling fallback — ensures other browsers eventually see new targets
+  // even if they miss the WebSocket event (e.g. during a reconnect window)
+  useEffect(() => {
+    const timer = setInterval(() => refetch(), 15000);
+    return () => clearInterval(timer);
+  }, [refetch]);
 
   // Toggle a target in the selection; clicking again deselects
   const handleTargetClick = useCallback((targetId) => {
