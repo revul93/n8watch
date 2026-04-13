@@ -41,7 +41,7 @@ export default function Dashboard() {
   const [newTargetName, setNewTargetName] = useState('');
   const [newTargetIp, setNewTargetIp] = useState('');
   const [newTargetIface, setNewTargetIface] = useState('');
-  const [newTargetLifetimeDays, setNewTargetLifetimeDays] = useState(7);
+  const [newTargetLifetimeDays, setNewTargetLifetimeDays] = useState(null);
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
 
@@ -149,12 +149,11 @@ export default function Dashboard() {
         ip,
         selectedIface ? selectedIface.name  : undefined,
         selectedIface ? selectedIface.alias : undefined,
-        newTargetLifetimeDays,
+        newTargetLifetimeDays ?? maxLifetimeDays,
       );
       setNewTargetName('');
       setNewTargetIp('');
       setNewTargetIface('');
-      setNewTargetLifetimeDays(maxLifetimeDays);
       setShowAddModal(false);
       await refetch();
     } catch (err) {
@@ -370,7 +369,7 @@ export default function Dashboard() {
                   Monitor for (days) — max {maxLifetimeDays}
                 </label>
                 <select
-                  value={newTargetLifetimeDays}
+                  value={newTargetLifetimeDays ?? maxLifetimeDays}
                   onChange={e => setNewTargetLifetimeDays(Number(e.target.value))}
                   className="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-600"
                 >

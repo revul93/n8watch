@@ -598,7 +598,8 @@ function resolveAlert(alertId, resolvedAt) {
 function addUserTarget(name, ip, iface, ifaceAlias, lifetimeDays) {
   const db = getDb();
   const now = Date.now();
-  const days = (typeof lifetimeDays === 'number' && lifetimeDays > 0) ? lifetimeDays : 7;
+  const maxDays = require('./config').getConfig().general.max_user_target_lifetime_days;
+  const days = (typeof lifetimeDays === 'number' && lifetimeDays > 0) ? lifetimeDays : maxDays;
   const expiresAt = now + days * 86400000;
 
   // Enforce (ip, interface) uniqueness at the application level.
