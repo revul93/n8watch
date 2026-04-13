@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { Activity, History, Bell, Menu, X, RefreshCw } from "lucide-react";
+import { Activity, History, Bell, Menu, X, RefreshCw, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 import ThemeToggle from "./ThemeToggle";
 import { cn } from "../lib/utils";
@@ -19,7 +19,19 @@ export default function Layout({
   lastConfigData,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(() => {
+    const saved = localStorage.getItem('sidebarVisible');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [notification, setNotification] = useState(null);
+
+  const toggleDesktopSidebar = () => {
+    setDesktopSidebarVisible(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebarVisible', next);
+      return next;
+    });
+  };
 
   // Show a banner whenever config.yaml is reloaded
   useEffect(() => {
@@ -49,7 +61,7 @@ export default function Layout({
         className={cn(
           "fixed inset-y-0 left-0 z-30 w-56 flex-shrink-0 flex flex-col bg-gray-900 border-r border-gray-800 transition-transform duration-200",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:relative lg:translate-x-0",
+          desktopSidebarVisible ? "lg:relative lg:translate-x-0" : "lg:hidden",
         )}
       >
         {/* Logo */}
@@ -65,6 +77,13 @@ export default function Layout({
             onClick={() => setSidebarOpen(false)}
           >
             <X size={18} />
+          </button>
+          <button
+            className="ml-auto hidden lg:flex text-gray-400 hover:text-white"
+            onClick={toggleDesktopSidebar}
+            title="Collapse sidebar"
+          >
+            <PanelLeftClose size={18} />
           </button>
         </div>
 
@@ -127,6 +146,15 @@ export default function Layout({
           >
             <Menu size={20} />
           </button>
+          {!desktopSidebarVisible && (
+            <button
+              className="hidden lg:flex text-gray-400 hover:text-white"
+              onClick={toggleDesktopSidebar}
+              title="Show sidebar"
+            >
+              <PanelLeftOpen size={20} />
+            </button>
+          )}
           <span className="text-base font-semibold text-white lg:hidden">
             n8watch
           </span>
