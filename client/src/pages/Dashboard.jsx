@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useApi } from '../hooks/useApi';
-import { getTargets, getPingResults, addUserTarget, deleteUserTarget, getReportData, getInterfaces } from '../lib/api';
+import { getTargets, getPingResults, addUserTarget, deleteUserTarget, getReportData, getInterfaces, getDashboardConfig } from '../lib/api';
 import { generatePDFReport, generateCSVReport } from '../lib/reportGenerator';
 import SummaryCards from '../components/SummaryCards';
 import UnifiedChart, { buildColorMap } from '../components/UnifiedChart';
@@ -37,14 +37,25 @@ export default function Dashboard() {
   const dragSectionRef = useRef(null);
 
   // User target form state
+  const [showAddModal, setShowAddModal] = useState(false);
   const [newTargetName, setNewTargetName] = useState('');
   const [newTargetIp, setNewTargetIp] = useState('');
   const [newTargetIface, setNewTargetIface] = useState('');
+  const [newTargetLifetimeDays, setNewTargetLifetimeDays] = useState(7);
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
 
   // Available interfaces from config
   const { data: interfaces } = useApi(getInterfaces, []);
+
+  // Max lifetime days from server config
+  const { data: serverConfig } = useApi(getDashboardConfig, []);
+  const maxLifetimeDays = serverConfig?.max_user_target_lifetime_days || 7;
+
+  // Sync lifetime days default once server config is loaded
+  useEffect(() => {
+    setNewTargetLifetimeDays(maxLifetimeDays);
+  }, [maxLifetimeDays]);
 
   // Confirmation dialog state
   const [deleteCandidate, setDeleteCandidate] = useState(null);
@@ -138,17 +149,20 @@ export default function Dashboard() {
         ip,
         selectedIface ? selectedIface.name  : undefined,
         selectedIface ? selectedIface.alias : undefined,
+        newTargetLifetimeDays,
       );
       setNewTargetName('');
       setNewTargetIp('');
       setNewTargetIface('');
+      setNewTargetLifetimeDays(maxLifetimeDays);
+      setShowAddModal(false);
       await refetch();
     } catch (err) {
       setAddError(err.message || 'Failed to add target.');
     } finally {
       setAddLoading(false);
     }
-  }, [newTargetName, newTargetIp, newTargetIface, interfaces, refetch]);
+  }, [newTargetName, newTargetIp, newTargetIface, newTargetLifetimeDays, maxLifetimeDays, interfaces, refetch]);
 
   // Show confirmation dialog before deleting a user target
   const handleDeleteRequest = useCallback((target) => {
@@ -294,55 +308,103 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Add temporary target form — always at the top */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Add Temporary Target</h2>
-        <form onSubmit={handleAddTarget} className="flex flex-wrap gap-2 items-start">
-          <input
-            type="text"
-            placeholder="Name (e.g. My Router)"
-            value={newTargetName}
-            onChange={e => setNewTargetName(e.target.value)}
-            maxLength={100}
-            className="flex-1 min-w-[140px] px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-600"
-          />
-          <input
-            type="text"
-            placeholder="IP / Hostname (e.g. 192.168.1.1)"
-            value={newTargetIp}
-            onChange={e => setNewTargetIp(e.target.value)}
-            maxLength={253}
-            className="flex-1 min-w-[180px] px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-600"
-          />
-          {interfaces && interfaces.length > 0 && (
-            <select
-              value={newTargetIface}
-              onChange={e => setNewTargetIface(e.target.value)}
-              className="flex-1 min-w-[200px] px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-600"
-              title="Outgoing network interface (optional)"
-            >
-              <option value="">Interface — default</option>
-              {interfaces.map(iface => (
-                <option key={iface.name} value={iface.name}>
-                  {[iface.name, iface.alias, iface.ipv4].filter(Boolean).join(' | ')}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            type="submit"
-            disabled={addLoading}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-60 rounded-lg text-sm text-white transition-colors"
-          >
-            <Plus size={14} />
-            {addLoading ? 'Adding…' : 'Add Target'}
-          </button>
-        </form>
-        {addError && <p className="text-xs text-red-400 mt-2">{addError}</p>}
-        <p className="text-xs text-gray-600 mt-2">
-          Temporary targets are monitored for up to 5 days and do not trigger alerts. They are not saved to config.yaml.
-        </p>
+      {/* Add temporary target button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => { setAddError(''); setShowAddModal(true); }}
+          className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-700 hover:bg-blue-600 rounded-lg text-sm text-white transition-colors"
+        >
+          <Plus size={14} />
+          Add Temporary Target
+        </button>
       </div>
+
+      {/* Add temporary target modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-base font-semibold text-white">Add Temporary Target</h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-gray-500 hover:text-white"
+                disabled={addLoading}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddTarget} className="flex flex-col gap-3">
+              <input
+                type="text"
+                placeholder="Name (e.g. My Router)"
+                value={newTargetName}
+                onChange={e => setNewTargetName(e.target.value)}
+                maxLength={100}
+                className="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-600"
+              />
+              <input
+                type="text"
+                placeholder="IP / Hostname (e.g. 192.168.1.1)"
+                value={newTargetIp}
+                onChange={e => setNewTargetIp(e.target.value)}
+                maxLength={253}
+                className="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-600"
+              />
+              {interfaces && interfaces.length > 0 && (
+                <select
+                  value={newTargetIface}
+                  onChange={e => setNewTargetIface(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-600"
+                  title="Outgoing network interface (optional)"
+                >
+                  <option value="">Interface — default</option>
+                  {interfaces.map(iface => (
+                    <option key={iface.name} value={iface.name}>
+                      {[iface.name, iface.alias, iface.ipv4].filter(Boolean).join(' | ')}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  Monitor for (days) — max {maxLifetimeDays}
+                </label>
+                <select
+                  value={newTargetLifetimeDays}
+                  onChange={e => setNewTargetLifetimeDays(Number(e.target.value))}
+                  className="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-600"
+                >
+                  {Array.from({ length: maxLifetimeDays }, (_, i) => i + 1).map(d => (
+                    <option key={d} value={d}>{d} {d === 1 ? 'day' : 'days'}</option>
+                  ))}
+                </select>
+              </div>
+              {addError && <p className="text-xs text-red-400">{addError}</p>}
+              <div className="flex gap-3 justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  disabled={addLoading}
+                  className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-700 hover:bg-blue-600 disabled:opacity-60 rounded-lg text-sm text-white transition-colors"
+                >
+                  <Plus size={14} />
+                  {addLoading ? 'Adding…' : 'Add Target'}
+                </button>
+              </div>
+            </form>
+            <p className="text-xs text-gray-600 mt-3">
+              Temporary targets are not saved to config.yaml and do not trigger alerts.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Draggable sections */}
       {sectionOrder.map(key => (

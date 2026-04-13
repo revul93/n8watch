@@ -3,6 +3,7 @@ general:
   ping_count: 5
   ping_timeout: 5
   data_retention_days: 90
+  max_user_target_lifetime_days: 7
 
 # interfaces — list the network interfaces available on this host.
 # Each entry has a machine name (used by the OS / ping -I), a human-readable

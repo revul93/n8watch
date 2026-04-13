@@ -4,6 +4,7 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../database');
 const { broadcast } = require('../websocket');
+const { getConfig } = require('../config');
 
 // GET /api/targets
 router.get('/', (req, res) => {
@@ -35,7 +36,7 @@ router.get('/:id', (req, res) => {
 // POST /api/user-targets — add a temporary user-defined target
 router.post('/user-targets', (req, res) => {
   try {
-    const { name, ip, interface: iface, interface_alias: ifaceAlias } = req.body || {};
+    const { name, ip, interface: iface, interface_alias: ifaceAlias, lifetime_days } = req.body || {};
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'name is required' });
     }
@@ -43,12 +44,27 @@ router.post('/user-targets', (req, res) => {
       return res.status(400).json({ error: 'ip is required' });
     }
 
+    const config = getConfig();
+    const maxDays = config.general.max_user_target_lifetime_days;
+
+    let lifetimeDays = maxDays;
+    if (lifetime_days !== undefined && lifetime_days !== null) {
+      const parsed = parseInt(lifetime_days, 10);
+      if (isNaN(parsed) || parsed < 1) {
+        return res.status(400).json({ error: 'lifetime_days must be a positive integer' });
+      }
+      if (parsed > maxDays) {
+        return res.status(400).json({ error: `lifetime_days cannot exceed ${maxDays}` });
+      }
+      lifetimeDays = parsed;
+    }
+
     const trimmedName       = name.trim().slice(0, 100);
     const trimmedIp         = ip.trim().slice(0, 253);
     const trimmedIface      = (iface && typeof iface === 'string' && iface.trim()) ? iface.trim().slice(0, 64) : null;
     const trimmedIfaceAlias = (ifaceAlias && typeof ifaceAlias === 'string' && ifaceAlias.trim()) ? ifaceAlias.trim().slice(0, 100) : null;
 
-    const id = db.addUserTarget(trimmedName, trimmedIp, trimmedIface, trimmedIfaceAlias);
+    const id = db.addUserTarget(trimmedName, trimmedIp, trimmedIface, trimmedIfaceAlias, lifetimeDays);
     const targets = db.getAllTargetsWithLatest();
     const target  = targets.find(t => t.id === id) || { id, name: trimmedName, ip: trimmedIp, is_user_target: 1 };
     res.status(201).json({ target });
