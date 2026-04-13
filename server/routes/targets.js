@@ -3,6 +3,7 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../database');
+const { broadcast } = require('../websocket');
 
 // GET /api/targets
 router.get('/', (req, res) => {
@@ -51,6 +52,9 @@ router.post('/user-targets', (req, res) => {
     const targets = db.getAllTargetsWithLatest();
     const target  = targets.find(t => t.id === id) || { id, name: trimmedName, ip: trimmedIp, is_user_target: 1 };
     res.status(201).json({ target });
+
+    // Notify all connected clients so they refetch targets without a page reload
+    broadcast('targets_changed', { action: 'added', target_id: id });
   } catch (err) {
     if (err.code === 'UNIQUE_IP_INTERFACE' || (err.message && err.message.includes('UNIQUE constraint'))) {
       return res.status(409).json({ error: 'A target with this IP and interface combination already exists' });
@@ -70,6 +74,9 @@ router.delete('/user-targets/:id', (req, res) => {
     if (!deleted) return res.status(404).json({ error: 'User target not found' });
 
     res.json({ success: true });
+
+    // Notify all connected clients so they refetch targets without a page reload
+    broadcast('targets_changed', { action: 'deleted', target_id: id });
   } catch (err) {
     console.error('[Routes/targets] DELETE /user-targets/:id:', err.message);
     res.status(500).json({ error: 'Internal server error' });

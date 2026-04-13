@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useApi } from '../hooks/useApi';
 import { getTargets, getPingResults, addUserTarget, deleteUserTarget, getReportData, getInterfaces } from '../lib/api';
@@ -7,14 +7,34 @@ import SummaryCards from '../components/SummaryCards';
 import UnifiedChart, { buildColorMap } from '../components/UnifiedChart';
 import HostGrid from '../components/HostGrid';
 import FullscreenChartModal from '../components/FullscreenChartModal';
-import { RefreshCw, Maximize2, Plus, X, FileText, FileDown } from 'lucide-react';
+import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, GripVertical } from 'lucide-react';
+import { cn } from '../lib/utils';
+
+const SECTION_KEYS = ['summary', 'chart', 'hosts'];
 
 export default function Dashboard() {
-  const { lastPingResults, configReloadedAt } = useWebSocket();
+  const { lastPingResults, configReloadedAt, targetsChangedAt, connected } = useWebSocket();
   const { data: targets, loading, refetch } = useApi(getTargets, []);
   const [sparklineData, setSparklineData] = useState({});
   const [selectedTargetIds, setSelectedTargetIds] = useState([]);
   const [fullscreen, setFullscreen] = useState(false);
+
+  // Section drag-and-drop order
+  const [sectionOrder, setSectionOrder] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('dashboardSectionOrder'));
+      if (
+        Array.isArray(saved) &&
+        SECTION_KEYS.every(k => saved.includes(k)) &&
+        saved.every(k => SECTION_KEYS.includes(k))
+      ) {
+        return saved;
+      }
+    } catch {}
+    return [...SECTION_KEYS];
+  });
+  const [dragOverSection, setDragOverSection] = useState(null);
+  const dragSectionRef = useRef(null);
 
   // User target form state
   const [newTargetName, setNewTargetName] = useState('');
@@ -65,6 +85,20 @@ export default function Dashboard() {
   useEffect(() => {
     if (configReloadedAt) refetch();
   }, [configReloadedAt, refetch]);
+
+  // Refetch targets when another client adds or removes a user-defined target (WebSocket push)
+  useEffect(() => {
+    if (targetsChangedAt) refetch();
+  }, [targetsChangedAt, refetch]);
+
+  // 15-second polling fallback — only active when WebSocket is disconnected to
+  // ensure other browsers eventually see target changes even if they missed the
+  // push event during a reconnect window
+  useEffect(() => {
+    if (connected) return;
+    const timer = setInterval(() => refetch(), 15000);
+    return () => clearInterval(timer);
+  }, [connected, refetch]);
 
   // Toggle a target in the selection; clicking again deselects
   const handleTargetClick = useCallback((targetId) => {
@@ -167,6 +201,73 @@ export default function Dashboard() {
     }
   }, [deleteCandidate, refetch]);
 
+  // Section drag handlers
+  const handleSectionDragStart = useCallback((e, key) => {
+    dragSectionRef.current = key;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('section', key);
+  }, []);
+
+  const handleSectionDragEnter = useCallback((key) => {
+    if (!dragSectionRef.current || dragSectionRef.current === key) return;
+    setDragOverSection(key);
+    setSectionOrder(prev => {
+      const from = prev.indexOf(dragSectionRef.current);
+      const to = prev.indexOf(key);
+      if (from === -1 || to === -1 || from === to) return prev;
+      const next = [...prev];
+      next.splice(from, 1);
+      next.splice(to, 0, dragSectionRef.current);
+      return next;
+    });
+  }, []);
+
+  const handleSectionDragEnd = useCallback(() => {
+    setSectionOrder(prev => {
+      localStorage.setItem('dashboardSectionOrder', JSON.stringify(prev));
+      return prev;
+    });
+    dragSectionRef.current = null;
+    setDragOverSection(null);
+  }, []);
+
+  const sectionContent = {
+    summary: (
+      <SummaryCards targets={targetList} lastPingResults={lastPingResults} />
+    ),
+    chart: (
+      <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} colorMap={colorMap} />
+    ),
+    hosts: (
+      <div>
+        <div className="flex items-center gap-3 mb-3">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Hosts</h2>
+          {selectedTargetIds.length > 0 && (
+            <span className="text-xs text-blue-400">
+              {selectedTargetIds.length} selected — click a host again to deselect
+            </span>
+          )}
+          {selectedTargetIds.length > 0 && (
+            <button
+              onClick={() => setSelectedTargetIds([])}
+              className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              Clear selection
+            </button>
+          )}
+        </div>
+        <HostGrid
+          targets={targetList}
+          lastPingResults={lastPingResults}
+          sparklineData={sparklineData}
+          selectedTargetIds={selectedTargetIds}
+          onTargetClick={handleTargetClick}
+          onDeleteUserTarget={handleDeleteRequest}
+        />
+      </div>
+    ),
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -193,7 +294,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Add temporary target form */}
+      {/* Add temporary target form — always at the top */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Add Temporary Target</h2>
         <form onSubmit={handleAddTarget} className="flex flex-wrap gap-2 items-start">
@@ -243,36 +344,27 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <SummaryCards targets={targetList} lastPingResults={lastPingResults} />
-
-      <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} colorMap={colorMap} />
-
-      <div>
-        <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Hosts</h2>
-          {selectedTargetIds.length > 0 && (
-            <span className="text-xs text-blue-400">
-              {selectedTargetIds.length} selected — click a host again to deselect
-            </span>
+      {/* Draggable sections */}
+      {sectionOrder.map(key => (
+        <div
+          key={key}
+          draggable
+          onDragStart={(e) => handleSectionDragStart(e, key)}
+          onDragEnter={() => handleSectionDragEnter(key)}
+          onDragOver={(e) => e.preventDefault()}
+          onDragEnd={handleSectionDragEnd}
+          className={cn(
+            "group relative rounded-xl transition-all",
+            dragOverSection === key && dragSectionRef.current !== key && "ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-950",
           )}
-          {selectedTargetIds.length > 0 && (
-            <button
-              onClick={() => setSelectedTargetIds([])}
-              className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
-            >
-              Clear selection
-            </button>
-          )}
+        >
+          {/* Drag handle indicator */}
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-60 transition-opacity pointer-events-none">
+            <GripVertical size={14} className="text-gray-500" />
+          </div>
+          {sectionContent[key]}
         </div>
-        <HostGrid
-          targets={targetList}
-          lastPingResults={lastPingResults}
-          sparklineData={sparklineData}
-          selectedTargetIds={selectedTargetIds}
-          onTargetClick={handleTargetClick}
-          onDeleteUserTarget={handleDeleteRequest}
-        />
-      </div>
+      ))}
 
       {fullscreen && (
         <FullscreenChartModal
