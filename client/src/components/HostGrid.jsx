@@ -4,7 +4,6 @@ import { GripVertical } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function HostGrid({ targets = [], lastPingResults = {}, sparklineData = {}, selectedTargetIds = [], onTargetClick, onDeleteUserTarget }) {
-  // Maintain a display order that can be reordered via drag-and-drop
   const [displayOrder, setDisplayOrder] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('hostGridOrder'));
@@ -12,6 +11,7 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
     } catch {}
     return targets.map(t => t.id);
   });
+  const [draggingId, setDraggingId] = useState(null);
 
   // Sync displayOrder when targets list changes (add new, remove deleted)
   useEffect(() => {
@@ -28,6 +28,7 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
   const handleCardDragStart = useCallback((e, id) => {
     e.stopPropagation(); // Prevent section drag from triggering
     draggingIdRef.current = id;
+    setDraggingId(id);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('card', id);
   }, []);
@@ -51,6 +52,7 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
       return prev;
     });
     draggingIdRef.current = null;
+    setDraggingId(null);
   }, []);
 
   if (!targets.length) {
@@ -61,9 +63,8 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
     );
   }
 
-  const orderedTargets = displayOrder
-    .map(id => targets.find(t => t.id === id))
-    .filter(Boolean);
+  const targetMap = new Map(targets.map(t => [t.id, t]));
+  const orderedTargets = displayOrder.map(id => targetMap.get(id)).filter(Boolean);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -77,7 +78,7 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
           onDragEnd={handleCardDragEnd}
           className={cn(
             "relative group cursor-grab active:cursor-grabbing",
-            draggingIdRef.current === target.id && "opacity-50",
+            draggingId === target.id && "opacity-50",
           )}
         >
           {/* Drag handle — visible on card hover */}

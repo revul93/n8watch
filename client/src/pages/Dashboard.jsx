@@ -23,7 +23,11 @@ export default function Dashboard() {
   const [sectionOrder, setSectionOrder] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('dashboardSectionOrder'));
-      if (Array.isArray(saved) && saved.length === SECTION_KEYS.length && saved.every(k => SECTION_KEYS.includes(k))) {
+      if (
+        Array.isArray(saved) &&
+        SECTION_KEYS.every(k => saved.includes(k)) &&
+        saved.every(k => SECTION_KEYS.includes(k))
+      ) {
         return saved;
       }
     } catch {}
