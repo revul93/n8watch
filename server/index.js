@@ -22,6 +22,7 @@ const alertsRouter = require("./routes/alerts");
 const dashboardRouter = require("./routes/dashboard");
 const exportRouter = require("./routes/export");
 const interfacesRouter = require("./routes/interfaces");
+const versionRouter = require("./routes/version");
 
 // Maximum time (ms) to wait for in-flight requests during graceful shutdown
 const SHUTDOWN_TIMEOUT_MS = 5000;
@@ -106,6 +107,7 @@ async function main() {
   app.use("/api/alerts", alertsRouter);
   app.use("/api/dashboard", dashboardRouter);
   app.use("/api/interfaces", interfacesRouter);
+  app.use("/api/version", versionRouter);
 
   // 7. Create HTTP/HTTPS server and init WebSocket
   let server;

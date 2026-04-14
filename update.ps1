@@ -52,6 +52,15 @@ if ($LASTEXITCODE -ne 0) {
 Set-Location ..
 Write-Host "[OK] Frontend built" -ForegroundColor Green
 
+# ── Stamp build version ────────────────────────────────────────────────────────
+
+Write-Host ""
+Write-Host "Stamping build version..."
+if (-not (Test-Path "data")) { New-Item -ItemType Directory -Path "data" | Out-Null }
+$timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+Set-Content -Path "data\version.json" -Value "{`"version`":`"$timestamp`"}" -Encoding UTF8
+Write-Host "[OK] Version stamp written" -ForegroundColor Green
+
 # ── Restart PM2 if it is managing n8watch ─────────────────────────────────────
 
 Write-Host ""

@@ -88,6 +88,10 @@ export function getDashboardConfig() {
   return request('/dashboard/config');
 }
 
+export function getVersion() {
+  return request('/version');
+}
+
 export function addUserTarget(name, ip, iface, ifaceAlias, lifetimeDays) {
   return fetch(`${BASE}/targets/user-targets`, {
     method: 'POST',

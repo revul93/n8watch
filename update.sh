@@ -27,6 +27,13 @@ npm run build
 cd ..
 echo "✓ Frontend built"
 
+# ── Stamp build version ────────────────────────────────────────────────────────
+echo ""
+echo "Stamping build version..."
+mkdir -p data
+printf '{"version":"%s"}' "$(date -u +%s)" > data/version.json
+echo "✓ Version stamp written"
+
 # ── Restart PM2 if it is managing n8watch ─────────────────────────────────────
 echo ""
 if command -v pm2 &> /dev/null && pm2 list 2>/dev/null | grep -q "n8watch"; then
