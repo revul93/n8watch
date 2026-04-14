@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Minimize2 } from 'lucide-react';
+import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
+import HostCard from './HostCard';
 
 const CHART_TYPES = [
   { key: 'latency', label: 'Latency' },
@@ -11,12 +12,45 @@ const CHART_TYPES = [
   { key: 'uptime', label: 'Uptime' },
 ];
 
-export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose, colorMap = {} }) {
+const PANEL_MIN = 180;
+const PANEL_MAX = 520;
+const PANEL_DEFAULT = 280;
+
+export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose, colorMap = {}, sparklineData = {} }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [activeCharts, setActiveCharts] = useState(['latency']);
+
+  // Left panel state (open/closed and width)
+  const [panelOpen, setPanelOpen] = useState(() => {
+    const saved = localStorage.getItem('fsPanelOpen');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [panelWidth, setPanelWidth] = useState(() => {
+    const saved = parseInt(localStorage.getItem('fsPanelWidth'), 10);
+    return isNaN(saved) ? PANEL_DEFAULT : Math.max(PANEL_MIN, Math.min(PANEL_MAX, saved));
+  });
+  const panelWidthRef = useRef(panelWidth);
+
+  // Chart-row split: fraction of chart area given to the latency row (vs secondary row)
+  const [chartSplit, setChartSplit] = useState(() => {
+    const saved = parseFloat(localStorage.getItem('fsChartSplit'));
+    return isNaN(saved) ? 0.6 : Math.max(0.2, Math.min(0.85, saved));
+  });
+  const chartSplitRef = useRef(chartSplit);
+  const chartBodyRef = useRef(null);
+
   const containerRef = useRef(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  // Toggle and persist panel visibility
+  const togglePanel = useCallback(() => {
+    setPanelOpen(prev => {
+      const next = !prev;
+      localStorage.setItem('fsPanelOpen', next);
+      return next;
+    });
+  }, []);
 
   // Request browser fullscreen when the modal mounts
   useEffect(() => {
@@ -76,6 +110,52 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     return () => { document.body.style.overflow = ''; };
   }, []);
 
+  // Panel resize drag
+  const handlePanelResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = panelWidthRef.current;
+
+    const onMouseMove = (ev) => {
+      const newWidth = Math.max(PANEL_MIN, Math.min(PANEL_MAX, startWidth + ev.clientX - startX));
+      panelWidthRef.current = newWidth;
+      setPanelWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('fsPanelWidth', panelWidthRef.current);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  // Chart-row split resize drag
+  const handleChartSplitMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startSplit = chartSplitRef.current;
+    const bodyHeight = chartBodyRef.current ? chartBodyRef.current.clientHeight : 600;
+
+    const onMouseMove = (ev) => {
+      const delta = (ev.clientY - startY) / bodyHeight;
+      const newSplit = Math.max(0.2, Math.min(0.85, startSplit + delta));
+      chartSplitRef.current = newSplit;
+      setChartSplit(newSplit);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('fsChartSplit', chartSplitRef.current);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
   const toggleTarget = useCallback((id) => {
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -85,7 +165,6 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
   const toggleChart = useCallback((key) => {
     setActiveCharts(prev => {
       if (prev.includes(key)) {
-        // Keep at least one chart active
         return prev.length > 1 ? prev.filter(k => k !== key) : prev;
       }
       return [...prev, key];
@@ -100,6 +179,7 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
   // all other charts share the bottom row side-by-side.
   const latencyActive = activeCharts.includes('latency');
   const nonLatencyCharts = activeCharts.filter(k => k !== 'latency');
+  const hasBothRows = latencyActive && nonLatencyCharts.length > 0;
 
   const content = (
     <div
@@ -111,8 +191,51 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
       aria-labelledby="fullscreen-chart-title"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-800 flex-shrink-0">
-        <h2 id="fullscreen-chart-title" className="text-lg font-semibold text-white">Live Metrics — Fullscreen</h2>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 flex-shrink-0">
+        <button
+          onClick={togglePanel}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          title={panelOpen ? 'Hide targets panel' : 'Show targets panel'}
+        >
+          {panelOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+        </button>
+        <h2 id="fullscreen-chart-title" className="text-lg font-bold text-white tracking-tight">
+          n8watch
+        </h2>
+
+        {/* Chart type selector */}
+        <div className="flex items-center gap-1.5 ml-4">
+          <span className="text-xs text-gray-500 mr-1">Charts:</span>
+          {CHART_TYPES.map(ct => {
+            const enabled = activeCharts.includes(ct.key);
+            return (
+              <button
+                key={ct.key}
+                onClick={() => toggleChart(ct.key)}
+                className={cn(
+                  'px-3 py-1 rounded-lg text-xs font-medium transition-colors border',
+                  enabled
+                    ? 'bg-indigo-900/50 border-indigo-700 text-indigo-300'
+                    : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300'
+                )}
+              >
+                {ct.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex-1" />
+
+        {selectedIds.length > 0 && (
+          <button
+            onClick={() => setSelectedIds([])}
+            className="px-3 py-1 rounded-lg text-xs text-gray-500 hover:text-gray-300 border border-gray-700 transition-colors"
+          >
+            Show all targets
+          </button>
+        )}
+
         <button
           onClick={handleClose}
           className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
@@ -123,94 +246,128 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         </button>
       </div>
 
-      {/* Legend / Target filter bar */}
-      <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-gray-800 flex-shrink-0">
-        <span className="text-xs text-gray-500 mr-1">Targets:</span>
-        {targets.map(t => {
-          const active = selectedIds.length === 0 || selectedIds.includes(t.id);
-          const color = colorMap[t.id] || '#60a5fa';
-          return (
-            <button
-              key={t.id}
-              onClick={() => toggleTarget(t.id)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors border',
-                active
-                  ? 'bg-blue-900/50 border-blue-700 text-blue-300'
-                  : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300'
-              )}
+      {/* Body: left panel + chart area */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Left panel — target cards */}
+        {panelOpen && (
+          <>
+            <div
+              className="flex flex-col bg-gray-900 border-r border-gray-800 flex-shrink-0 overflow-y-auto"
+              style={{ width: panelWidth }}
             >
-              <span
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: active ? color : '#4b5563' }}
-              />
-              {t.name}
-            </button>
-          );
-        })}
-        {selectedIds.length > 0 && (
-          <button
-            onClick={() => setSelectedIds([])}
-            className="px-3 py-1 rounded-lg text-xs text-gray-500 hover:text-gray-300 border border-gray-700 transition-colors"
-          >
-            Show all
-          </button>
-        )}
-      </div>
-
-      {/* Chart type selector */}
-      <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-gray-800 flex-shrink-0">
-        <span className="text-xs text-gray-500 mr-1">Charts:</span>
-        {CHART_TYPES.map(ct => {
-          const enabled = activeCharts.includes(ct.key);
-          return (
-            <button
-              key={ct.key}
-              onClick={() => toggleChart(ct.key)}
-              className={cn(
-                'px-3 py-1 rounded-lg text-xs font-medium transition-colors border',
-                enabled
-                  ? 'bg-indigo-900/50 border-indigo-700 text-indigo-300'
-                  : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300'
-              )}
-            >
-              {ct.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Charts — no-scroll layout: latency on top full-width, others side-by-side below */}
-      <div className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col gap-4">
-        {/* Latency row — full width, takes more vertical space when others are present */}
-        {latencyActive && (
-          <div className={cn('min-h-0', nonLatencyCharts.length > 0 ? 'flex-[2]' : 'flex-1')}>
-            <UnifiedChart
-              targets={filteredTargets}
-              lastPingResults={lastPingResults}
-              colorMap={colorMap}
-              controlledMetric="latency"
-              fillHeight
-            />
-          </div>
-        )}
-
-        {/* Remaining charts — side by side in one row */}
-        {nonLatencyCharts.length > 0 && (
-          <div className="flex-1 min-h-0 flex gap-4">
-            {nonLatencyCharts.map(chartKey => (
-              <div key={chartKey} className="flex-1 min-h-0">
-                <UnifiedChart
-                  targets={filteredTargets}
-                  lastPingResults={lastPingResults}
-                  colorMap={colorMap}
-                  controlledMetric={chartKey}
-                  fillHeight
-                />
+              <div className="px-3 py-2 border-b border-gray-800 flex-shrink-0">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Targets</span>
+                <p className="text-xs text-gray-600 mt-0.5">Click a card to filter charts</p>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-col gap-2 p-2 overflow-y-auto flex-1">
+                {targets.map(t => {
+                  const isSelected = selectedIds.includes(t.id);
+                  return (
+                    <div
+                      key={t.id}
+                      className={cn(
+                        'rounded-xl border transition-colors cursor-pointer',
+                        isSelected
+                          ? 'border-blue-500 ring-1 ring-blue-500/40'
+                          : 'border-gray-800 hover:border-blue-700'
+                      )}
+                      onClick={() => toggleTarget(t.id)}
+                      title={isSelected ? 'Click to deselect' : 'Click to filter charts to this target'}
+                    >
+                      <HostCard
+                        target={t}
+                        lastPingResult={lastPingResults[t.id]}
+                        sparklineData={sparklineData[t.id] || []}
+                        isSelected={isSelected}
+                        onTargetClick={toggleTarget}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Panel resize handle */}
+            <div
+              className="w-1 flex-shrink-0 bg-gray-800 hover:bg-blue-600 cursor-col-resize transition-colors group relative"
+              onMouseDown={handlePanelResizeMouseDown}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowLeft') { const v = Math.max(PANEL_MIN, panelWidthRef.current - 20); panelWidthRef.current = v; setPanelWidth(v); localStorage.setItem('fsPanelWidth', v); }
+                if (e.key === 'ArrowRight') { const v = Math.min(PANEL_MAX, panelWidthRef.current + 20); panelWidthRef.current = v; setPanelWidth(v); localStorage.setItem('fsPanelWidth', v); }
+              }}
+              tabIndex={0}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Drag or use arrow keys to resize the targets panel"
+              title="Drag or use arrow keys to resize panel"
+            >
+              <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex items-center pointer-events-none opacity-0 group-hover:opacity-60">
+                <GripVertical size={14} className="text-gray-400" />
+              </div>
+            </div>
+          </>
         )}
+
+        {/* Chart area */}
+        <div ref={chartBodyRef} className="flex-1 min-w-0 min-h-0 overflow-hidden p-4 flex flex-col gap-0">
+          {/* Latency row */}
+          {latencyActive && (
+            <div
+              className="min-h-0 overflow-hidden"
+              style={{ flexBasis: hasBothRows ? `${chartSplit * 100}%` : '100%', flexGrow: 0, flexShrink: 0 }}
+            >
+              <UnifiedChart
+                targets={filteredTargets}
+                lastPingResults={lastPingResults}
+                colorMap={colorMap}
+                controlledMetric="latency"
+                fillHeight
+              />
+            </div>
+          )}
+
+          {/* Drag handle between chart rows */}
+          {hasBothRows && (
+            <div
+              className="h-2 flex-shrink-0 flex items-center justify-center cursor-row-resize group"
+              onMouseDown={handleChartSplitMouseDown}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowUp') { const v = Math.max(0.2, chartSplitRef.current - 0.05); chartSplitRef.current = v; setChartSplit(v); localStorage.setItem('fsChartSplit', v); }
+                if (e.key === 'ArrowDown') { const v = Math.min(0.85, chartSplitRef.current + 0.05); chartSplitRef.current = v; setChartSplit(v); localStorage.setItem('fsChartSplit', v); }
+              }}
+              tabIndex={0}
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Drag or use arrow keys to resize chart rows"
+              title="Drag or use arrow keys to resize chart rows"
+            >
+              <div className="h-1 w-16 rounded-full bg-gray-700 group-hover:bg-blue-600 transition-colors" />
+            </div>
+          )}
+
+          {/* Secondary charts row */}
+          {nonLatencyCharts.length > 0 && (
+            <div
+              className="min-h-0 overflow-hidden flex gap-4"
+              style={hasBothRows
+                ? { flexBasis: `${(1 - chartSplit) * 100}%`, flexGrow: 0, flexShrink: 0 }
+                : { flex: 1 }
+              }
+            >
+              {nonLatencyCharts.map(chartKey => (
+                <div key={chartKey} className="flex-1 min-h-0">
+                  <UnifiedChart
+                    targets={filteredTargets}
+                    lastPingResults={lastPingResults}
+                    colorMap={colorMap}
+                    controlledMetric={chartKey}
+                    fillHeight
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import HostCard from './HostCard';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, LayoutGrid, AlignJustify } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function HostGrid({ targets = [], lastPingResults = {}, sparklineData = {}, selectedTargetIds = [], onTargetClick, onDeleteUserTarget }) {
@@ -12,6 +12,19 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
     return targets.map(t => t.id);
   });
   const [draggingId, setDraggingId] = useState(null);
+
+  // Card size: 'normal' = default grid, 'compact' = more columns / smaller cards
+  const [cardSize, setCardSize] = useState(() => {
+    return localStorage.getItem('hostCardSize') || 'normal';
+  });
+
+  const toggleCardSize = useCallback(() => {
+    setCardSize(prev => {
+      const next = prev === 'normal' ? 'compact' : 'normal';
+      localStorage.setItem('hostCardSize', next);
+      return next;
+    });
+  }, []);
 
   // Sync displayOrder when targets list changes (add new, remove deleted)
   useEffect(() => {
@@ -66,35 +79,53 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
   const targetMap = new Map(targets.map(t => [t.id, t]));
   const orderedTargets = displayOrder.map(id => targetMap.get(id)).filter(Boolean);
 
+  const gridClass = cardSize === 'compact'
+    ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3'
+    : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4';
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {orderedTargets.map(target => (
-        <div
-          key={target.id}
-          draggable
-          onDragStart={(e) => handleCardDragStart(e, target.id)}
-          onDragEnter={() => handleCardDragEnter(target.id)}
-          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onDragEnd={handleCardDragEnd}
-          className={cn(
-            "relative group cursor-grab active:cursor-grabbing",
-            draggingId === target.id && "opacity-50",
-          )}
+    <div>
+      {/* Card size toggle */}
+      <div className="flex justify-end mb-3">
+        <button
+          onClick={toggleCardSize}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-white transition-colors"
+          title={cardSize === 'normal' ? 'Switch to compact view' : 'Switch to normal view'}
+          aria-label={cardSize === 'normal' ? 'Switch to compact card view' : 'Switch to normal card view'}
         >
-          {/* Drag handle — visible on card hover */}
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none">
-            <GripVertical size={12} className="text-gray-400 rotate-90" />
+          {cardSize === 'normal' ? <AlignJustify size={13} /> : <LayoutGrid size={13} />}
+          {cardSize === 'normal' ? 'Compact' : 'Normal'}
+        </button>
+      </div>
+      <div className={gridClass}>
+        {orderedTargets.map(target => (
+          <div
+            key={target.id}
+            draggable
+            onDragStart={(e) => handleCardDragStart(e, target.id)}
+            onDragEnter={() => handleCardDragEnter(target.id)}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onDragEnd={handleCardDragEnd}
+            className={cn(
+              "relative group cursor-grab active:cursor-grabbing",
+              draggingId === target.id && "opacity-50",
+            )}
+          >
+            {/* Drag handle — visible on card hover */}
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none">
+              <GripVertical size={12} className="text-gray-400 rotate-90" />
+            </div>
+            <HostCard
+              target={target}
+              lastPingResult={lastPingResults[target.id]}
+              sparklineData={sparklineData[target.id] || []}
+              isSelected={selectedTargetIds.includes(target.id)}
+              onTargetClick={onTargetClick}
+              onDelete={onDeleteUserTarget}
+            />
           </div>
-          <HostCard
-            target={target}
-            lastPingResult={lastPingResults[target.id]}
-            sparklineData={sparklineData[target.id] || []}
-            isSelected={selectedTargetIds.includes(target.id)}
-            onTargetClick={onTargetClick}
-            onDelete={onDeleteUserTarget}
-          />
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
