@@ -69,11 +69,11 @@ if ($pm2Available) {
     } else {
         Write-Host "PM2 is not managing n8watch."
         Write-Host "  If you use PM2, run:  npm run pm2:restart"
-        Write-Host "  If you use node, run: node server\index.js"
+        Write-Host "  If you use node, run: npm start"
     }
 } else {
     Write-Host "PM2 is not installed."
-    Write-Host "  To start the app, run: node server\index.js"
+    Write-Host "  To start the app, run: npm start"
 }
 
 Write-Host ""
