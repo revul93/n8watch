@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical } from 'lucide-react';
+import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical, LayoutGrid, AlignJustify } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
 import CompactHostCard from './CompactHostCard';
+import HostCard from './HostCard';
 
 const CHART_TYPES = [
   { key: 'latency', label: 'Latency' },
@@ -226,8 +227,17 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     document.addEventListener('mouseup', onMouseUp);
   }, []);
 
+  // Detail-view IDs: cards shown in full HostCard view instead of compact
+  const [detailViewIds, setDetailViewIds] = useState([]);
+
   const toggleTarget = useCallback((id) => {
     setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  }, []);
+
+  const toggleDetailView = useCallback((id) => {
+    setDetailViewIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   }, []);
@@ -333,29 +343,53 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
                 {panelTargets.map(t => {
                   const isSelected = selectedIds.includes(t.id);
                   const isDragOver = dragOverId === t.id && dragTargetRef.current !== t.id;
+                  const isDetail = detailViewIds.includes(t.id);
                   return (
                     <div
                       key={t.id}
                       className={cn(
-                        'rounded-lg border transition-colors cursor-pointer select-none',
-                        isSelected
-                          ? 'border-blue-500 ring-1 ring-blue-500/40 bg-blue-950/20'
-                          : 'border-gray-800 hover:border-blue-700',
+                        'relative group/card select-none',
+                        !isDetail && cn(
+                          'rounded-lg border transition-colors cursor-pointer',
+                          isSelected
+                            ? 'border-blue-500 ring-1 ring-blue-500/40 bg-blue-950/20'
+                            : 'border-gray-800 hover:border-blue-700',
+                        ),
+                        isDetail && 'cursor-grab active:cursor-grabbing',
                         isDragOver && 'ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-900'
                       )}
-                      onClick={() => toggleTarget(t.id)}
-                      title={isSelected ? 'Click to deselect' : 'Click to filter charts to this target'}
+                      onClick={isDetail ? undefined : () => toggleTarget(t.id)}
+                      title={!isDetail ? (isSelected ? 'Click to deselect' : 'Click to filter charts to this target') : undefined}
                       draggable
                       onDragStart={(e) => handleTargetDragStart(e, t.id)}
                       onDragEnter={() => handleTargetDragEnter(t.id)}
                       onDragOver={(e) => e.preventDefault()}
                       onDragEnd={handleTargetDragEnd}
                     >
-                      <CompactHostCard
-                        target={t}
-                        lastPingResult={lastPingResults[t.id]}
-                        isSelected={isSelected}
-                      />
+                      {/* Detail / compact view toggle button */}
+                      <button
+                        className="absolute top-1.5 right-1.5 z-10 p-0.5 rounded text-gray-600 hover:text-blue-400 hover:bg-gray-800 transition-colors opacity-0 group-hover/card:opacity-100 focus:opacity-100"
+                        onClick={(e) => { e.stopPropagation(); toggleDetailView(t.id); }}
+                        title={isDetail ? 'Switch to compact view' : 'Switch to detail view'}
+                        aria-label={isDetail ? 'Switch to compact view' : 'Switch to detail view'}
+                      >
+                        {isDetail ? <AlignJustify size={11} /> : <LayoutGrid size={11} />}
+                      </button>
+                      {isDetail ? (
+                        <HostCard
+                          target={t}
+                          lastPingResult={lastPingResults[t.id]}
+                          sparklineData={sparklineData[t.id] || []}
+                          isSelected={isSelected}
+                          onTargetClick={toggleTarget}
+                        />
+                      ) : (
+                        <CompactHostCard
+                          target={t}
+                          lastPingResult={lastPingResults[t.id]}
+                          isSelected={isSelected}
+                        />
+                      )}
                     </div>
                   );
                 })}
