@@ -67,7 +67,7 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         return next;
       });
     }
-  }, [targets]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targets, panelOrder]);
 
   const handleTargetDragStart = useCallback((e, id) => {
     dragTargetRef.current = id;
@@ -77,8 +77,9 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
   const handleTargetDragEnter = useCallback((id) => {
     if (!dragTargetRef.current || dragTargetRef.current === id) return;
     setDragOverId(id);
+    const currentIds = panelTargets.map(t => t.id);
     setPanelOrder(prev => {
-      const base = prev || panelTargets.map(t => t.id);
+      const base = prev || currentIds;
       const from = base.indexOf(dragTargetRef.current);
       const to = base.indexOf(id);
       if (from === -1 || to === -1 || from === to) return prev;
@@ -90,8 +91,9 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
   }, [panelTargets]);
 
   const handleTargetDragEnd = useCallback(() => {
+    const currentIds = panelTargets.map(t => t.id);
     setPanelOrder(prev => {
-      const order = prev || panelTargets.map(t => t.id);
+      const order = prev || currentIds;
       localStorage.setItem('fsPanelOrder', JSON.stringify(order));
       return order;
     });
