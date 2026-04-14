@@ -14,7 +14,7 @@ function AppInner() {
   });
 
   const { configReloadedAt, lastConfigData } = useWebSocket();
-  useVersionCheck();
+  const { updateAvailable } = useVersionCheck();
 
   useEffect(() => {
     localStorage.setItem('darkMode', darkMode);
@@ -26,7 +26,7 @@ function AppInner() {
   }, [darkMode]);
 
   return (
-    <Layout darkMode={darkMode} setDarkMode={setDarkMode} configReloadedAt={configReloadedAt} lastConfigData={lastConfigData}>
+    <Layout darkMode={darkMode} setDarkMode={setDarkMode} configReloadedAt={configReloadedAt} lastConfigData={lastConfigData} updateAvailable={updateAvailable}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/history" element={<History />} />

@@ -1,18 +1,22 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getVersion } from '../lib/api';
 
 const POLL_INTERVAL_MS = 30_000;
+const RELOAD_DELAY_MS = 5_000;
 
 /**
  * Polls /api/version every 30 seconds.
  * When the version value changes from the one captured on first load,
- * the page is reloaded so the user gets the latest UI after an update.
+ * sets updateAvailable to true and reloads the page after a short delay
+ * so the user has time to see the notification.
  */
 export function useVersionCheck() {
   const initialVersionRef = useRef(null);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
-    let timerId;
+    let pollTimer;
+    let reloadTimer;
 
     async function check() {
       try {
@@ -26,16 +30,22 @@ export function useVersionCheck() {
         }
 
         if (initialVersionRef.current !== current) {
-          window.location.reload();
+          setUpdateAvailable(true);
+          reloadTimer = setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
+          return; // stop polling — reload is imminent
         }
       } catch {
         // ignore transient network errors and keep polling
-      } finally {
-        timerId = setTimeout(check, POLL_INTERVAL_MS);
       }
+      pollTimer = setTimeout(check, POLL_INTERVAL_MS);
     }
 
     check();
-    return () => clearTimeout(timerId);
+    return () => {
+      clearTimeout(pollTimer);
+      clearTimeout(reloadTimer);
+    };
   }, []);
+
+  return { updateAvailable };
 }
