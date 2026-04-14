@@ -382,6 +382,7 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
                           sparklineData={sparklineData[t.id] || []}
                           isSelected={isSelected}
                           onTargetClick={toggleTarget}
+                          hideExport
                         />
                       ) : (
                         <CompactHostCard

@@ -1,11 +1,15 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, FileText, FileDown } from 'lucide-react';
 import { cn, formatMs, formatPercent } from '../lib/utils';
 import SparklineChart from './SparklineChart';
 import UptimeCircle from './UptimeCircle';
+import { getReportData } from '../lib/api';
+import { generatePDFReport, generateCSVReport } from '../lib/reportGenerator';
 
-export default function HostCard({ target, lastPingResult, sparklineData = [], isSelected = false, onTargetClick, onDelete }) {
+export default function HostCard({ target, lastPingResult, sparklineData = [], isSelected = false, onTargetClick, onDelete, hideExport = false }) {
   const navigate = useNavigate();
+  const [exportLoading, setExportLoading] = useState(null);
   const result = lastPingResult || target;
 
   const rawAlive = result?.is_alive;
@@ -28,6 +32,23 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
   function handleDelete(e) {
     e.stopPropagation();
     if (onDelete) onDelete(target);
+  }
+
+  async function handleExport(e, format) {
+    e.stopPropagation();
+    setExportLoading(format);
+    try {
+      const data = await getReportData(target.id);
+      if (format === 'pdf') {
+        generatePDFReport(data);
+      } else {
+        generateCSVReport(data);
+      }
+    } catch (err) {
+      console.error(`Failed to generate ${format} report for target ${target.id}:`, err);
+    } finally {
+      setExportLoading(null);
+    }
   }
 
   return (
@@ -106,6 +127,29 @@ export default function HostCard({ target, lastPingResult, sparklineData = [], i
       </div>
 
       <SparklineChart data={sparklineData} />
+
+      {!hideExport && (
+        <div className="flex gap-1.5 mt-3" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={(e) => handleExport(e, 'pdf')}
+            disabled={exportLoading === 'pdf'}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-600 disabled:opacity-50 transition-colors"
+            title="Export PDF report"
+          >
+            <FileText size={11} />
+            {exportLoading === 'pdf' ? '…' : 'PDF'}
+          </button>
+          <button
+            onClick={(e) => handleExport(e, 'csv')}
+            disabled={exportLoading === 'csv'}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-600 disabled:opacity-50 transition-colors"
+            title="Export CSV report"
+          >
+            <FileDown size={11} />
+            {exportLoading === 'csv' ? '…' : 'CSV'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
