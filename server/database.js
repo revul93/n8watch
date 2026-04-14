@@ -293,7 +293,9 @@ function getAllTargetsWithLatest() {
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
     )
     WHERE (t.is_user_target = 0) OR (t.is_user_target = 1 AND (t.expires_at IS NULL OR t.expires_at > ?))
-    ORDER BY t.name ASC
+    ORDER BY t.is_user_target ASC,
+             CASE WHEN t.is_user_target = 0 THEN t.id END ASC,
+             t.created_at DESC
   `,
     )
     .all(Date.now());
