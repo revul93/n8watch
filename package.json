@@ -20,6 +20,7 @@
     "electron:build:win": "npm run electron:rebuild && electron-builder --win",
     "electron:build:mac": "npm run electron:rebuild && electron-builder --mac",
     "electron:build:linux": "npm run electron:rebuild && electron-builder --linux",
+    "update": "bash update.sh",
     "db:flush": "node scripts/flush-data.js",
     "db:flush:all": "node scripts/flush-data.js --all",
     "db:nuke": "node scripts/nuke-db.js"
