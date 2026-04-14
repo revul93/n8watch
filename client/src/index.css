@@ -60,17 +60,18 @@ html:not(.dark) .bg-gray-700 { background-color: #e2e8f0 !important; }
 html:not(.dark) .hover\:bg-gray-800:hover { background-color: #e2e8f0 !important; }
 html:not(.dark) .hover\:bg-gray-700:hover { background-color: #cbd5e1 !important; }
 
-/* text */
-html:not(.dark) .text-white  { color: #0f172a !important; }
+/* text — ensure sufficient contrast on light backgrounds */
+html:not(.dark) .text-white    { color: #0f172a !important; }
 html:not(.dark) .text-gray-100 { color: #1e293b !important; }
 html:not(.dark) .text-gray-200 { color: #334155 !important; }
 html:not(.dark) .text-gray-300 { color: #475569 !important; }
-html:not(.dark) .text-gray-400 { color: #64748b !important; }
-html:not(.dark) .text-gray-500 { color: #94a3b8 !important; }
-html:not(.dark) .text-gray-600 { color: #cbd5e1 !important; }
+html:not(.dark) .text-gray-400 { color: #475569 !important; }
+html:not(.dark) .text-gray-500 { color: #64748b !important; }
+html:not(.dark) .text-gray-600 { color: #94a3b8 !important; }
 
 /* hover text */
-html:not(.dark) .hover\:text-white:hover { color: #0f172a !important; }
+html:not(.dark) .hover\:text-white:hover  { color: #0f172a !important; }
+html:not(.dark) .hover\:text-gray-300:hover { color: #334155 !important; }
 
 /* borders */
 html:not(.dark) .border-gray-800 { border-color: #e2e8f0 !important; }
@@ -91,5 +92,31 @@ html:not(.dark) .bg-blue-600 { background-color: #2563eb !important; }
 
 /* notification / badge */
 html:not(.dark) .bg-blue-900\/50 { background-color: #dbeafe !important; }
-html:not(.dark) .text-blue-300    { color: #1d4ed8 !important; }
-html:not(.dark) .border-blue-800  { border-color: #93c5fd !important; }
+html:not(.dark) .text-blue-300   { color: #1d4ed8 !important; }
+html:not(.dark) .border-blue-800 { border-color: #93c5fd !important; }
+
+/* chart type / tag pill active states */
+html:not(.dark) .bg-indigo-900\/50 { background-color: #e0e7ff !important; }
+html:not(.dark) .text-indigo-300   { color: #4338ca !important; }
+html:not(.dark) .border-indigo-700 { border-color: #a5b4fc !important; }
+
+/* status colours — ensure visibility on white cards */
+html:not(.dark) .text-green-400 { color: #16a34a !important; }
+html:not(.dark) .bg-green-400   { background-color: #16a34a !important; }
+html:not(.dark) .text-red-400   { color: #dc2626 !important; }
+html:not(.dark) .bg-red-400     { background-color: #dc2626 !important; }
+html:not(.dark) .text-yellow-400 { color: #ca8a04 !important; }
+html:not(.dark) .bg-yellow-400  { background-color: #ca8a04 !important; }
+html:not(.dark) .text-blue-400  { color: #2563eb !important; }
+
+/* temporary / group tag badges */
+html:not(.dark) .bg-purple-900\/50 { background-color: #ede9fe !important; }
+html:not(.dark) .text-purple-300   { color: #7c3aed !important; }
+html:not(.dark) .border-purple-800 { border-color: #c4b5fd !important; }
+html:not(.dark) .bg-teal-900\/50   { background-color: #ccfbf1 !important; }
+html:not(.dark) .text-teal-300     { color: #0f766e !important; }
+html:not(.dark) .border-teal-800   { border-color: #5eead4 !important; }
+
+/* resize handles */
+html:not(.dark) .bg-gray-800.group-hover\:bg-blue-600:hover,
+html:not(.dark) .group:hover .group-hover\:bg-blue-600 { background-color: #3b82f6 !important; }

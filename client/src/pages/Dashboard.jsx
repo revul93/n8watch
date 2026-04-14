@@ -12,12 +12,44 @@ import { cn } from '../lib/utils';
 
 const SECTION_KEYS = ['summary', 'chart', 'hosts'];
 
+const CHART_HEIGHT_MIN = 180;
+const CHART_HEIGHT_MAX = 800;
+const CHART_HEIGHT_DEFAULT = 280;
+
 export default function Dashboard() {
   const { lastPingResults, configReloadedAt, targetsChangedAt, connected } = useWebSocket();
   const { data: targets, loading, refetch } = useApi(getTargets, []);
   const [sparklineData, setSparklineData] = useState({});
   const [selectedTargetIds, setSelectedTargetIds] = useState([]);
   const [fullscreen, setFullscreen] = useState(false);
+
+  // Resizable chart height
+  const [chartHeight, setChartHeight] = useState(() => {
+    const saved = parseInt(localStorage.getItem('dashChartHeight'), 10);
+    return isNaN(saved) ? CHART_HEIGHT_DEFAULT : Math.max(CHART_HEIGHT_MIN, Math.min(CHART_HEIGHT_MAX, saved));
+  });
+  const chartHeightRef = useRef(chartHeight);
+
+  const handleChartResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = chartHeightRef.current;
+
+    const onMouseMove = (ev) => {
+      const newHeight = Math.max(CHART_HEIGHT_MIN, Math.min(CHART_HEIGHT_MAX, startHeight + ev.clientY - startY));
+      chartHeightRef.current = newHeight;
+      setChartHeight(newHeight);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('dashChartHeight', chartHeightRef.current);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   // Section drag-and-drop order
   const [sectionOrder, setSectionOrder] = useState(() => {
@@ -249,7 +281,25 @@ export default function Dashboard() {
       <SummaryCards targets={targetList} lastPingResults={lastPingResults} />
     ),
     chart: (
-      <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} colorMap={colorMap} />
+      <div className="relative">
+        <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} colorMap={colorMap} chartHeight={chartHeight} />
+        {/* Resize handle */}
+        <div
+          className="w-full h-2 flex items-center justify-center cursor-row-resize group mt-1"
+          onMouseDown={handleChartResizeMouseDown}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp') { setChartHeight(h => { const v = Math.max(CHART_HEIGHT_MIN, h - 20); chartHeightRef.current = v; localStorage.setItem('dashChartHeight', v); return v; }); }
+            if (e.key === 'ArrowDown') { setChartHeight(h => { const v = Math.min(CHART_HEIGHT_MAX, h + 20); chartHeightRef.current = v; localStorage.setItem('dashChartHeight', v); return v; }); }
+          }}
+          tabIndex={0}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Drag or use arrow keys to resize chart height"
+          title="Drag or use arrow keys to resize chart"
+        >
+          <div className="h-1 w-16 rounded-full bg-gray-800 group-hover:bg-blue-600 transition-colors" />
+        </div>
+      </div>
     ),
     hosts: (
       <div>
@@ -432,6 +482,7 @@ export default function Dashboard() {
           targets={targetList}
           lastPingResults={lastPingResults}
           colorMap={colorMap}
+          sparklineData={sparklineData}
           onClose={() => setFullscreen(false)}
         />
       )}

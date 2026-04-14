@@ -155,7 +155,7 @@ export default function Layout({
               <PanelLeftOpen size={20} />
             </button>
           )}
-          <span className="text-base font-semibold text-white lg:hidden">
+          <span className="text-base font-semibold text-white">
             n8watch
           </span>
           <div className="flex-1" />
