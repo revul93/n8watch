@@ -17,6 +17,7 @@ export default function Layout({
   setDarkMode,
   configReloadedAt,
   lastConfigData,
+  updateAvailable,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(() => {
@@ -117,6 +118,18 @@ export default function Layout({
 
       {/* Main */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* App update notification banner */}
+        {updateAvailable && (
+          <div
+            role="status"
+            aria-live="assertive"
+            className="flex items-center gap-3 px-4 py-2 bg-green-600 text-white text-sm flex-shrink-0"
+          >
+            <RefreshCw size={14} className="animate-spin" />
+            <span>Update applied — reloading page…</span>
+          </div>
+        )}
+
         {/* Config reload notification banner */}
         {notification && (
           <div
