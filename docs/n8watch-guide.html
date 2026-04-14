@@ -224,9 +224,10 @@
   <hr class="cover-rule" />
   <p class="cover-tagline">
     Real-time IP and network host monitoring with a web dashboard,
-    historical metrics, configurable alert rules, and email notifications.
+    historical metrics, configurable alert rules, email notifications,
+    and optional remote desktop access.
   </p>
-  <p class="cover-meta">System Guide · Version 1.0 · Node.js 24.0</p>
+  <p class="cover-meta">System Guide · Version 1.0 · Node.js 24 LTS</p>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ SECTION 1 -->
@@ -238,11 +239,12 @@
     <strong>n8watch</strong> is a lightweight, self-hosted network monitoring system that
     continuously pings a configurable list of hosts, stores historical results in a local
     SQLite database, and pushes live metrics to a React web dashboard via WebSocket.
+    No external database server is required — everything runs as a single Node.js process.
   </p>
 
   <h2>Key Features</h2>
   <ul>
-    <li><strong>Real-time ICMP monitoring</strong> — sends configurable ping cycles (count, interval, timeout) to every target.</li>
+    <li><strong>Real-time ICMP monitoring</strong> — configurable ping cycles (count, interval, timeout) for every target.</li>
     <li><strong>Web dashboard</strong> — live status grid with latency, jitter, packet loss, and uptime badges.</li>
     <li><strong>Historical data</strong> — SQLite store with configurable retention (default 90 days); CSV export.</li>
     <li><strong>Alert engine</strong> — JavaScript expression conditions (e.g. <code>packet_loss &gt; 20</code>) with per-rule cooldowns and per-target scoping.</li>
@@ -250,8 +252,8 @@
     <li><strong>Live config reload</strong> — edit <code>config.yaml</code> while running; targets and rules are applied within one second.</li>
     <li><strong>WebSocket push</strong> — all connected browsers receive updated metrics immediately after each ping cycle.</li>
     <li><strong>Multi-interface support</strong> — bind outgoing pings to a specific NIC per target.</li>
-    <li><strong>User-defined targets</strong> — add temporary ad-hoc hosts from the dashboard without editing config.</li>
-    <li><strong>Electron desktop app</strong> — optional standalone application for Windows, macOS, and Linux.</li>
+    <li><strong>System-defined &amp; user-defined targets</strong> — permanent config-based hosts plus ad-hoc dashboard targets.</li>
+    <li><strong>HTTPS support</strong> — optional TLS configuration for serving the dashboard securely.</li>
   </ul>
 
   <h2>Architecture at a Glance</h2>
@@ -260,8 +262,7 @@
     <tr><td>Backend</td><td>Node.js · Express</td><td>REST API, WebSocket server, ping engine, alert engine, scheduler</td></tr>
     <tr><td>Database</td><td>SQLite (better-sqlite3)</td><td>Persistent storage for targets, ping results, alerts</td></tr>
     <tr><td>Frontend</td><td>React 18 · Vite · Tailwind CSS</td><td>Dashboard SPA (served as static files from <code>client/dist</code>)</td></tr>
-    <tr><td>Process mgr</td><td>PM2</td><td>Production process supervision, log rotation, system boot startup</td></tr>
-    <tr><td>Desktop</td><td>Electron (optional)</td><td>Wraps the server + SPA in a native application window</td></tr>
+    <tr><td>Process manager</td><td>PM2</td><td>Production process supervision, log rotation, system boot startup</td></tr>
   </table>
 
 </div>
@@ -274,16 +275,33 @@
   <h2>Prerequisites</h2>
   <table>
     <tr><th>Requirement</th><th>Version</th><th>Notes</th></tr>
-    <tr><td>Node.js</td><td><strong>24.0</strong> (v18+ minimum)</td><td><a href="https://nodejs.org">nodejs.org</a> — the setup scripts install v24 LTS automatically if Node.js is absent</td></tr>
+    <tr><td>Node.js</td><td><strong>24 LTS</strong> (v18+ minimum)</td><td><a href="https://nodejs.org">nodejs.org</a> — setup scripts install v24 automatically when absent</td></tr>
     <tr><td>npm</td><td>Bundled with Node.js</td><td>No separate install needed</td></tr>
     <tr><td><code>ping</code></td><td>System binary</td><td>Pre-installed on Linux, macOS, Windows. On Debian/Ubuntu: <code>sudo apt install iputils-ping</code></td></tr>
     <tr><td>Git</td><td>Any recent version</td><td>Required for the one-line install scripts</td></tr>
   </table>
 
+  <h2>Installing Node.js 24 on Linux (via nvm)</h2>
+  <p>
+    The recommended way to install and manage Node.js on Linux is through
+    <strong>nvm</strong> (Node Version Manager):
+  </p>
+  <pre><code># 1. Install nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
+# 2. Reload your shell profile
+source ~/.bashrc
+
+# 3. Install Node.js 24
+nvm install 24
+
+# 4. Use Node.js 24
+nvm use 24</code></pre>
+
   <div class="note">
-    <strong>Node.js v24 LTS</strong> is strongly recommended. The automated setup scripts
-    (<code>setup.sh</code> / <code>setup.ps1</code>) will install it automatically when Node.js
-    is not already present.
+    The automated setup scripts (<code>setup.sh</code> / <code>setup.ps1</code>) will install
+    <strong>Node.js v24 LTS</strong> automatically via nvm when Node.js is not already present
+    on the system.
   </div>
 
   <h2>One-Line Install (Linux / macOS) — Recommended</h2>
@@ -294,7 +312,7 @@ curl -fsSL https://raw.githubusercontent.com/revul93/n8watch/main/install.sh | b
 # Using wget
 wget -qO- https://raw.githubusercontent.com/revul93/n8watch/main/install.sh | bash</code></pre>
 
-  <p>The installer clones the repo into an <code>n8watch/</code> directory then calls <code>setup.sh</code>.</p>
+  <p>The installer clones the repository into an <code>n8watch/</code> directory and runs <code>setup.sh</code> automatically.</p>
 
   <h2>One-Line Install (Windows — PowerShell)</h2>
   <pre><code>Invoke-Expression (Invoke-WebRequest `
@@ -319,13 +337,13 @@ powershell -ExecutionPolicy Bypass -File setup.ps1</code></pre>
     <li>Checks for Node.js v24 LTS and installs it (via <code>nvm</code> or the platform package manager) if missing.</li>
     <li>Installs backend Node.js dependencies (<code>npm install --omit=dev</code>).</li>
     <li>Installs and builds the React frontend (<code>cd client &amp;&amp; npm install &amp;&amp; npm run build</code>).</li>
-    <li>Detects real network interfaces on the host and writes them into <code>config.yaml</code>; falls back to copying <code>config.example.yaml</code> unchanged.</li>
-    <li>Optionally installs PM2 globally, starts the application, saves the process list, and configures system-boot auto-startup.</li>
+    <li>Detects real network interfaces and writes them into <code>config.yaml</code>; falls back to copying <code>config.example.yaml</code>.</li>
+    <li>Optionally installs PM2, starts the application, and configures system-boot auto-startup.</li>
   </ol>
 
   <h3>Step 3 — Manual setup (alternative to the script)</h3>
   <pre><code># Backend dependencies
-npm install
+npm install --omit=dev
 
 # Frontend build
 cd client &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..
@@ -335,8 +353,8 @@ cp config.example.yaml config.yaml
 # → edit config.yaml with your targets and SMTP settings</code></pre>
 
   <div class="warning">
-    <strong>After installation</strong>, open <code>config.yaml</code> and set your target IP addresses
-    and SMTP credentials before starting the application.
+    <strong>After installation</strong>, open <code>config.yaml</code> and configure your target
+    IP addresses and SMTP credentials before starting the application.
   </div>
 
 </div>
@@ -353,31 +371,38 @@ cp config.example.yaml config.yaml
 
   <h2>3.1 General Settings</h2>
   <pre><code>general:
-  ping_interval: 30        # Seconds between ping cycles (1–59)
-  ping_count: 5            # ICMP packets sent per cycle
-  ping_timeout: 5          # Timeout in seconds per ping attempt
-  data_retention_days: 90  # Days to keep historical ping results</code></pre>
+  ping_interval: 30          # Seconds between ping cycles (1–59)
+  ping_count: 5              # ICMP packets sent per cycle
+  ping_timeout: 5            # Timeout in seconds per ping attempt
+  data_retention_days: 90    # Days to keep historical ping results
+  max_user_target_lifetime_days: 7  # Auto-expiry for dashboard-added targets</code></pre>
 
   <table>
     <tr><th>Key</th><th>Default</th><th>Description</th></tr>
     <tr><td><code>ping_interval</code></td><td>30</td><td>Seconds between each full ping sweep of all targets</td></tr>
     <tr><td><code>ping_count</code></td><td>5</td><td>Number of ICMP packets sent to each host per cycle</td></tr>
     <tr><td><code>ping_timeout</code></td><td>5</td><td>Per-packet timeout in seconds</td></tr>
-    <tr><td><code>data_retention_days</code></td><td>90</td><td>Historical ping results older than this are automatically purged</td></tr>
+    <tr><td><code>data_retention_days</code></td><td>90</td><td>Ping results older than this are automatically purged</td></tr>
+    <tr><td><code>max_user_target_lifetime_days</code></td><td>7</td><td>Days before a user-added target is automatically removed</td></tr>
   </table>
 
   <h2>3.2 Network Interfaces (optional)</h2>
   <pre><code>interfaces:
-  - name: "eth0"           # OS interface name (used with ping -I)
-    alias: "Primary LAN"  # Human-readable label shown in the dashboard
-    ipv4: "192.168.1.100" # IPv4 address bound to this interface</code></pre>
+  - name: "eth0"            # OS interface name (used with ping -I)
+    alias: "Primary LAN"   # Human-readable label shown in the dashboard
+    ipv4: "192.168.1.100"  # IPv4 address bound to this interface
+  - name: "eth1"
+    alias: "Management NIC"
+    ipv4: "10.0.0.1"</code></pre>
 
   <p>
-    When present, the dashboard shows a drop-down in the <em>Add Target</em> panel and displays
-    a teal interface badge on each target card. The setup script auto-detects interfaces on the host.
+    When present, the dashboard shows an interface drop-down in the <em>Add Target</em> panel
+    and displays a teal interface badge on each target card. Run <code>ip link</code> (Linux)
+    or <code>ifconfig</code> (macOS) to list your interface names. The setup script auto-detects
+    and populates this section.
   </p>
 
-  <h2>3.3 System-Defined Targets</h2>
+  <h2>3.3 Targets</h2>
   <pre><code>targets:
   - name: "Google DNS"
     ip: "8.8.8.8"
@@ -385,26 +410,64 @@ cp config.example.yaml config.yaml
     interface: "eth0"           # Optional: binds outgoing ping to this NIC
   - name: "Core Router"
     ip: "192.168.1.1"
-    group: "Local Network"</code></pre>
+    group: "Local Network"
+    # interface: "eth1"         # Omit to use the default system interface</code></pre>
 
   <table>
     <tr><th>Field</th><th>Required</th><th>Description</th></tr>
     <tr><td><code>name</code></td><td>Yes</td><td>Display name in the dashboard and reports</td></tr>
     <tr><td><code>ip</code></td><td>Yes</td><td>IPv4 address or resolvable hostname</td></tr>
-    <tr><td><code>group</code></td><td>No</td><td>Label used to filter targets in the dashboard</td></tr>
+    <tr><td><code>group</code></td><td>No</td><td>Label used to group and filter targets in the dashboard</td></tr>
     <tr><td><code>interface</code></td><td>No</td><td>OS interface name; must match an entry in the <code>interfaces</code> section</td></tr>
   </table>
 
-  <h2>3.4 Server</h2>
-  <pre><code>server:
-  port: 3000          # HTTP port (default 3000)
-  host: "0.0.0.0"     # Bind address (0.0.0.0 = all network interfaces)
-  # ssl:              # Uncomment to enable HTTPS
-  #   enabled: true
-  #   cert: "/etc/ssl/certs/n8watch.crt"
-  #   key:  "/etc/ssl/private/n8watch.key"</code></pre>
+  <h2>3.4 System-Defined vs User-Defined Targets</h2>
 
-  <h2>3.5 Alerts &amp; Email Notifications</h2>
+  <h3>System-Defined Targets</h3>
+  <p>
+    Targets listed in <code>config.yaml</code> are <strong>system-defined</strong>. They are loaded
+    at startup, kept in sync on every live config reload, and persist as long as they appear in the file.
+  </p>
+
+  <h3>User-Defined Targets</h3>
+  <p>
+    Any host added via the dashboard's <em>Add Target</em> panel (or via
+    <code>POST /api/targets/user-targets</code>) is a <strong>user-defined target</strong>.
+    These are temporary and expire automatically after <code>max_user_target_lifetime_days</code>.
+    They can also be removed individually from the dashboard at any time.
+  </p>
+
+  <table>
+    <tr>
+      <th>Feature</th>
+      <th>System-Defined</th>
+      <th>User-Defined</th>
+    </tr>
+    <tr><td>Defined in <code>config.yaml</code></td><td>✅ Yes</td><td>❌ No</td></tr>
+    <tr><td>Persists across restarts</td><td>✅ Yes</td><td>⚠️ Temporary</td></tr>
+    <tr><td>Live-reloaded with config</td><td>✅ Yes</td><td>❌ No</td></tr>
+    <tr><td>Added via dashboard / API</td><td>❌ No</td><td>✅ Yes</td></tr>
+    <tr><td>Subject to alert rules</td><td>✅ Yes</td><td>✅ Yes</td></tr>
+    <tr><td>Manually removable from dashboard</td><td>❌ No</td><td>✅ Yes</td></tr>
+  </table>
+
+  <div class="note">
+    <strong>Tip:</strong> Use system-defined targets for critical, permanent hosts and user-defined
+    targets for quick ad-hoc checks without touching <code>config.yaml</code>.
+  </div>
+
+  <h2>3.5 Server</h2>
+  <pre><code>server:
+  port: 3000          # HTTP(S) port (default 3000)
+  host: "0.0.0.0"     # Bind address (0.0.0.0 = all network interfaces)
+
+  # Optional TLS — uncomment to enable HTTPS
+  # ssl:
+  #   enabled: true
+  #   cert: "/etc/letsencrypt/live/yourdomain.com/fullchain.pem"
+  #   key:  "/etc/letsencrypt/live/yourdomain.com/privkey.pem"</code></pre>
+
+  <h2>3.6 Alerts &amp; Email Notifications</h2>
   <pre><code>alerts:
   email_notifications: true   # Set false to disable all email alerts
 
@@ -413,7 +476,7 @@ cp config.example.yaml config.yaml
     port: 587
     secure: false             # true = port 465 (TLS); false = port 587 (STARTTLS)
     user: "you@gmail.com"
-    pass: "app-password"      # Use an app-specific password, not your account password
+    pass: "app-password"      # Use an app-specific password
     from: "n8watch &lt;monitor@yourdomain.com&gt;"
     to:
       - "admin@yourdomain.com"
@@ -424,12 +487,23 @@ cp config.example.yaml config.yaml
       severity: "critical"    # critical | warning
       cooldown: 300           # Min seconds between repeated alerts for the same target
       # targets:              # Omit or leave empty to apply rule to ALL targets
+
+    - name: "High Packet Loss"
+      condition: "packet_loss > 20"
+      severity: "warning"
+      cooldown: 600
+      targets:                # Restrict to specific targets by name, IP, or numeric ID
+        - "Google DNS"
+
     - name: "High Latency"
       condition: "avg_latency > 200"
       severity: "warning"
       cooldown: 600
-      targets:                # Restrict to specific targets by name, IP, or numeric ID
-        - "Core Router"</code></pre>
+
+    - name: "High Jitter"
+      condition: "jitter > 50"
+      severity: "warning"
+      cooldown: 600</code></pre>
 
   <h3>Alert Rule Condition Variables</h3>
   <table>
@@ -456,88 +530,9 @@ condition: "is_alive == 0"        # Host not responding</code></pre>
 <!-- ═══════════════════════════════════════════════════════════════ SECTION 4 -->
 <div class="section page-break">
 
-  <h1>4 · How the System Works</h1>
+  <h1>4 · Running the Application</h1>
 
-  <h2>4.1 Ping Engine &amp; Scheduler</h2>
-  <p>
-    On startup, <code>server/scheduler.js</code> creates a <code>node-cron</code> job that fires every
-    <code>general.ping_interval</code> seconds. Each tick triggers <code>server/ping-engine.js</code>,
-    which pings all active targets in parallel. Results (min/avg/max latency, jitter, packet loss,
-    alive status) are written to the <code>ping_results</code> SQLite table and immediately broadcast
-    to all connected WebSocket clients.
-  </p>
-
-  <h2>4.2 Alert Engine</h2>
-  <p>
-    After each ping cycle, <code>server/alert-engine.js</code> evaluates every alert rule against
-    the fresh metrics for each in-scope target. If a condition evaluates to <code>true</code> and
-    the rule's cooldown timer has not yet elapsed, an alert record is written to the
-    <code>alerts</code> table, a WebSocket <code>alert</code> event is pushed to the dashboard, and
-    (if SMTP is configured) an HTML email notification is dispatched.
-  </p>
-
-  <h2>4.3 Live Config Reload</h2>
-  <p>
-    <code>server/config.js</code> uses Node.js <code>fs.watch</code> to monitor <code>config.yaml</code>.
-    When a change is detected, the file is re-parsed and the application:
-  </p>
-  <ol>
-    <li>Re-syncs the target list in the database (adds new entries, removes deleted ones).</li>
-    <li>Restarts the ping scheduler with the (possibly new) interval.</li>
-    <li>Reinitialises the email service and alert engine with updated rules.</li>
-    <li>Broadcasts a <code>config_reloaded</code> WebSocket event so connected browsers can refresh.</li>
-  </ol>
-
-  <h2>4.4 System-Defined vs User-Defined Targets</h2>
-
-  <h3>System-Defined Targets</h3>
-  <p>
-    Targets listed in the <code>targets:</code> section of <code>config.yaml</code> are
-    <strong>system-defined</strong>. They are loaded on startup, kept in sync on every live
-    config reload, and persist as long as they appear in the file. They are stored in the
-    database with <code>is_user_target = 0</code>.
-  </p>
-
-  <h3>User-Defined Targets</h3>
-  <p>
-    Any host added via the dashboard's <em>Add Target</em> panel (or via
-    <code>POST /api/targets/user-targets</code>) is a <strong>user-defined target</strong>.
-    These are useful for quick, ad-hoc monitoring without editing config. They are stored
-    with <code>is_user_target = 1</code>, are temporary by default, and can be removed
-    individually from the dashboard or via <code>DELETE /api/targets/user-targets/:id</code>.
-  </p>
-
-  <table>
-    <tr>
-      <th>Feature</th>
-      <th>System-Defined</th>
-      <th>User-Defined</th>
-    </tr>
-    <tr><td>Defined in <code>config.yaml</code></td><td>✅ Yes</td><td>❌ No</td></tr>
-    <tr><td>Persists across restarts</td><td>✅ Yes</td><td>⚠️ Temporary</td></tr>
-    <tr><td>Live-reloaded with config</td><td>✅ Yes</td><td>❌ No</td></tr>
-    <tr><td>Added via dashboard / API</td><td>❌ No</td><td>✅ Yes</td></tr>
-    <tr><td>Subject to alert rules</td><td>✅ Yes</td><td>✅ Yes</td></tr>
-    <tr><td>Manually removable from dashboard</td><td>❌ No</td><td>✅ Yes</td></tr>
-  </table>
-
-  <h2>4.5 WebSocket Events</h2>
-  <p>Connect to <code>ws://&lt;host&gt;:3000</code> to receive real-time events:</p>
-  <table>
-    <tr><th>Event</th><th>Emitted when</th></tr>
-    <tr><td><code>ping_result</code></td><td>After each full ping cycle — contains fresh metrics for all targets</td></tr>
-    <tr><td><code>alert</code></td><td>An alert rule fires for a target</td></tr>
-    <tr><td><code>config_reloaded</code></td><td><code>config.yaml</code> is saved and reloaded</td></tr>
-  </table>
-
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════ SECTION 5 -->
-<div class="section page-break">
-
-  <h1>5 · Running the Application</h1>
-
-  <h2>5.1 Development (Node.js directly)</h2>
+  <h2>4.1 Direct Start (Node.js)</h2>
   <pre><code># Start the backend (serves the pre-built frontend from client/dist)
 npm start
 # or
@@ -549,9 +544,12 @@ npm run dev    # Vite dev server on http://localhost:5173 — proxies API to :30
 
   <p>Open <code>http://localhost:3000</code> (or the configured host/port) in your browser.</p>
 
-  <h2>5.2 Production with PM2</h2>
+  <h2>4.2 Production with PM2</h2>
 
-  <p>PM2 is the recommended process manager — it restarts the app automatically, rotates logs, and can start on system boot.</p>
+  <p>
+    PM2 is the recommended process manager — it restarts the app on crash, rotates logs,
+    and configures system-boot startup automatically.
+  </p>
 
   <pre><code># Install PM2 globally (one-time)
 npm install -g pm2</code></pre>
@@ -569,49 +567,42 @@ npm install -g pm2</code></pre>
     <tr><td><code>npm run pm2:startup</code></td><td>Generate and run the system-boot startup command</td></tr>
   </table>
 
-  <h3>Direct PM2 commands (equivalent)</h3>
-  <pre><code>pm2 start ecosystem.config.js   # Start
-pm2 stop n8watch                 # Stop
-pm2 restart n8watch              # Hard restart
-pm2 reload n8watch               # Zero-downtime reload
-pm2 logs n8watch                 # Tail logs
-pm2 status                       # Process list
-pm2 monit                        # Real-time monitor
-pm2 save &amp;&amp; pm2 startup          # Enable auto-start on reboot</code></pre>
+  <h3>Enable auto-start on system boot</h3>
+  <pre><code>npm run pm2:startup   # Generates and runs the systemd/launchd hook
+npm run pm2:save      # Saves the current process list</code></pre>
 
   <h3>Log files</h3>
-  <p>Logs are written to:</p>
   <ul>
     <li><code>logs/out.log</code> — standard output</li>
     <li><code>logs/error.log</code> — standard error</li>
   </ul>
 
-  <h2>5.3 Windows (without PM2)</h2>
+  <h2>4.3 Windows</h2>
   <pre><code>REM Option A — double-click or CMD
 start.cmd
 
 REM Option B — Node.js directly
 node server\index.js
 
-REM Option C — PM2 (recommended)
+REM Option C — PM2 (recommended for production)
 npm run pm2:start</code></pre>
 
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════ SECTION 6 -->
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 5 -->
 <div class="section page-break">
 
-  <h1>6 · Database Maintenance Scripts</h1>
+  <h1>5 · Utility Scripts</h1>
 
   <p>
-    n8watch ships two maintenance scripts in <code>scripts/</code>. Always stop the application
-    before running either script to avoid database conflicts.
+    n8watch ships two maintenance scripts in <code>scripts/</code>.
+    <strong>Always stop the application before running either script</strong> to avoid database conflicts.
   </p>
 
-  <h2>6.1 flush-data.js — Clear Rows</h2>
+  <h2>5.1 flush-data.js — Clear Rows</h2>
   <p>
-    Deletes rows from the database without removing the database file itself.
-    Useful for freeing disk space or resetting metrics between test runs.
+    Deletes rows from the database without removing the database file.
+    Useful for freeing disk space or resetting metrics without losing the schema.
   </p>
 
   <pre><code># Via npm shortcut (flushes ping results only — default)
@@ -621,11 +612,11 @@ npm run db:flush
 npm run db:flush:all
 
 # Direct invocation with flags
-node scripts/flush-data.js --ping-results   # ping results only (default)
-node scripts/flush-data.js --alerts         # alert records only
+node scripts/flush-data.js --ping-results         # ping results only (default)
+node scripts/flush-data.js --alerts               # alert records only
 node scripts/flush-data.js --ping-results --alerts  # both
-node scripts/flush-data.js --all            # ping results + alerts + targets
-node scripts/flush-data.js --all --yes      # non-interactive (skip confirmation)</code></pre>
+node scripts/flush-data.js --all                  # ping results + alerts + targets
+node scripts/flush-data.js --all --yes            # non-interactive (skip confirmation)</code></pre>
 
   <table>
     <tr><th>Flag</th><th>What is deleted</th></tr>
@@ -636,7 +627,7 @@ node scripts/flush-data.js --all --yes      # non-interactive (skip confirmation
     <tr><td><code>--yes</code></td><td>Suppresses the confirmation prompt</td></tr>
   </table>
 
-  <h2>6.2 nuke-db.js — Complete Wipe &amp; Recreate</h2>
+  <h2>5.2 nuke-db.js — Complete Wipe &amp; Recreate</h2>
   <p>
     Deletes the database <em>file</em> entirely (including WAL and SHM sidecar files)
     and recreates an empty schema from scratch. Auto-increment counters are reset;
@@ -657,10 +648,10 @@ node scripts/nuke-db.js --yes</code></pre>
 
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════ SECTION 7 -->
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 6 -->
 <div class="section page-break">
 
-  <h1>7 · Web Dashboard</h1>
+  <h1>6 · Web Dashboard &amp; API</h1>
 
   <p>Open <code>http://&lt;host&gt;:3000</code> after the application is running.</p>
 
@@ -674,13 +665,12 @@ node scripts/nuke-db.js --yes</code></pre>
   <h2>Adding a Temporary Target</h2>
   <ol>
     <li>Click <strong>Add Target</strong> on the Dashboard page.</li>
-    <li>Enter a display name, IP address / hostname, and (optionally) select an interface from the drop-down.</li>
+    <li>Enter a display name, IP address or hostname, and optionally select an interface.</li>
     <li>Click <strong>Add</strong> — the target appears in the grid and is pinged in the next cycle.</li>
     <li>Remove it with the <strong>×</strong> button on its card (user-defined targets only).</li>
   </ol>
 
-  <h1>8 · API Quick Reference</h1>
-
+  <h2>API Quick Reference</h2>
   <p>All endpoints are prefixed with <code>/api</code> and return JSON.</p>
 
   <table>
@@ -696,6 +686,167 @@ node scripts/nuke-db.js --yes</code></pre>
     <tr><td>GET</td><td><code>/api/export</code></td><td>Export metrics to CSV</td></tr>
     <tr><td>GET</td><td><code>/api/interfaces</code></td><td>List interfaces from <code>config.yaml</code></td></tr>
   </table>
+
+  <h2>WebSocket Events</h2>
+  <p>
+    Connect to <code>ws://&lt;host&gt;:3000</code> (use <code>wss://</code> behind a TLS-terminating proxy)
+    to receive real-time push events:
+  </p>
+  <table>
+    <tr><th>Event</th><th>Emitted when</th></tr>
+    <tr><td><code>ping_result</code></td><td>After each full ping cycle — contains fresh metrics for all targets</td></tr>
+    <tr><td><code>alert</code></td><td>An alert rule fires for a target</td></tr>
+    <tr><td><code>config_reloaded</code></td><td><code>config.yaml</code> is saved and reloaded</td></tr>
+  </table>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 7 -->
+<div class="section page-break">
+
+  <h1>7 · Optional: Remote Desktop Setup (Linux)</h1>
+
+  <p>
+    This guide shows how to run n8watch on a headless Linux server, display the dashboard
+    full-screen in a browser, and access the screen remotely via VNC. This is ideal for a
+    dedicated monitoring workstation or a wall-mounted display.
+  </p>
+
+  <h2>7.1 Install a Desktop Environment</h2>
+  <pre><code>sudo apt update
+sudo apt install xfce4 xfce4-goodies lightdm -y</code></pre>
+
+  <h2>7.2 Configure Auto-Login</h2>
+  <p>Edit the LightDM configuration to enable automatic login to the XFCE desktop:</p>
+  <pre><code>sudo nano /etc/lightdm/lightdm.conf</code></pre>
+
+  <p>Add the following block (replace <code>administrator</code> with your username):</p>
+  <pre><code>[Seat:*]
+xserver-command=X -core
+autologin-user=administrator
+autologin-session=xfce</code></pre>
+
+  <h2>7.3 Install Chromium</h2>
+  <pre><code>sudo apt install chromium-browser -y</code></pre>
+
+  <h2>7.4 Auto-Launch the Dashboard in Kiosk Mode</h2>
+  <p>Create an autostart entry so Chromium opens the n8watch dashboard on every login:</p>
+  <pre><code>mkdir -p ~/.config/autostart
+nano ~/.config/autostart/browser.desktop</code></pre>
+
+  <p>Paste the following (replace <code>YOUR_PORT</code> with your configured port, e.g. <code>3000</code>):</p>
+  <pre><code>[Desktop Entry]
+Type=Application
+Exec=chromium-browser --kiosk http://localhost:YOUR_PORT
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=Monitoring</code></pre>
+
+  <h2>7.5 Install and Configure VNC for Remote Access</h2>
+  <pre><code># Install x11vnc
+sudo apt install x11vnc -y
+
+# Set a VNC password
+x11vnc -storepasswd</code></pre>
+
+  <p>Create a systemd service so VNC starts automatically with the display manager:</p>
+  <pre><code>sudo nano /etc/systemd/system/x11vnc.service</code></pre>
+
+  <p>Paste the following (replace <code>administrator</code> with your username):</p>
+  <pre><code>[Unit]
+Description=Start x11vnc
+After=display-manager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/x11vnc -auth guess -forever -loop -noxdamage -repeat \
+  -rfbauth /home/administrator/.vnc/passwd -rfbport 5900 -shared
+User=administrator
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+
+  <p>Enable and start the service:</p>
+  <pre><code>sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable x11vnc
+sudo systemctl start x11vnc</code></pre>
+
+  <p>
+    Connect from any VNC client (e.g. RealVNC, TigerVNC, Remmina) to
+    <code>&lt;server-ip&gt;:5900</code> using the password you set above.
+  </p>
+
+  <h2>7.6 Prevent Screen Sleep</h2>
+  <p>
+    To keep the display on at all times, disable power management in the XFCE Power Manager
+    (<strong>xfce4-power-manager-settings</strong> → Display tab → turn all sleep/blank timers OFF),
+    or apply the settings from the command line:
+  </p>
+  <pre><code>xset s off       # Disable screen saver
+xset -dpms       # Disable Display Power Management
+xset s noblank   # Disable screen blanking</code></pre>
+
+  <div class="note">
+    To make the <code>xset</code> commands persistent, add them as an autostart entry in
+    <code>~/.config/autostart/</code> using the same <code>[Desktop Entry]</code> format as the
+    browser entry above.
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 8 -->
+<div class="section page-break">
+
+  <h1>8 · Optional: Firewall Configuration</h1>
+
+  <p>
+    The following <code>iptables</code> rules provide a hardened baseline for a monitoring server —
+    allowing only essential traffic and dropping everything else.
+  </p>
+
+  <div class="warning">
+    <strong>Persistence note:</strong> <code>iptables</code> rules are not persistent across reboots
+    by default. To persist them, install <code>iptables-persistent</code>:<br/>
+    <code>sudo apt install iptables-persistent</code> then
+    <code>sudo netfilter-persistent save</code>
+  </div>
+
+  <pre><code># ── 1. Flush all existing rules ────────────────────────────────────────────
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t mangle -F
+
+# ── 2. Set default policies ────────────────────────────────────────────────
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT ACCEPT
+
+# ── 3. Allow loopback traffic ──────────────────────────────────────────────
+iptables -A INPUT -i lo -j ACCEPT
+
+# ── 4. Allow established and related connections ───────────────────────────
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# ── 5. Allow SSH (prevent lockout) ─────────────────────────────────────────
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
+# ── 6. Allow n8watch dashboard (adjust port if changed in config.yaml) ─────
+iptables -A INPUT -p tcp --dport 3000 -j ACCEPT
+
+# ── 7. Allow VNC remote access (only if using the remote desktop setup) ────
+iptables -A INPUT -p tcp --dport 5900 -j ACCEPT
+
+# ── 8. Allow ICMP so the server itself is reachable ────────────────────────
+iptables -A INPUT -p icmp -j ACCEPT</code></pre>
+
+  <div class="note">
+    <strong>Tip:</strong> To restrict dashboard and VNC access to a trusted network only
+    (e.g. your LAN <code>192.168.1.0/24</code>), replace <code>-j ACCEPT</code> on those rules with
+    <code>-s 192.168.1.0/24 -j ACCEPT</code>.
+  </div>
 
   <div class="footer">
     n8watch · Night Network Watch · Licensed under GNU GPL v3.0 ·
