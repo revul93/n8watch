@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
-import HostCard from './HostCard';
+import CompactHostCard from './CompactHostCard';
 
 const CHART_TYPES = [
   { key: 'latency', label: 'Latency' },
@@ -30,6 +30,74 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     return isNaN(saved) ? PANEL_DEFAULT : Math.max(PANEL_MIN, Math.min(PANEL_MAX, saved));
   });
   const panelWidthRef = useRef(panelWidth);
+
+  // Panel target order (manual sort by drag-and-drop, persisted in localStorage)
+  const [panelOrder, setPanelOrder] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('fsPanelOrder'));
+      if (Array.isArray(saved) && saved.every(id => typeof id === 'number')) return saved;
+    } catch {}
+    return null; // null means "use server order"
+  });
+  const dragTargetRef = useRef(null);
+  const [dragOverId, setDragOverId] = useState(null);
+
+  // Merge server targets with saved panel order:
+  // Known IDs keep their manual position; new IDs are appended at the end.
+  const orderedTargets = useCallback((serverTargets, order) => {
+    if (!order) return serverTargets;
+    const idSet = new Set(serverTargets.map(t => t.id));
+    const knownIds = order.filter(id => idSet.has(id));
+    const newTargets = serverTargets.filter(t => !knownIds.includes(t.id));
+    const idToTarget = Object.fromEntries(serverTargets.map(t => [t.id, t]));
+    return [...knownIds.map(id => idToTarget[id]), ...newTargets];
+  }, []);
+
+  const panelTargets = orderedTargets(targets, panelOrder);
+
+  // When targets list changes (new targets added), persist any new IDs into the order
+  useEffect(() => {
+    if (!panelOrder) return;
+    const knownSet = new Set(panelOrder);
+    const newIds = targets.map(t => t.id).filter(id => !knownSet.has(id));
+    if (newIds.length > 0) {
+      setPanelOrder(prev => {
+        const next = [...(prev || []), ...newIds];
+        localStorage.setItem('fsPanelOrder', JSON.stringify(next));
+        return next;
+      });
+    }
+  }, [targets]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTargetDragStart = useCallback((e, id) => {
+    dragTargetRef.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleTargetDragEnter = useCallback((id) => {
+    if (!dragTargetRef.current || dragTargetRef.current === id) return;
+    setDragOverId(id);
+    setPanelOrder(prev => {
+      const base = prev || panelTargets.map(t => t.id);
+      const from = base.indexOf(dragTargetRef.current);
+      const to = base.indexOf(id);
+      if (from === -1 || to === -1 || from === to) return prev;
+      const next = [...base];
+      next.splice(from, 1);
+      next.splice(to, 0, dragTargetRef.current);
+      return next;
+    });
+  }, [panelTargets]);
+
+  const handleTargetDragEnd = useCallback(() => {
+    setPanelOrder(prev => {
+      const order = prev || panelTargets.map(t => t.id);
+      localStorage.setItem('fsPanelOrder', JSON.stringify(order));
+      return order;
+    });
+    dragTargetRef.current = null;
+    setDragOverId(null);
+  }, [panelTargets]);
 
   // Chart-row split: fraction of chart area given to the latency row (vs secondary row)
   const [chartSplit, setChartSplit] = useState(() => {
@@ -172,8 +240,8 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
   }, []);
 
   const filteredTargets = selectedIds.length > 0
-    ? targets.filter(t => selectedIds.includes(t.id))
-    : targets;
+    ? panelTargets.filter(t => selectedIds.includes(t.id))
+    : panelTargets;
 
   // Split active charts: latency always goes on the top row alone;
   // all other charts share the bottom row side-by-side.
@@ -257,29 +325,34 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
             >
               <div className="px-3 py-2 border-b border-gray-800 flex-shrink-0">
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Targets</span>
-                <p className="text-xs text-gray-600 mt-0.5">Click a card to filter charts</p>
+                <p className="text-xs text-gray-600 mt-0.5">Click to filter · drag to reorder</p>
               </div>
-              <div className="flex flex-col gap-2 p-2 overflow-y-auto flex-1">
-                {targets.map(t => {
+              <div className="flex flex-col gap-1 p-2 overflow-y-auto flex-1">
+                {panelTargets.map(t => {
                   const isSelected = selectedIds.includes(t.id);
+                  const isDragOver = dragOverId === t.id && dragTargetRef.current !== t.id;
                   return (
                     <div
                       key={t.id}
                       className={cn(
-                        'rounded-xl border transition-colors cursor-pointer',
+                        'rounded-lg border transition-colors cursor-pointer select-none',
                         isSelected
-                          ? 'border-blue-500 ring-1 ring-blue-500/40'
-                          : 'border-gray-800 hover:border-blue-700'
+                          ? 'border-blue-500 ring-1 ring-blue-500/40 bg-blue-950/20'
+                          : 'border-gray-800 hover:border-blue-700',
+                        isDragOver && 'ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-900'
                       )}
                       onClick={() => toggleTarget(t.id)}
                       title={isSelected ? 'Click to deselect' : 'Click to filter charts to this target'}
+                      draggable
+                      onDragStart={(e) => handleTargetDragStart(e, t.id)}
+                      onDragEnter={() => handleTargetDragEnter(t.id)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDragEnd={handleTargetDragEnd}
                     >
-                      <HostCard
+                      <CompactHostCard
                         target={t}
                         lastPingResult={lastPingResults[t.id]}
-                        sparklineData={sparklineData[t.id] || []}
                         isSelected={isSelected}
-                        onTargetClick={toggleTarget}
                       />
                     </div>
                   );
