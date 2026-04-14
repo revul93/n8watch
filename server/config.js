@@ -49,6 +49,7 @@ function loadConfig() {
   config.general.ping_count = config.general.ping_count || 5;
   config.general.ping_timeout = config.general.ping_timeout || 5;
   config.general.data_retention_days = config.general.data_retention_days || 90;
+  config.general.max_user_target_lifetime_days = config.general.max_user_target_lifetime_days || 7;
   config.server.port = config.server.port || 3000;
   config.server.host = config.server.host || "0.0.0.0";
 

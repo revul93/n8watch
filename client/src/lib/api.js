@@ -84,11 +84,21 @@ export function getInterfaces() {
   return request('/interfaces').then(res => res.interfaces || []);
 }
 
-export function addUserTarget(name, ip, iface, ifaceAlias) {
+export function getDashboardConfig() {
+  return request('/dashboard/config');
+}
+
+export function addUserTarget(name, ip, iface, ifaceAlias, lifetimeDays) {
   return fetch(`${BASE}/targets/user-targets`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, ip, interface: iface || undefined, interface_alias: ifaceAlias || undefined }),
+    body: JSON.stringify({
+      name,
+      ip,
+      interface: iface || undefined,
+      interface_alias: ifaceAlias || undefined,
+      lifetime_days: lifetimeDays,
+    }),
   }).then(async res => {
     if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
     return res.json();

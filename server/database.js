@@ -595,10 +595,12 @@ function resolveAlert(alertId, resolvedAt) {
   ).run(resolvedAt || Date.now(), alertId);
 }
 
-function addUserTarget(name, ip, iface, ifaceAlias) {
+function addUserTarget(name, ip, iface, ifaceAlias, lifetimeDays) {
   const db = getDb();
   const now = Date.now();
-  const expiresAt = now + 5 * 86400000; // 5 days
+  const maxDays = require('./config').getConfig().general.max_user_target_lifetime_days;
+  const days = (typeof lifetimeDays === 'number' && lifetimeDays > 0) ? lifetimeDays : maxDays;
+  const expiresAt = now + days * 86400000;
 
   // Enforce (ip, interface) uniqueness at the application level.
   // Two NULLs are considered equal here (same host, same default interface).

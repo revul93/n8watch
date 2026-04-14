@@ -31,4 +31,18 @@ router.get('/system', (req, res) => {
   }
 });
 
+// GET /api/dashboard/config  — public-facing config settings for the frontend
+router.get('/config', (req, res) => {
+  try {
+    const { getConfig } = require('../config');
+    const config = getConfig();
+    res.json({
+      max_user_target_lifetime_days: config.general.max_user_target_lifetime_days,
+    });
+  } catch (err) {
+    console.error('[Routes/dashboard] GET /config:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
