@@ -155,7 +155,12 @@ export default function Layout({
               <PanelLeftOpen size={20} />
             </button>
           )}
-          <span className="text-base font-semibold text-white">
+          {!desktopSidebarVisible && (
+            <span className="hidden lg:inline text-base font-semibold text-white">
+              n8watch
+            </span>
+          )}
+          <span className="text-base font-semibold text-white lg:hidden">
             n8watch
           </span>
           <div className="flex-1" />
