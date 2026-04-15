@@ -86,6 +86,24 @@ function initDatabase() {
 
     CREATE INDEX IF NOT EXISTS idx_alerts_resolved
       ON alerts(resolved, created_at DESC);
+
+    -- Archive table for user-defined targets whose lifetime has ended.
+    -- Records are never deleted so the full history is preserved.
+    CREATE TABLE IF NOT EXISTS expired_targets (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      name            TEXT    NOT NULL,
+      ip              TEXT    NOT NULL,
+      interface       TEXT,
+      interface_alias TEXT,
+      target_created_at INTEGER NOT NULL,
+      expired_at      INTEGER NOT NULL,
+      archived_at     INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
+      ping_count      INTEGER NOT NULL DEFAULT 0,
+      uptime_overall  REAL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_expired_targets_expired_at
+      ON expired_targets(expired_at DESC);
   `);
 
   // Migrate existing databases: add columns if they don't exist yet
@@ -680,15 +698,73 @@ function getUserTargets() {
     .all(Date.now());
 }
 
-function cleanupExpiredUserTargets() {
+function archiveExpiredUserTargets() {
   const db = getDb();
-  const info = db
+  const now = Date.now();
+
+  // Find all expired user targets that have not yet been archived
+  const expired = db
     .prepare(
-      "DELETE FROM targets WHERE is_user_target = 1 AND expires_at IS NOT NULL AND expires_at <= ?",
+      `SELECT t.id, t.name, t.ip, t.interface, t.interface_alias,
+              t.created_at, t.expires_at,
+              COUNT(pr.id) AS ping_count,
+              CASE WHEN COUNT(pr.id) > 0
+                   THEN SUM(CASE WHEN pr.is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(pr.id)
+                   ELSE NULL END AS uptime_overall
+       FROM targets t
+       LEFT JOIN ping_results pr ON pr.target_id = t.id
+       WHERE t.is_user_target = 1
+         AND t.expires_at IS NOT NULL
+         AND t.expires_at <= ?
+       GROUP BY t.id`,
     )
-    .run(Date.now());
-  return info.changes;
+    .all(now);
+
+  if (expired.length === 0) return 0;
+
+  const archiveStmt = db.prepare(`
+    INSERT INTO expired_targets
+      (name, ip, interface, interface_alias, target_created_at, expired_at, archived_at, ping_count, uptime_overall)
+    VALUES
+      (@name, @ip, @interface, @interface_alias, @target_created_at, @expired_at, @archived_at, @ping_count, @uptime_overall)
+  `);
+
+  const deleteStmt = db.prepare('DELETE FROM targets WHERE id = ?');
+
+  const doArchive = db.transaction((rows) => {
+    for (const row of rows) {
+      archiveStmt.run({
+        name:              row.name,
+        ip:                row.ip,
+        interface:         row.interface || null,
+        interface_alias:   row.interface_alias || null,
+        target_created_at: row.created_at,
+        expired_at:        row.expires_at,
+        archived_at:       now,
+        ping_count:        row.ping_count || 0,
+        uptime_overall:    row.uptime_overall ?? null,
+      });
+      deleteStmt.run(row.id);
+    }
+  });
+
+  doArchive(expired);
+  return expired.length;
 }
+
+function getExpiredTargets() {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM expired_targets ORDER BY expired_at DESC`,
+    )
+    .all();
+}
+
+function cleanupExpiredUserTargets() {
+  return archiveExpiredUserTargets();
+}
+
 
 function deleteOldData(retentionDays) {
   const db = getDb();
@@ -748,4 +824,6 @@ module.exports = {
   deleteUserTarget,
   getUserTargets,
   cleanupExpiredUserTargets,
+  archiveExpiredUserTargets,
+  getExpiredTargets,
 };

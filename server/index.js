@@ -16,6 +16,7 @@ const { initScheduler, stopAll: stopScheduler } = require("./scheduler");
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 const targetsRouter = require("./routes/targets");
+const expiredTargetsRouter = require("./routes/expired-targets");
 const pingResultsRouter = require("./routes/ping-results");
 const metricsRouter = require("./routes/metrics");
 const alertsRouter = require("./routes/alerts");
@@ -99,6 +100,7 @@ async function main() {
 
   // 6. Mount all API routes
   app.use("/api/targets", targetsRouter);
+  app.use("/api/targets", expiredTargetsRouter);
   app.use("/api/targets", metricsRouter);
   app.use("/api/targets", exportRouter);
   app.use("/api/ping-results", pingResultsRouter);

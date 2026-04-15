@@ -42,6 +42,14 @@ function initScheduler(config, db, wss, alertEngine, emailSvc) {
 
   const pingTask = cron.schedule(pingPattern, async () => {
     try {
+      // Archive any user targets whose lifetime has just ended, then notify
+      // clients so the dashboard removes them without a page reload.
+      const archived = db.archiveExpiredUserTargets();
+      if (archived > 0) {
+        console.log(`[Scheduler] Archived ${archived} expired user target(s)`);
+        broadcast('targets_changed', { action: 'expired', count: archived });
+      }
+
       const targets = db.getAllTargetsWithLatest();
       if (targets.length === 0) return;
 
