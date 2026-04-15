@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
 import Alerts from './pages/Alerts';
+import ExpiredTargets from './pages/ExpiredTargets';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
@@ -31,6 +32,7 @@ function AppInner() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/history" element={<History />} />
         <Route path="/alerts" element={<Alerts />} />
+        <Route path="/expired" element={<ExpiredTargets />} />
       </Routes>
     </Layout>
   );

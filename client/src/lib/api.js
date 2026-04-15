@@ -115,3 +115,7 @@ export function deleteUserTarget(id) {
     return res.json();
   });
 }
+
+export function getExpiredTargets() {
+  return request('/targets/expired').then(res => res.targets || []);
+}

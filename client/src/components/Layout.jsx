@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { Activity, History, Bell, Menu, X, RefreshCw, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Activity, History, Bell, Menu, X, RefreshCw, PanelLeftClose, PanelLeftOpen, Archive } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 import ThemeToggle from "./ThemeToggle";
 import { cn } from "../lib/utils";
@@ -9,6 +9,7 @@ const navItems = [
   { to: "/", label: "Dashboard", icon: Activity, exact: true },
   { to: "/history", label: "History", icon: History },
   { to: "/alerts", label: "Alerts", icon: Bell },
+  { to: "/expired", label: "Expired", icon: Archive },
 ];
 
 export default function Layout({
