@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useApi } from '../hooks/useApi';
 import { getExpiredTargets } from '../lib/api';
-import { RefreshCw, Archive, Clock, Activity, AlertCircle } from 'lucide-react';
+import { RefreshCw, Archive, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 function formatDate(ms) {
@@ -89,9 +89,7 @@ export default function ExpiredTargets() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-                  <th className="text-left px-4 py-3 font-medium">Target</th>
-                  <th className="text-left px-4 py-3 font-medium">IP</th>
-                  <th className="text-left px-4 py-3 font-medium">Name</th>
+                  <th className="text-left px-4 py-3 font-medium">Target (IP — Name — Expiry Date)</th>
                   <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Interface</th>
                   <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Added</th>
                   <th className="text-left px-4 py-3 font-medium">Expired</th>
@@ -102,14 +100,12 @@ export default function ExpiredTargets() {
               <tbody className="divide-y divide-gray-800">
                 {rows.map((target) => (
                   <tr key={target.id} className="hover:bg-gray-800/50 transition-colors">
-                    {/* Composite display name */}
+                    {/* Composite display name: ip — hostname — expiry date */}
                     <td className="px-4 py-3">
                       <span className="font-mono text-gray-300 text-xs break-all">
                         {buildDisplayName(target)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-300 font-mono text-xs">{target.ip}</td>
-                    <td className="px-4 py-3 text-white font-medium">{target.name}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">
                       {target.interface_alias || target.interface || <span className="text-gray-600">—</span>}
                     </td>
