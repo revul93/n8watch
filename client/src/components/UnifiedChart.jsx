@@ -459,14 +459,25 @@ export default function UnifiedChart({
 
   const panelHeight = effectiveHeight;
 
-  // Active metric for the toggle in the multi-metric (main) view
-  const [activeMetric, setActiveMetric] = useState('latency');
-
   const METRIC_TABS = [
     { key: 'latency',     label: 'Latency',     unit: 'ms', chartType: 'line',  data: latencyData },
     { key: 'jitter',      label: 'Jitter',      unit: 'ms', chartType: 'line',  data: jitterData },
     { key: 'packet_loss', label: 'Packet Loss',  unit: '%',  chartType: 'area',  data: packetLossData },
   ];
+
+  // Selected metrics for the multi-metric (main) view — multiple can be active
+  const [activeMetrics, setActiveMetrics] = useState(['latency']);
+
+  function toggleMetric(key) {
+    setActiveMetrics(prev => {
+      if (prev.includes(key)) {
+        // Keep at least one selected
+        if (prev.length === 1) return prev;
+        return prev.filter(k => k !== key);
+      }
+      return [...prev, key];
+    });
+  }
 
   if (singleMetric) {
     const data = singleMetric === 'latency' ? latencyData
@@ -480,9 +491,6 @@ export default function UnifiedChart({
 
     return (
       <div ref={containerRef}>
-        <div className="flex justify-end mb-2">
-          <TimeRangeSelector value={range.key} onChange={setRange} />
-        </div>
         <ChartPanel
           title={title}
           unit={unit}
@@ -495,38 +503,43 @@ export default function UnifiedChart({
           chartHeight={panelHeight}
           loading={loading}
         />
+        <div className="flex justify-end mt-2">
+          <TimeRangeSelector value={range.key} onChange={setRange} />
+        </div>
       </div>
     );
   }
 
-  const activeTab = METRIC_TABS.find(t => t.key === activeMetric) || METRIC_TABS[0];
+  const activeTabs = METRIC_TABS.filter(t => activeMetrics.includes(t.key));
 
   return (
     <div ref={containerRef}>
-      {/* Top bar: metric toggle + time range selector */}
-      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-        <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
-          {METRIC_TABS.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveMetric(tab.key)}
-              className={cn(
-                'px-3 py-1 rounded text-xs font-medium transition-colors',
-                activeMetric === tab.key
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <TimeRangeSelector value={range.key} onChange={setRange} />
+      {/* Horizontally stacked charts for all active metrics */}
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${activeTabs.length}, minmax(0, 1fr))` }}
+      >
+        {activeTabs.map(tab => (
+          <ChartPanel
+            key={tab.key}
+            title={tab.label}
+            unit={tab.unit}
+            data={tab.data}
+            targets={targets}
+            colorMap={colorMap}
+            defaultColorMap={defaultColorMap}
+            onColorChange={handleColorChange}
+            chartType={tab.chartType}
+            chartHeight={panelHeight}
+            loading={loading}
+            showLegend={false}
+          />
+        ))}
       </div>
 
-      {/* Shared legend (single legend for all targets) */}
+      {/* Bottom bar: shared legend, metric toggles, and time range selector */}
       {targets.length > 0 && (
-        <div className="mb-3">
+        <div className="mt-3">
           <SharedLegend
             targets={targets}
             colorMap={colorMap}
@@ -535,21 +548,30 @@ export default function UnifiedChart({
           />
         </div>
       )}
-
-      {/* Full-width chart for the active metric */}
-      <ChartPanel
-        title={activeTab.label}
-        unit={activeTab.unit}
-        data={activeTab.data}
-        targets={targets}
-        colorMap={colorMap}
-        defaultColorMap={defaultColorMap}
-        onColorChange={handleColorChange}
-        chartType={activeTab.chartType}
-        chartHeight={panelHeight}
-        loading={loading}
-        showLegend={false}
-      />
+      <div className="flex items-center justify-between mt-3 gap-3 flex-wrap">
+        <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
+          {METRIC_TABS.map(tab => {
+            const isActive = activeMetrics.includes(tab.key);
+            const isOnlyActive = isActive && activeMetrics.length === 1;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => toggleMetric(tab.key)}
+                className={cn(
+                  'px-3 py-1 rounded text-xs font-medium transition-colors',
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-400 hover:text-white'
+                )}
+                title={isOnlyActive ? 'At least one metric must be selected' : isActive ? 'Click to hide' : 'Click to show'}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        <TimeRangeSelector value={range.key} onChange={setRange} />
+      </div>
     </div>
   );
 }
