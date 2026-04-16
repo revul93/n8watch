@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical, LayoutGrid, AlignJustify } from 'lucide-react';
+import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical, LayoutGrid, AlignJustify, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
 import CompactHostCard from './CompactHostCard';
 import HostCard from './HostCard';
+import GroupedView from './GroupedView';
 
 const CHART_TYPES = [
   { key: 'latency', label: 'Latency' },
@@ -230,6 +231,20 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
   // Detail-view IDs: cards shown in full HostCard view instead of compact
   const [detailViewIds, setDetailViewIds] = useState([]);
 
+  // Groups panel open/closed in fullscreen
+  const [fsGroupsPanelOpen, setFsGroupsPanelOpen] = useState(() => {
+    const saved = localStorage.getItem('fsGroupsPanelOpen');
+    return saved === null ? true : saved === 'true';
+  });
+
+  const toggleFsGroupsPanel = useCallback(() => {
+    setFsGroupsPanelOpen(prev => {
+      const next = !prev;
+      localStorage.setItem('fsGroupsPanelOpen', String(next));
+      return next;
+    });
+  }, []);
+
   const toggleTarget = useCallback((id) => {
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -419,62 +434,89 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         )}
 
         {/* Chart area */}
-        <div ref={chartBodyRef} className="flex-1 min-w-0 min-h-0 overflow-hidden p-4 flex flex-col gap-0">
-          {/* Latency row */}
-          {latencyActive && (
-            <div
-              className="min-h-0 overflow-hidden"
-              style={{ flexBasis: hasBothRows ? `${chartSplit * 100}%` : '100%', flexGrow: 0, flexShrink: 0 }}
-            >
-              <UnifiedChart
-                targets={filteredTargets}
-                lastPingResults={lastPingResults}
-                colorMap={colorMap}
-                controlledMetric="latency"
-                fillHeight
-              />
-            </div>
-          )}
+        <div className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
+          {/* Charts section */}
+          <div ref={chartBodyRef} className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col gap-0">
+            {/* Latency row */}
+            {latencyActive && (
+              <div
+                className="min-h-0 overflow-hidden"
+                style={{ flexBasis: hasBothRows ? `${chartSplit * 100}%` : '100%', flexGrow: 0, flexShrink: 0 }}
+              >
+                <UnifiedChart
+                  targets={filteredTargets}
+                  lastPingResults={lastPingResults}
+                  colorMap={colorMap}
+                  controlledMetric="latency"
+                  fillHeight
+                />
+              </div>
+            )}
 
-          {/* Drag handle between chart rows */}
-          {hasBothRows && (
-            <div
-              className="h-2 flex-shrink-0 flex items-center justify-center cursor-row-resize group"
-              onMouseDown={handleChartSplitMouseDown}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowUp') { const v = Math.max(0.2, chartSplitRef.current - 0.05); chartSplitRef.current = v; setChartSplit(v); localStorage.setItem('fsChartSplit', v); }
-                if (e.key === 'ArrowDown') { const v = Math.min(0.85, chartSplitRef.current + 0.05); chartSplitRef.current = v; setChartSplit(v); localStorage.setItem('fsChartSplit', v); }
-              }}
-              tabIndex={0}
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Drag or use arrow keys to resize chart rows"
-              title="Drag or use arrow keys to resize chart rows"
-            >
-              <div className="h-1 w-16 rounded-full bg-gray-700 group-hover:bg-blue-600 transition-colors" />
-            </div>
-          )}
+            {/* Drag handle between chart rows */}
+            {hasBothRows && (
+              <div
+                className="h-2 flex-shrink-0 flex items-center justify-center cursor-row-resize group"
+                onMouseDown={handleChartSplitMouseDown}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp') { const v = Math.max(0.2, chartSplitRef.current - 0.05); chartSplitRef.current = v; setChartSplit(v); localStorage.setItem('fsChartSplit', v); }
+                  if (e.key === 'ArrowDown') { const v = Math.min(0.85, chartSplitRef.current + 0.05); chartSplitRef.current = v; setChartSplit(v); localStorage.setItem('fsChartSplit', v); }
+                }}
+                tabIndex={0}
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="Drag or use arrow keys to resize chart rows"
+                title="Drag or use arrow keys to resize chart rows"
+              >
+                <div className="h-1 w-16 rounded-full bg-gray-700 group-hover:bg-blue-600 transition-colors" />
+              </div>
+            )}
 
-          {/* Secondary charts row */}
-          {nonLatencyCharts.length > 0 && (
-            <div
-              className="min-h-0 overflow-hidden flex gap-4"
-              style={hasBothRows
-                ? { flexBasis: `${(1 - chartSplit) * 100}%`, flexGrow: 0, flexShrink: 0 }
-                : { flex: 1 }
-              }
-            >
-              {nonLatencyCharts.map(chartKey => (
-                <div key={chartKey} className="flex-1 min-h-0">
-                  <UnifiedChart
-                    targets={filteredTargets}
+            {/* Secondary charts row */}
+            {nonLatencyCharts.length > 0 && (
+              <div
+                className="min-h-0 overflow-hidden flex gap-4"
+                style={hasBothRows
+                  ? { flexBasis: `${(1 - chartSplit) * 100}%`, flexGrow: 0, flexShrink: 0 }
+                  : { flex: 1 }
+                }
+              >
+                {nonLatencyCharts.map(chartKey => (
+                  <div key={chartKey} className="flex-1 min-h-0">
+                    <UnifiedChart
+                      targets={filteredTargets}
+                      lastPingResults={lastPingResults}
+                      colorMap={colorMap}
+                      controlledMetric={chartKey}
+                      fillHeight
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Groups section below charts */}
+          {targets.length > 0 && (
+            <div className="flex-shrink-0 border-t border-gray-800">
+              <button
+                onClick={toggleFsGroupsPanel}
+                className="flex items-center gap-2 w-full px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
+              >
+                {fsGroupsPanelOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                Groups
+              </button>
+              {fsGroupsPanelOpen && (
+                <div className="px-4 pb-4 overflow-y-auto max-h-72" aria-label="Groups list">
+                  <GroupedView
+                    targets={targets}
                     lastPingResults={lastPingResults}
+                    selectedTargetIds={selectedIds}
+                    onTargetClick={toggleTarget}
                     colorMap={colorMap}
-                    controlledMetric={chartKey}
-                    fillHeight
                   />
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
