@@ -16,8 +16,37 @@ const TOKEN_KEY = 'admin_token';
 function storeToken(t) { if (t) sessionStorage.setItem(TOKEN_KEY, t); else sessionStorage.removeItem(TOKEN_KEY); }
 function readToken()   { return sessionStorage.getItem(TOKEN_KEY); }
 
+// ── IP / hostname validation ──────────────────────────────────────────────────
+const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+// Simplified but reasonably strict IPv6: groups of 1-4 hex digits separated by colons,
+// with an optional '::' shorthand. Covers the most common forms.
+const IPV6_RE = /^([\da-fA-F]{1,4}:){7}[\da-fA-F]{1,4}$|^([\da-fA-F]{1,4}:)*::?([\da-fA-F]{1,4}:)*[\da-fA-F]{0,4}$/;
+const HOST_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+function isValidIpOrHost(value) {
+  if (!value || !value.trim()) return false;
+  const v = value.trim();
+  if (IPV4_RE.test(v)) {
+    return v.split('.').every(n => /^\d+$/.test(n) && parseInt(n, 10) <= 255);
+  }
+  if (v.includes(':') && IPV6_RE.test(v)) return true;
+  return HOST_RE.test(v);
+}
+
+// ── Alert condition presets ───────────────────────────────────────────────────
+const CONDITION_PRESETS = [
+  'packet_loss == 100',
+  'packet_loss > 50',
+  'packet_loss > 10',
+  'avg_latency > 200',
+  'avg_latency > 500',
+  'jitter > 50',
+  'is_alive == 0',
+  'is_alive == 1',
+];
+
 // ── Shared form field ─────────────────────────────────────────────────────────
-function Field({ label, type = 'text', value, onChange, placeholder, required, className }) {
+function Field({ label, type = 'text', value, onChange, placeholder, required, className, error }) {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
       <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
@@ -26,6 +55,50 @@ function Field({ label, type = 'text', value, onChange, placeholder, required, c
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
+        className={cn(
+          'px-3 py-2 bg-gray-800 border rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500',
+          error ? 'border-red-500' : 'border-gray-700',
+        )}
+      />
+      {error && <span className="text-red-400 text-xs">{error}</span>}
+    </div>
+  );
+}
+
+// ── Select field (dropdown) ───────────────────────────────────────────────────
+function SelectField({ label, value, onChange, options, placeholder, required, className }) {
+  return (
+    <div className={cn('flex flex-col gap-1', className)}>
+      <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+      >
+        {placeholder !== undefined && <option value="">{placeholder}</option>}
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ── Condition field with presets datalist ─────────────────────────────────────
+let _conditionFieldIdx = 0;
+function ConditionField({ label, value, onChange, required, className }) {
+  const [id] = useState(() => `condition-presets-${++_conditionFieldIdx}`);
+  return (
+    <div className={cn('flex flex-col gap-1', className)}>
+      <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
+      <datalist id={id}>
+        {CONDITION_PRESETS.map(p => <option key={p} value={p} />)}
+      </datalist>
+      <input
+        list={id}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="packet_loss == 100"
         className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
       />
     </div>
@@ -161,9 +234,15 @@ function LoginForm({ onLogin }) {
 function TargetsSection({ config, token, onConfigRefresh }) {
   const [targets, setTargets]   = useState([]);
   const [newTarget, setNewTarget] = useState({ name: '', ip: '', group: '', interface: '' });
+  const [ipErrors, setIpErrors] = useState({});
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
   const [error, setError]       = useState('');
+
+  const ifaceOptions = (config?.interfaces || []).map(f => ({
+    value: f.name,
+    label: f.alias ? `${f.name} — ${f.alias}` : f.name,
+  }));
 
   useEffect(() => {
     if (config?.targets) setTargets(config.targets.map(t => ({ ...t })));
@@ -171,9 +250,18 @@ function TargetsSection({ config, token, onConfigRefresh }) {
 
   const updateTarget = (i, field, value) => {
     setTargets(prev => prev.map((t, idx) => idx === i ? { ...t, [field]: value } : t));
+    if (field === 'ip') {
+      setIpErrors(prev => ({ ...prev, [i]: value && !isValidIpOrHost(value) ? 'Enter a valid IP address or hostname' : '' }));
+    }
   };
 
   const handleSave = async () => {
+    // Validate all IPs before saving
+    const errors = {};
+    targets.forEach((t, i) => {
+      if (t.ip && !isValidIpOrHost(t.ip)) errors[i] = 'Enter a valid IP address or hostname';
+    });
+    if (Object.keys(errors).length > 0) { setIpErrors(errors); setError('Fix validation errors before saving'); return; }
     setSaving(true); setError(''); setSaved(false);
     try {
       await adminSaveTargets(token, targets);
@@ -187,6 +275,10 @@ function TargetsSection({ config, token, onConfigRefresh }) {
   const handleAdd = async () => {
     if (!newTarget.name.trim() || !newTarget.ip.trim()) {
       setError('Name and IP are required for a new target');
+      return;
+    }
+    if (!isValidIpOrHost(newTarget.ip)) {
+      setError('Enter a valid IP address or hostname');
       return;
     }
     setSaving(true); setError('');
@@ -211,12 +303,25 @@ function TargetsSection({ config, token, onConfigRefresh }) {
     <SectionCard icon={Target} title="System Targets">
       <div className="flex flex-col gap-3">
         {targets.map((t, i) => (
-          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
+          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-start">
             <Field label={i === 0 ? 'Name' : ''} value={t.name} onChange={v => updateTarget(i, 'name', v)} placeholder="Google DNS" required />
-            <Field label={i === 0 ? 'IP / Host' : ''} value={t.ip} onChange={v => updateTarget(i, 'ip', v)} placeholder="8.8.8.8" required />
+            <Field
+              label={i === 0 ? 'IP / Host' : ''}
+              value={t.ip}
+              onChange={v => updateTarget(i, 'ip', v)}
+              placeholder="8.8.8.8"
+              required
+              error={ipErrors[i]}
+            />
             <Field label={i === 0 ? 'Group' : ''} value={t.group || ''} onChange={v => updateTarget(i, 'group', v)} placeholder="DNS Servers" />
-            <Field label={i === 0 ? 'Interface' : ''} value={t.interface || ''} onChange={v => updateTarget(i, 'interface', v)} placeholder="eth0" />
-            <button onClick={() => handleDelete(i)} className="mb-0.5 p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors" title="Remove">
+            <SelectField
+              label={i === 0 ? 'Interface' : ''}
+              value={t.interface || ''}
+              onChange={v => updateTarget(i, 'interface', v)}
+              options={ifaceOptions}
+              placeholder="— any —"
+            />
+            <button onClick={() => handleDelete(i)} className={cn('p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors', i === 0 ? 'mt-5' : '')} title="Remove">
               <Trash2 size={15} />
             </button>
           </div>
@@ -228,7 +333,13 @@ function TargetsSection({ config, token, onConfigRefresh }) {
             <Field label="Name" value={newTarget.name} onChange={v => setNewTarget(p => ({ ...p, name: v }))} placeholder="My Server" required />
             <Field label="IP / Host" value={newTarget.ip} onChange={v => setNewTarget(p => ({ ...p, ip: v }))} placeholder="192.168.1.10" required />
             <Field label="Group" value={newTarget.group} onChange={v => setNewTarget(p => ({ ...p, group: v }))} placeholder="Servers" />
-            <Field label="Interface" value={newTarget.interface} onChange={v => setNewTarget(p => ({ ...p, interface: v }))} placeholder="eth0" />
+            <SelectField
+              label="Interface"
+              value={newTarget.interface}
+              onChange={v => setNewTarget(p => ({ ...p, interface: v }))}
+              options={ifaceOptions}
+              placeholder="— any —"
+            />
             <button onClick={handleAdd} disabled={saving} className="mb-0.5 p-2 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded transition-colors" title="Add target">
               <Plus size={15} />
             </button>
@@ -319,7 +430,7 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
         {rules.map((r, i) => (
           <div key={i} className="grid grid-cols-[1fr_2fr_auto_auto_auto] gap-2 items-end">
             <Field label={i === 0 ? 'Rule Name' : ''} value={r.name} onChange={v => update(i, 'name', v)} placeholder="Host Down" required />
-            <Field label={i === 0 ? 'Condition' : ''} value={r.condition} onChange={v => update(i, 'condition', v)} placeholder="packet_loss == 100" required />
+            <ConditionField label={i === 0 ? 'Condition' : ''} value={r.condition} onChange={v => update(i, 'condition', v)} required />
             <div className={cn('flex flex-col gap-1', i === 0 ? '' : '')}>
               {i === 0 && <label className="text-xs text-gray-400">Severity</label>}
               <select

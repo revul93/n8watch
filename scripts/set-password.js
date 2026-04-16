@@ -17,15 +17,24 @@ const path = require('path');
 const auth = require(path.join(__dirname, '..', 'server', 'auth'));
 
 async function promptPassword() {
+  const PROMPT = 'New admin password (min 6 chars): ';
   return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    process.stdout.write(PROMPT);
 
-    // Hide input on terminals that support it
-    const { stdout } = process;
-    if (stdout.isTTY && stdout.write) {
-      stdout.write('New admin password (min 6 chars): ');
-    } else {
-      process.stdout.write('New admin password (min 6 chars): ');
+    // Try raw mode for hidden input (TTY)
+    try {
+      process.stdin.setRawMode(true);
+    } catch (_) {
+      // Non-TTY fallback (e.g. piped input): password will be visible
+      process.stdout.write('\n(warning: terminal does not support hidden input — password will be visible)\n');
+      process.stdout.write(PROMPT);
+      // Use readline with output suppressed so it doesn't echo
+      const rl = readline.createInterface({ input: process.stdin, output: null, terminal: false });
+      rl.once('line', (answer) => {
+        rl.close();
+        resolve(answer);
+      });
+      return;
     }
 
     let password = '';
@@ -33,29 +42,21 @@ async function promptPassword() {
       ch = ch + '';
       if (ch === '\n' || ch === '\r' || ch === '\u0004') {
         process.stdin.pause();
-        process.stdin.setRawMode && process.stdin.setRawMode(false);
+        process.stdin.setRawMode(false);
         process.stdin.removeListener('data', onData);
         process.stdout.write('\n');
         resolve(password);
       } else if (ch === '\u0003') {
         process.stdout.write('\n');
         process.exit(0);
+      } else if (ch === '\u007f' || ch === '\b') {
+        // Handle backspace
+        if (password.length > 0) password = password.slice(0, -1);
       } else {
         password += ch;
       }
     };
 
-    try {
-      process.stdin.setRawMode(true);
-    } catch (_) {
-      // Non-TTY fallback: password will be visible in terminal output
-      process.stdout.write('(warning: terminal does not support hidden input — password will be visible)\n');
-      rl.question('', (answer) => {
-        rl.close();
-        resolve(answer);
-      });
-      return;
-    }
     process.stdin.resume();
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', onData);
