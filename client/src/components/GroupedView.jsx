@@ -7,15 +7,11 @@ import GroupPanel from './GroupPanel';
  * Props:
  *   targets          – full list of target objects
  *   lastPingResults  – { [targetId]: pingResult } map
- *   selectedTargetIds – currently selected target IDs
- *   onTargetClick    – callback(targetId)
  *   colorMap         – stable color map from buildColorMap()
  */
 export default function GroupedView({
   targets = [],
   lastPingResults = {},
-  selectedTargetIds = [],
-  onTargetClick,
   colorMap = {},
 }) {
   // Build ordered group map: named groups first, "Ungrouped" last
@@ -48,8 +44,6 @@ export default function GroupedView({
           groupName={groupName}
           targets={groupTargets}
           lastPingResults={lastPingResults}
-          selectedTargetIds={selectedTargetIds}
-          onTargetClick={onTargetClick}
           colorMap={colorMap}
         />
       ))}

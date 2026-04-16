@@ -3,24 +3,15 @@ import { createPortal } from 'react-dom';
 import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical, LayoutGrid, AlignJustify, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
-import CompactHostCard from './CompactHostCard';
 import HostCard from './HostCard';
 import GroupedView from './GroupedView';
-
-const CHART_TYPES = [
-  { key: 'latency', label: 'Latency' },
-  { key: 'jitter', label: 'Jitter' },
-  { key: 'packet_loss', label: 'Packet Loss' },
-  { key: 'uptime', label: 'Uptime' },
-];
 
 const PANEL_MIN = 180;
 const PANEL_MAX = 520;
 const PANEL_DEFAULT = 280;
 
-export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose, colorMap = {}, sparklineData = {} }) {
+export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose, colorMap = {}, onColorChange, sparklineData = {} }) {
   const [selectedIds, setSelectedIds] = useState([]);
-  const [activeCharts, setActiveCharts] = useState(['latency']);
 
   // Left panel state (open/closed and width)
   const [panelOpen, setPanelOpen] = useState(() => {
@@ -39,13 +30,12 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
       const saved = JSON.parse(localStorage.getItem('fsPanelOrder'));
       if (Array.isArray(saved) && saved.every(id => typeof id === 'number')) return saved;
     } catch {}
-    return null; // null means "use server order"
+    return null;
   });
   const dragTargetRef = useRef(null);
   const [dragOverId, setDragOverId] = useState(null);
 
-  // Merge server targets with saved panel order:
-  // Known IDs keep their manual position; new IDs are appended at the end.
+  // Merge server targets with saved panel order
   const orderedTargets = useCallback((serverTargets, order) => {
     if (!order) return serverTargets;
     const idSet = new Set(serverTargets.map(t => t.id));
@@ -57,7 +47,6 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
 
   const panelTargets = orderedTargets(targets, panelOrder);
 
-  // When targets list changes (new targets added), persist any new IDs into the order
   useEffect(() => {
     if (!panelOrder) return;
     const knownSet = new Set(panelOrder);
@@ -103,14 +92,6 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     setDragOverId(null);
   }, [panelTargets]);
 
-  // Chart-row split: fraction of chart area given to the latency row (vs secondary row)
-  const [chartSplit, setChartSplit] = useState(() => {
-    const saved = parseFloat(localStorage.getItem('fsChartSplit'));
-    return isNaN(saved) ? 0.6 : Math.max(0.2, Math.min(0.85, saved));
-  });
-  const chartSplitRef = useRef(chartSplit);
-  const chartBodyRef = useRef(null);
-
   const containerRef = useRef(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
@@ -137,7 +118,6 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
       el.msRequestFullscreen();
     }
 
-    // Listen for the browser's own fullscreen-exit (pressing Esc in browser)
     const handleFsChange = () => {
       const isFs = !!(
         document.fullscreenElement ||
@@ -204,30 +184,6 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     document.addEventListener('mouseup', onMouseUp);
   }, []);
 
-  // Chart-row split resize drag
-  const handleChartSplitMouseDown = useCallback((e) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startSplit = chartSplitRef.current;
-    const bodyHeight = chartBodyRef.current ? chartBodyRef.current.clientHeight : 600;
-
-    const onMouseMove = (ev) => {
-      const delta = (ev.clientY - startY) / bodyHeight;
-      const newSplit = Math.max(0.2, Math.min(0.85, startSplit + delta));
-      chartSplitRef.current = newSplit;
-      setChartSplit(newSplit);
-    };
-
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      localStorage.setItem('fsChartSplit', chartSplitRef.current);
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, []);
-
   // Detail-view IDs: cards shown in full HostCard view instead of compact
   const [detailViewIds, setDetailViewIds] = useState([]);
 
@@ -257,24 +213,9 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     );
   }, []);
 
-  const toggleChart = useCallback((key) => {
-    setActiveCharts(prev => {
-      if (prev.includes(key)) {
-        return prev.length > 1 ? prev.filter(k => k !== key) : prev;
-      }
-      return [...prev, key];
-    });
-  }, []);
-
   const filteredTargets = selectedIds.length > 0
     ? panelTargets.filter(t => selectedIds.includes(t.id))
     : panelTargets;
-
-  // Split active charts: latency always goes on the top row alone;
-  // all other charts share the bottom row side-by-side.
-  const latencyActive = activeCharts.includes('latency');
-  const nonLatencyCharts = activeCharts.filter(k => k !== 'latency');
-  const hasBothRows = latencyActive && nonLatencyCharts.length > 0;
 
   const content = (
     <div
@@ -297,28 +238,6 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         <h2 id="fullscreen-chart-title" className="text-lg font-bold text-white tracking-tight">
           n8watch
         </h2>
-
-        {/* Chart type selector */}
-        <div className="flex items-center gap-1.5 ml-4">
-          <span className="text-xs text-gray-500 mr-1">Charts:</span>
-          {CHART_TYPES.map(ct => {
-            const enabled = activeCharts.includes(ct.key);
-            return (
-              <button
-                key={ct.key}
-                onClick={() => toggleChart(ct.key)}
-                className={cn(
-                  'px-3 py-1 rounded-lg text-xs font-medium transition-colors border',
-                  enabled
-                    ? 'bg-indigo-900/50 border-indigo-700 text-indigo-300'
-                    : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300'
-                )}
-              >
-                {ct.label}
-              </button>
-            );
-          })}
-        </div>
 
         <div className="flex-1" />
 
@@ -381,31 +300,24 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
                       onDragOver={(e) => e.preventDefault()}
                       onDragEnd={handleTargetDragEnd}
                     >
-                      {/* Detail / compact view toggle button */}
+                      {/* Detail / summary view toggle button */}
                       <button
                         className="absolute top-1.5 right-1.5 z-10 p-0.5 rounded text-gray-600 hover:text-blue-400 hover:bg-gray-800 transition-colors opacity-0 group-hover/card:opacity-100 focus:opacity-100"
                         onClick={(e) => { e.stopPropagation(); toggleDetailView(t.id); }}
-                        title={isDetail ? 'Switch to compact view' : 'Switch to detail view'}
-                        aria-label={isDetail ? 'Switch to compact view' : 'Switch to detail view'}
+                        title={isDetail ? 'Switch to summary view' : 'Switch to detail view'}
+                        aria-label={isDetail ? 'Switch to summary view' : 'Switch to detail view'}
                       >
                         {isDetail ? <AlignJustify size={11} /> : <LayoutGrid size={11} />}
                       </button>
-                      {isDetail ? (
-                        <HostCard
-                          target={t}
-                          lastPingResult={lastPingResults[t.id]}
-                          sparklineData={sparklineData[t.id] || []}
-                          isSelected={isSelected}
-                          onTargetClick={toggleTarget}
-                          hideExport
-                        />
-                      ) : (
-                        <CompactHostCard
-                          target={t}
-                          lastPingResult={lastPingResults[t.id]}
-                          isSelected={isSelected}
-                        />
-                      )}
+                      <HostCard
+                        target={t}
+                        lastPingResult={lastPingResults[t.id]}
+                        sparklineData={sparklineData[t.id] || []}
+                        isSelected={isSelected}
+                        onTargetClick={isDetail ? undefined : toggleTarget}
+                        hideExport
+                        viewMode={isDetail ? 'detailed' : 'summary'}
+                      />
                     </div>
                   );
                 })}
@@ -436,64 +348,14 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         {/* Chart area */}
         <div className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
           {/* Charts section */}
-          <div ref={chartBodyRef} className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col gap-0">
-            {/* Latency row */}
-            {latencyActive && (
-              <div
-                className="min-h-0 overflow-hidden"
-                style={{ flexBasis: hasBothRows ? `${chartSplit * 100}%` : '100%', flexGrow: 0, flexShrink: 0 }}
-              >
-                <UnifiedChart
-                  targets={filteredTargets}
-                  lastPingResults={lastPingResults}
-                  colorMap={colorMap}
-                  controlledMetric="latency"
-                  fillHeight
-                />
-              </div>
-            )}
-
-            {/* Drag handle between chart rows */}
-            {hasBothRows && (
-              <div
-                className="h-2 flex-shrink-0 flex items-center justify-center cursor-row-resize group"
-                onMouseDown={handleChartSplitMouseDown}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowUp') { const v = Math.max(0.2, chartSplitRef.current - 0.05); chartSplitRef.current = v; setChartSplit(v); localStorage.setItem('fsChartSplit', v); }
-                  if (e.key === 'ArrowDown') { const v = Math.min(0.85, chartSplitRef.current + 0.05); chartSplitRef.current = v; setChartSplit(v); localStorage.setItem('fsChartSplit', v); }
-                }}
-                tabIndex={0}
-                role="separator"
-                aria-orientation="horizontal"
-                aria-label="Drag or use arrow keys to resize chart rows"
-                title="Drag or use arrow keys to resize chart rows"
-              >
-                <div className="h-1 w-16 rounded-full bg-gray-700 group-hover:bg-blue-600 transition-colors" />
-              </div>
-            )}
-
-            {/* Secondary charts row */}
-            {nonLatencyCharts.length > 0 && (
-              <div
-                className="min-h-0 overflow-hidden flex gap-4"
-                style={hasBothRows
-                  ? { flexBasis: `${(1 - chartSplit) * 100}%`, flexGrow: 0, flexShrink: 0 }
-                  : { flex: 1 }
-                }
-              >
-                {nonLatencyCharts.map(chartKey => (
-                  <div key={chartKey} className="flex-1 min-h-0">
-                    <UnifiedChart
-                      targets={filteredTargets}
-                      lastPingResults={lastPingResults}
-                      colorMap={colorMap}
-                      controlledMetric={chartKey}
-                      fillHeight
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="flex-1 min-h-0 overflow-auto p-4">
+            <UnifiedChart
+              targets={filteredTargets}
+              lastPingResults={lastPingResults}
+              colorMap={colorMap}
+              onColorChange={onColorChange}
+              fillHeight
+            />
           </div>
 
           {/* Groups section below charts */}
@@ -511,8 +373,6 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
                   <GroupedView
                     targets={targets}
                     lastPingResults={lastPingResults}
-                    selectedTargetIds={selectedIds}
-                    onTargetClick={toggleTarget}
                     colorMap={colorMap}
                   />
                 </div>

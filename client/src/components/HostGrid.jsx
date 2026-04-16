@@ -13,15 +13,15 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
   });
   const [draggingId, setDraggingId] = useState(null);
 
-  // Card size: 'normal' = default grid, 'compact' = more columns / smaller cards
-  const [cardSize, setCardSize] = useState(() => {
-    return localStorage.getItem('hostCardSize') || 'normal';
+  // View mode: 'detailed' = full card, 'summary' = compact card
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('hostCardViewMode') || 'detailed';
   });
 
-  const toggleCardSize = useCallback(() => {
-    setCardSize(prev => {
-      const next = prev === 'normal' ? 'compact' : 'normal';
-      localStorage.setItem('hostCardSize', next);
+  const toggleViewMode = useCallback(() => {
+    setViewMode(prev => {
+      const next = prev === 'detailed' ? 'summary' : 'detailed';
+      localStorage.setItem('hostCardViewMode', next);
       return next;
     });
   }, []);
@@ -39,7 +39,7 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
   const draggingIdRef = useRef(null);
 
   const handleCardDragStart = useCallback((e, id) => {
-    e.stopPropagation(); // Prevent section drag from triggering
+    e.stopPropagation();
     draggingIdRef.current = id;
     setDraggingId(id);
     e.dataTransfer.effectAllowed = 'move';
@@ -79,22 +79,22 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
   const targetMap = new Map(targets.map(t => [t.id, t]));
   const orderedTargets = displayOrder.map(id => targetMap.get(id)).filter(Boolean);
 
-  const gridClass = cardSize === 'compact'
+  const gridClass = viewMode === 'summary'
     ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3'
     : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4';
 
   return (
     <div>
-      {/* Card size toggle */}
+      {/* View mode toggle */}
       <div className="flex justify-end mb-3">
         <button
-          onClick={toggleCardSize}
+          onClick={toggleViewMode}
           className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-white transition-colors"
-          title={cardSize === 'normal' ? 'Switch to compact view' : 'Switch to normal view'}
-          aria-label={cardSize === 'normal' ? 'Switch to compact card view' : 'Switch to normal card view'}
+          title={viewMode === 'detailed' ? 'Switch to summary view' : 'Switch to detailed view'}
+          aria-label={viewMode === 'detailed' ? 'Switch to summary view' : 'Switch to detailed view'}
         >
-          {cardSize === 'normal' ? <AlignJustify size={13} /> : <LayoutGrid size={13} />}
-          {cardSize === 'normal' ? 'Compact' : 'Normal'}
+          {viewMode === 'detailed' ? <AlignJustify size={13} /> : <LayoutGrid size={13} />}
+          {viewMode === 'detailed' ? 'Summary' : 'Detailed'}
         </button>
       </div>
       <div className={gridClass}>
@@ -122,6 +122,7 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
               isSelected={selectedTargetIds.includes(target.id)}
               onTargetClick={onTargetClick}
               onDelete={onDeleteUserTarget}
+              viewMode={viewMode}
             />
           </div>
         ))}
