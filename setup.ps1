@@ -147,6 +147,28 @@ if (-not (Test-Path "config.yaml")) {
 Write-Host ""
 Write-Host "  *** IMPORTANT: Edit config.yaml with your target IPs and SMTP settings ***" -ForegroundColor Yellow
 
+# ── Admin password ────────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "-------------------------------------------------" -ForegroundColor Cyan
+Write-Host "  Admin Dashboard Password" -ForegroundColor Cyan
+Write-Host "-------------------------------------------------" -ForegroundColor Cyan
+Write-Host "Set a password to protect the Settings panel in the dashboard."
+Write-Host "  (You can change it later with: npm run set-password)"
+$adminPass = Read-Host "  New admin password (min 6 chars, leave blank to skip)" -AsSecureString
+$adminPassPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+    [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($adminPass)
+)
+if ($adminPassPlain -ne '') {
+    node scripts/set-password.js --password $adminPassPlain
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[OK] Admin password set" -ForegroundColor Green
+    } else {
+        Write-Host "WARNING: Failed to set admin password. Run 'npm run set-password' manually." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  Skipped — run 'npm run set-password' to set it before using the Settings panel." -ForegroundColor Yellow
+}
+
 # ── PM2 startup (optional) ────────────────────────────────────────────────────
 
 Write-Host ""

@@ -22,7 +22,8 @@
     "electron:build:linux": "npm run electron:rebuild && electron-builder --linux",
     "db:flush": "node scripts/flush-data.js",
     "db:flush:all": "node scripts/flush-data.js --all",
-    "db:nuke": "node scripts/nuke-db.js"
+    "db:nuke": "node scripts/nuke-db.js",
+    "set-password": "node scripts/set-password.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",

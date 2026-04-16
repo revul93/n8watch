@@ -202,6 +202,26 @@ fi
 echo ""
 echo "  *** IMPORTANT: Edit config.yaml with your target IPs and SMTP settings ***"
 
+# ── Admin password ────────────────────────────────────────────────────────────
+echo ""
+echo "─────────────────────────────────────────────────"
+echo "  Admin Dashboard Password"
+echo "─────────────────────────────────────────────────"
+echo "Set a password to protect the Settings panel in the dashboard."
+echo "  (You can change it later with: npm run set-password)"
+if [ -e /dev/tty ]; then
+  printf "  New admin password (min 6 chars, leave blank to skip): "
+  read -rs ADMIN_PASS < /dev/tty
+  echo ""
+  if [ -n "$ADMIN_PASS" ]; then
+    node scripts/set-password.js --password "$ADMIN_PASS" && echo "✓ Admin password set"
+  else
+    echo "  Skipped — run 'npm run set-password' to set it before using the Settings panel."
+  fi
+else
+  echo "  (Non-interactive mode — skipping password prompt. Run 'npm run set-password' after setup.)"
+fi
+
 # ── PM2 startup ───────────────────────────────────────────────────────────────
 echo ""
 echo "─────────────────────────────────────────────────"

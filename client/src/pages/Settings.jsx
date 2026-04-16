@@ -1,0 +1,604 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Lock, LogOut, Plus, Trash2, Save, RefreshCw, ChevronDown, ChevronUp,
+  Server, Wifi, Bell, Mail, Settings2, Target
+} from 'lucide-react';
+import {
+  adminHasPassword, adminLogin, adminLogout, adminVerify, adminGetConfig,
+  adminSaveTargets, adminAddTarget, adminDeleteTarget,
+  adminSaveInterfaces, adminSaveAlertRules, adminSaveSmtp,
+  adminSaveServer, adminSaveGeneral,
+} from '../lib/api';
+import { cn } from '../lib/utils';
+
+// ── Token persistence ─────────────────────────────────────────────────────────
+const TOKEN_KEY = 'admin_token';
+function storeToken(t) { if (t) sessionStorage.setItem(TOKEN_KEY, t); else sessionStorage.removeItem(TOKEN_KEY); }
+function readToken()   { return sessionStorage.getItem(TOKEN_KEY); }
+
+// ── Shared form field ─────────────────────────────────────────────────────────
+function Field({ label, type = 'text', value, onChange, placeholder, required, className }) {
+  return (
+    <div className={cn('flex flex-col gap-1', className)}>
+      <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+      />
+    </div>
+  );
+}
+
+function Toggle({ label, checked, onChange }) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer">
+      <div
+        className={cn(
+          'relative w-10 h-6 rounded-full transition-colors',
+          checked ? 'bg-blue-600' : 'bg-gray-700',
+        )}
+        onClick={() => onChange(!checked)}
+      >
+        <div className={cn(
+          'absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform',
+          checked ? 'translate-x-5' : 'translate-x-1',
+        )} />
+      </div>
+      <span className="text-sm text-gray-300">{label}</span>
+    </label>
+  );
+}
+
+function SectionCard({ icon: Icon, title, children }) {
+  return (
+    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-800 bg-gray-800/40">
+        <Icon size={16} className="text-blue-400" />
+        <h2 className="text-sm font-semibold text-gray-200">{title}</h2>
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+function SaveBar({ saving, saved, error, onSave }) {
+  return (
+    <div className="flex items-center gap-3 mt-4">
+      <button
+        onClick={onSave}
+        disabled={saving}
+        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+      >
+        {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+        {saving ? 'Saving…' : 'Save Changes'}
+      </button>
+      {saved && <span className="text-green-400 text-xs">✓ Saved</span>}
+      {error && <span className="text-red-400 text-xs">{error}</span>}
+    </div>
+  );
+}
+
+// ── Login form ─────────────────────────────────────────────────────────────────
+function LoginForm({ onLogin }) {
+  const [password, setPassword] = useState('');
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [noPassword, setNoPassword] = useState(false);
+
+  useEffect(() => {
+    adminHasPassword().then(has => { if (!has) setNoPassword(true); }).catch(() => {});
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const { token } = await adminLogin(password);
+      storeToken(token);
+      onLogin(token);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (noPassword) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-sm text-center">
+          <Lock size={32} className="mx-auto mb-4 text-yellow-400" />
+          <h2 className="text-lg font-semibold mb-2">Admin Password Not Set</h2>
+          <p className="text-gray-400 text-sm">
+            Run <code className="bg-gray-800 px-1.5 py-0.5 rounded text-xs">npm run set-password</code> on the
+            server to configure the admin password before accessing the Settings panel.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
+            <Lock size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold">Admin Login</h2>
+            <p className="text-xs text-gray-400">Settings panel is password protected</p>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <Field
+            label="Password"
+            type="password"
+            value={password}
+            onChange={setPassword}
+            placeholder="Enter admin password"
+            required
+          />
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading || !password}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+          >
+            {loading ? 'Logging in…' : 'Log In'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── System Targets section ────────────────────────────────────────────────────
+function TargetsSection({ config, token, onConfigRefresh }) {
+  const [targets, setTargets]   = useState([]);
+  const [newTarget, setNewTarget] = useState({ name: '', ip: '', group: '', interface: '' });
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
+  const [error, setError]       = useState('');
+
+  useEffect(() => {
+    if (config?.targets) setTargets(config.targets.map(t => ({ ...t })));
+  }, [config]);
+
+  const updateTarget = (i, field, value) => {
+    setTargets(prev => prev.map((t, idx) => idx === i ? { ...t, [field]: value } : t));
+  };
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      await adminSaveTargets(token, targets);
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleAdd = async () => {
+    if (!newTarget.name.trim() || !newTarget.ip.trim()) {
+      setError('Name and IP are required for a new target');
+      return;
+    }
+    setSaving(true); setError('');
+    try {
+      await adminAddTarget(token, newTarget);
+      setNewTarget({ name: '', ip: '', group: '', interface: '' });
+      onConfigRefresh();
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (index) => {
+    setSaving(true); setError('');
+    try {
+      await adminDeleteTarget(token, index);
+      onConfigRefresh();
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <SectionCard icon={Target} title="System Targets">
+      <div className="flex flex-col gap-3">
+        {targets.map((t, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
+            <Field label={i === 0 ? 'Name' : ''} value={t.name} onChange={v => updateTarget(i, 'name', v)} placeholder="Google DNS" required />
+            <Field label={i === 0 ? 'IP / Host' : ''} value={t.ip} onChange={v => updateTarget(i, 'ip', v)} placeholder="8.8.8.8" required />
+            <Field label={i === 0 ? 'Group' : ''} value={t.group || ''} onChange={v => updateTarget(i, 'group', v)} placeholder="DNS Servers" />
+            <Field label={i === 0 ? 'Interface' : ''} value={t.interface || ''} onChange={v => updateTarget(i, 'interface', v)} placeholder="eth0" />
+            <button onClick={() => handleDelete(i)} className="mb-0.5 p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors" title="Remove">
+              <Trash2 size={15} />
+            </button>
+          </div>
+        ))}
+
+        <div className="mt-2 pt-3 border-t border-gray-800">
+          <p className="text-xs text-gray-500 mb-2 font-medium">Add New Target</p>
+          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
+            <Field label="Name" value={newTarget.name} onChange={v => setNewTarget(p => ({ ...p, name: v }))} placeholder="My Server" required />
+            <Field label="IP / Host" value={newTarget.ip} onChange={v => setNewTarget(p => ({ ...p, ip: v }))} placeholder="192.168.1.10" required />
+            <Field label="Group" value={newTarget.group} onChange={v => setNewTarget(p => ({ ...p, group: v }))} placeholder="Servers" />
+            <Field label="Interface" value={newTarget.interface} onChange={v => setNewTarget(p => ({ ...p, interface: v }))} placeholder="eth0" />
+            <button onClick={handleAdd} disabled={saving} className="mb-0.5 p-2 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded transition-colors" title="Add target">
+              <Plus size={15} />
+            </button>
+          </div>
+        </div>
+
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Interfaces section ────────────────────────────────────────────────────────
+function InterfacesSection({ config, token, onConfigRefresh }) {
+  const [ifaces, setIfaces]   = useState([]);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const [error, setError]     = useState('');
+
+  useEffect(() => {
+    if (config) setIfaces((config.interfaces || []).map(i => ({ ...i })));
+  }, [config]);
+
+  const update = (i, field, value) => setIfaces(prev => prev.map((f, idx) => idx === i ? { ...f, [field]: value } : f));
+  const addRow  = () => setIfaces(prev => [...prev, { name: '', alias: '', ipv4: '' }]);
+  const remove  = (i) => setIfaces(prev => prev.filter((_, idx) => idx !== i));
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      await adminSaveInterfaces(token, ifaces);
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <SectionCard icon={Wifi} title="Network Interfaces">
+      <div className="flex flex-col gap-3">
+        {ifaces.map((f, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+            <Field label={i === 0 ? 'Interface Name' : ''} value={f.name} onChange={v => update(i, 'name', v)} placeholder="eth0" required />
+            <Field label={i === 0 ? 'Alias' : ''} value={f.alias || ''} onChange={v => update(i, 'alias', v)} placeholder="Primary LAN" />
+            <Field label={i === 0 ? 'IPv4 Address' : ''} value={f.ipv4 || ''} onChange={v => update(i, 'ipv4', v)} placeholder="192.168.1.1" />
+            <button onClick={() => remove(i)} className="mb-0.5 p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"><Trash2 size={15} /></button>
+          </div>
+        ))}
+        <button onClick={addRow} className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 mt-1 w-fit">
+          <Plus size={13} /> Add Interface
+        </button>
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Alert rules section ───────────────────────────────────────────────────────
+function AlertRulesSection({ config, token, onConfigRefresh }) {
+  const [rules, setRules]   = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const [error, setError]   = useState('');
+
+  useEffect(() => {
+    if (config?.alerts?.rules) setRules(config.alerts.rules.map(r => ({ ...r })));
+  }, [config]);
+
+  const update = (i, field, value) => setRules(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
+  const addRow  = () => setRules(prev => [...prev, { name: '', condition: '', severity: 'warning', cooldown: 300 }]);
+  const remove  = (i) => setRules(prev => prev.filter((_, idx) => idx !== i));
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      await adminSaveAlertRules(token, rules);
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <SectionCard icon={Bell} title="Alert Rules">
+      <div className="flex flex-col gap-3">
+        {rules.map((r, i) => (
+          <div key={i} className="grid grid-cols-[1fr_2fr_auto_auto_auto] gap-2 items-end">
+            <Field label={i === 0 ? 'Rule Name' : ''} value={r.name} onChange={v => update(i, 'name', v)} placeholder="Host Down" required />
+            <Field label={i === 0 ? 'Condition' : ''} value={r.condition} onChange={v => update(i, 'condition', v)} placeholder="packet_loss == 100" required />
+            <div className={cn('flex flex-col gap-1', i === 0 ? '' : '')}>
+              {i === 0 && <label className="text-xs text-gray-400">Severity</label>}
+              <select
+                value={r.severity || 'warning'}
+                onChange={e => update(i, 'severity', e.target.value)}
+                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+              >
+                <option value="critical">critical</option>
+                <option value="warning">warning</option>
+                <option value="info">info</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              {i === 0 && <label className="text-xs text-gray-400">Cooldown (s)</label>}
+              <input
+                type="number"
+                value={r.cooldown ?? 300}
+                onChange={e => update(i, 'cooldown', parseInt(e.target.value, 10) || 0)}
+                className="w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <button onClick={() => remove(i)} className={cn('p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors', i === 0 ? 'mt-5' : '')}>
+              <Trash2 size={15} />
+            </button>
+          </div>
+        ))}
+        <button onClick={addRow} className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 mt-1 w-fit">
+          <Plus size={13} /> Add Rule
+        </button>
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── SMTP section ──────────────────────────────────────────────────────────────
+function SmtpSection({ config, token, onConfigRefresh }) {
+  const alerts = config?.alerts || {};
+  const smtp   = alerts.smtp || {};
+
+  const [enabled, setEnabled] = useState(alerts.email_notifications !== false);
+  const [host, setHost]       = useState(smtp.host || '');
+  const [port, setPort]       = useState(smtp.port ?? 587);
+  const [secure, setSecure]   = useState(smtp.secure || false);
+  const [user, setUser]       = useState(smtp.user || '');
+  const [pass, setPass]       = useState(smtp.pass || '');
+  const [from, setFrom]       = useState(smtp.from || '');
+  const [to, setTo]           = useState((smtp.to || []).join(', '));
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const [error, setError]     = useState('');
+
+  useEffect(() => {
+    if (!config) return;
+    const a = config.alerts || {};
+    const s = a.smtp || {};
+    setEnabled(a.email_notifications !== false);
+    setHost(s.host || '');
+    setPort(s.port ?? 587);
+    setSecure(s.secure || false);
+    setUser(s.user || '');
+    setPass(s.pass || '');
+    setFrom(s.from || '');
+    setTo((s.to || []).join(', '));
+  }, [config]);
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      const toList = to.split(',').map(s => s.trim()).filter(Boolean);
+      await adminSaveSmtp(token, {
+        email_notifications: enabled,
+        smtp: { host, port: parseInt(port, 10) || 587, secure, user, pass, from, to: toList },
+      });
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <SectionCard icon={Mail} title="SMTP / Email Notifications">
+      <div className="flex flex-col gap-4">
+        <Toggle label="Enable email notifications" checked={enabled} onChange={setEnabled} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="SMTP Host" value={host} onChange={setHost} placeholder="smtp.gmail.com" />
+          <Field label="Port" type="number" value={port} onChange={setPort} placeholder="587" />
+        </div>
+        <Toggle label="Use TLS (secure)" checked={secure} onChange={setSecure} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Username" value={user} onChange={setUser} placeholder="you@gmail.com" />
+          <Field label="Password / App Password" type="password" value={pass} onChange={setPass} placeholder="••••••••" />
+        </div>
+        <Field label="From address" value={from} onChange={setFrom} placeholder='n8watch <monitor@yourdomain.com>' />
+        <Field label="To addresses (comma-separated)" value={to} onChange={setTo} placeholder="admin@yourdomain.com, ops@yourdomain.com" />
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Server settings section ───────────────────────────────────────────────────
+function ServerSection({ config, token, onConfigRefresh }) {
+  const server  = config?.server  || {};
+  const general = config?.general || {};
+
+  const [port, setPort]           = useState(server.port || 3000);
+  const [host, setHost]           = useState(server.host || '0.0.0.0');
+  const [pingInterval, setPingInterval] = useState(general.ping_interval || 30);
+  const [pingCount, setPingCount]       = useState(general.ping_count || 5);
+  const [pingTimeout, setPingTimeout]   = useState(general.ping_timeout || 5);
+  const [retentionDays, setRetentionDays] = useState(general.data_retention_days || 90);
+  const [maxLifetime, setMaxLifetime]   = useState(general.max_user_target_lifetime_days || 7);
+
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const [error, setError]   = useState('');
+
+  useEffect(() => {
+    if (!config) return;
+    const s = config.server  || {};
+    const g = config.general || {};
+    setPort(s.port || 3000);
+    setHost(s.host || '0.0.0.0');
+    setPingInterval(g.ping_interval || 30);
+    setPingCount(g.ping_count || 5);
+    setPingTimeout(g.ping_timeout || 5);
+    setRetentionDays(g.data_retention_days || 90);
+    setMaxLifetime(g.max_user_target_lifetime_days || 7);
+  }, [config]);
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      await adminSaveServer(token, { port: parseInt(port, 10), host });
+      await adminSaveGeneral(token, {
+        ping_interval: parseInt(pingInterval, 10),
+        ping_count: parseInt(pingCount, 10),
+        ping_timeout: parseInt(pingTimeout, 10),
+        data_retention_days: parseInt(retentionDays, 10),
+        max_user_target_lifetime_days: parseInt(maxLifetime, 10),
+      });
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <SectionCard icon={Server} title="Server & General Settings">
+      <div className="flex flex-col gap-4">
+        <p className="text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800 rounded px-3 py-2">
+          ⚠ Changes to port/host take effect after restarting n8watch.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Listen Port" type="number" value={port} onChange={setPort} placeholder="3000" />
+          <Field label="Listen Host" value={host} onChange={setHost} placeholder="0.0.0.0" />
+        </div>
+        <hr className="border-gray-800" />
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Ping Settings</p>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Interval (s)" type="number" value={pingInterval} onChange={setPingInterval} placeholder="30" />
+          <Field label="Packets per ping" type="number" value={pingCount} onChange={setPingCount} placeholder="5" />
+          <Field label="Timeout (s)" type="number" value={pingTimeout} onChange={setPingTimeout} placeholder="5" />
+        </div>
+        <hr className="border-gray-800" />
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Data Retention</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Data retention (days)" type="number" value={retentionDays} onChange={setRetentionDays} placeholder="90" />
+          <Field label="Max user target lifetime (days)" type="number" value={maxLifetime} onChange={setMaxLifetime} placeholder="7" />
+        </div>
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Tab bar ───────────────────────────────────────────────────────────────────
+const TABS = [
+  { id: 'targets',    label: 'Targets',    icon: Target  },
+  { id: 'interfaces', label: 'Interfaces', icon: Wifi    },
+  { id: 'rules',      label: 'Alert Rules',icon: Bell    },
+  { id: 'smtp',       label: 'SMTP',       icon: Mail    },
+  { id: 'server',     label: 'Server',     icon: Server  },
+];
+
+// ── Main Settings page ────────────────────────────────────────────────────────
+export default function Settings() {
+  const [token, setToken]     = useState(() => readToken());
+  const [config, setConfig]   = useState(null);
+  const [activeTab, setActiveTab] = useState('targets');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = (tok) => { setToken(tok); };
+
+  const fetchConfig = useCallback(async (tok) => {
+    if (!tok) return;
+    setLoading(true);
+    try {
+      const cfg = await adminGetConfig(tok);
+      setConfig(cfg);
+    } catch (err) {
+      if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+        storeToken(null);
+        setToken(null);
+      }
+    } finally { setLoading(false); }
+  }, []);
+
+  // On mount: verify existing session token
+  useEffect(() => {
+    if (!token) return;
+    adminVerify(token)
+      .then(() => fetchConfig(token))
+      .catch(() => { storeToken(null); setToken(null); });
+  }, [token, fetchConfig]);
+
+  const handleLogout = async () => {
+    try { await adminLogout(token); } catch (_) {}
+    storeToken(null);
+    setToken(null);
+    setConfig(null);
+  };
+
+  if (!token) return <LoginForm onLogin={handleLogin} />;
+
+  return (
+    <div className="flex flex-col gap-6 max-w-5xl">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Settings</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Manage system configuration — changes are saved to config.yaml</p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+        >
+          <LogOut size={15} />
+          Log out
+        </button>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-lg p-1">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center',
+              activeTab === id
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800',
+            )}
+          >
+            <Icon size={14} />
+            <span className="hidden sm:inline">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {loading && (
+        <div className="flex items-center gap-2 text-gray-400 text-sm">
+          <RefreshCw size={14} className="animate-spin" /> Loading config…
+        </div>
+      )}
+
+      {config && (
+        <>
+          {activeTab === 'targets'    && <TargetsSection    config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
+          {activeTab === 'interfaces' && <InterfacesSection config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
+          {activeTab === 'rules'      && <AlertRulesSection config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
+          {activeTab === 'smtp'       && <SmtpSection       config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
+          {activeTab === 'server'     && <ServerSection     config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
+        </>
+      )}
+    </div>
+  );
+}

@@ -119,3 +119,71 @@ export function deleteUserTarget(id) {
 export function getExpiredTargets() {
   return request('/targets/expired').then(res => res.targets || []);
 }
+
+// ── Admin API ─────────────────────────────────────────────────────────────────
+
+function adminRequest(path, method = 'GET', body = undefined, token = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return fetch(`${BASE}/admin${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }).then(async res => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  });
+}
+
+export function adminHasPassword() {
+  return adminRequest('/has-password').then(r => r.hasPassword);
+}
+
+export function adminLogin(password) {
+  return adminRequest('/login', 'POST', { password });
+}
+
+export function adminLogout(token) {
+  return adminRequest('/logout', 'POST', undefined, token);
+}
+
+export function adminVerify(token) {
+  return adminRequest('/verify', 'GET', undefined, token);
+}
+
+export function adminGetConfig(token) {
+  return adminRequest('/config', 'GET', undefined, token).then(r => r.config);
+}
+
+export function adminSaveTargets(token, targets) {
+  return adminRequest('/config/targets', 'PUT', { targets }, token);
+}
+
+export function adminAddTarget(token, target) {
+  return adminRequest('/config/targets', 'POST', target, token);
+}
+
+export function adminDeleteTarget(token, index) {
+  return adminRequest(`/config/targets/${index}`, 'DELETE', undefined, token);
+}
+
+export function adminSaveInterfaces(token, interfaces) {
+  return adminRequest('/config/interfaces', 'PUT', { interfaces }, token);
+}
+
+export function adminSaveAlertRules(token, rules) {
+  return adminRequest('/config/alerts/rules', 'PUT', { rules }, token);
+}
+
+export function adminSaveSmtp(token, data) {
+  return adminRequest('/config/alerts/smtp', 'PUT', data, token);
+}
+
+export function adminSaveServer(token, data) {
+  return adminRequest('/config/server', 'PUT', data, token);
+}
+
+export function adminSaveGeneral(token, data) {
+  return adminRequest('/config/general', 'PUT', data, token);
+}
