@@ -4,6 +4,7 @@ import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical, LayoutGrid, Ali
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
 import HostCard from './HostCard';
+import HostGrid from './HostGrid';
 import GroupedView from './GroupedView';
 
 const PANEL_MIN = 180;
@@ -260,7 +261,7 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
         </button>
       </div>
 
-      {/* Body: left panel + chart area */}
+      {/* Body: left panel + main content area */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left panel — target cards */}
         {panelOpen && (
@@ -345,40 +346,50 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
           </>
         )}
 
-        {/* Chart area */}
-        <div className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
-          {/* Charts section */}
-          <div className="flex-1 min-h-0 overflow-auto p-4">
+        {/* Main content area — mirrors the normal dashboard layout */}
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
+          <div className="p-4 space-y-6">
+            {/* Chart section */}
             <UnifiedChart
               targets={filteredTargets}
               lastPingResults={lastPingResults}
               colorMap={colorMap}
               onColorChange={onColorChange}
-              fillHeight
+              fillHeight={false}
+              chartHeight={280}
             />
-          </div>
 
-          {/* Groups section below charts */}
-          {targets.length > 0 && (
-            <div className="flex-shrink-0 border-t border-gray-800">
-              <button
-                onClick={toggleFsGroupsPanel}
-                className="flex items-center gap-2 w-full px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
-              >
-                {fsGroupsPanelOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                Groups
-              </button>
-              {fsGroupsPanelOpen && (
-                <div className="px-4 pb-4 overflow-y-auto max-h-72" aria-label="Groups list">
+            {/* Host grid section */}
+            {targets.length > 0 && (
+              <HostGrid
+                targets={targets}
+                lastPingResults={lastPingResults}
+                sparklineData={sparklineData}
+                selectedTargetIds={selectedIds}
+                onTargetClick={toggleTarget}
+              />
+            )}
+
+            {/* Groups section */}
+            {targets.length > 0 && (
+              <div>
+                <button
+                  onClick={toggleFsGroupsPanel}
+                  className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
+                >
+                  {fsGroupsPanelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  Groups
+                </button>
+                {fsGroupsPanelOpen && (
                   <GroupedView
                     targets={targets}
                     lastPingResults={lastPingResults}
                     colorMap={colorMap}
                   />
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

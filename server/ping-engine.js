@@ -78,22 +78,25 @@ function buildDeadResult(count) {
 }
 
 /**
- * pingAllTargets - pings all targets concurrently.
+ * pingAllTargets - pings all targets sequentially, one after another,
+ * so that simultaneous pings do not inflate response times.
  *
  * @param {Array<object>} targets
  * @param {object} config
  * @returns {Promise<Array<{ target: object, metrics: object }>>}
  */
 async function pingAllTargets(targets, config) {
-  const results = await Promise.allSettled(
-    targets.map((target) => pingTarget(target, config).then((metrics) => ({ target, metrics })))
-  );
-
-  return results.map((r, i) => {
-    if (r.status === 'fulfilled') return r.value;
-    console.error(`[Ping] Unexpected error for ${targets[i].ip}:`, r.reason);
-    return { target: targets[i], metrics: buildDeadResult(config.ping_count || 5) };
-  });
+  const results = [];
+  for (const target of targets) {
+    try {
+      const metrics = await pingTarget(target, config);
+      results.push({ target, metrics });
+    } catch (err) {
+      console.error(`[Ping] Unexpected error for ${target.ip}:`, err.message);
+      results.push({ target, metrics: buildDeadResult(config.ping_count || 5) });
+    }
+  }
+  return results;
 }
 
 module.exports = { pingTarget, pingAllTargets };

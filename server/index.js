@@ -84,10 +84,10 @@ async function main() {
   const app = express();
   app.use(express.json());
 
-  // Global rate limiter — 300 requests per minute per IP
+  // Global rate limiter — 1000 requests per minute per IP
   const globalLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 300,
+    max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many requests, please try again later." },
