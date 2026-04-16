@@ -48,7 +48,8 @@ async function promptPassword() {
     try {
       process.stdin.setRawMode(true);
     } catch (_) {
-      // Non-TTY — just read normally
+      // Non-TTY fallback: password will be visible in terminal output
+      process.stdout.write('(warning: terminal does not support hidden input — password will be visible)\n');
       rl.question('', (answer) => {
         rl.close();
         resolve(answer);

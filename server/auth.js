@@ -102,6 +102,8 @@ function setPassword(password) {
   }
   const { salt, hash } = hashPassword(password);
   saveCredentials({ salt, hash });
+  // NOTE: On Windows, file permission mode 0o600 is not enforced by the OS.
+  // Ensure the data/ directory itself is access-controlled on Windows deployments.
 }
 
 function checkPassword(password) {

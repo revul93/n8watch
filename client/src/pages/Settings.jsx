@@ -337,7 +337,7 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
               <input
                 type="number"
                 value={r.cooldown ?? 300}
-                onChange={e => update(i, 'cooldown', parseInt(e.target.value, 10) || 0)}
+                onChange={e => update(i, 'cooldown', parseInt(e.target.value, 10) || 300)}
                 className="w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
               />
             </div>

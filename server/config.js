@@ -135,7 +135,9 @@ function watchConfig(onChange) {
 
 /**
  * saveConfig - write the in-memory config back to config.yaml.
- * NOTE: Comments in the original file are not preserved by js-yaml.dump().
+ * NOTE: js-yaml.dump() does not preserve comments from the original file.
+ * Users who manage config.yaml manually should be aware that saving via the
+ * Settings dashboard will replace it with a comment-free YAML representation.
  * The file is written atomically (tmp → rename) to prevent corruption.
  *
  * @param {object} config  The config object to serialise
