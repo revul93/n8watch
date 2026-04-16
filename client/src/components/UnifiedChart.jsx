@@ -6,6 +6,7 @@ import {
 import { format } from 'date-fns';
 import TimeRangeSelector, { RANGES } from './TimeRangeSelector';
 import { getMetrics } from '../lib/api';
+import { cn } from '../lib/utils';
 
 const COLORS = [
   '#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7',
@@ -170,8 +171,25 @@ function CustomLegend({ payload, targets, colorMap, defaultColorMap, onColorChan
   );
 }
 
+/** Shared legend rendered outside individual chart panels */
+function SharedLegend({ targets, colorMap, defaultColorMap, onColorChange }) {
+  const payload = targets.map(t => ({
+    dataKey: String(t.id),
+    color: colorMap[t.id] || defaultColorMap[t.id] || COLORS[0],
+  }));
+  return (
+    <CustomLegend
+      payload={payload}
+      targets={targets}
+      colorMap={colorMap}
+      defaultColorMap={defaultColorMap}
+      onColorChange={onColorChange}
+    />
+  );
+}
+
 /** One chart panel */
-function ChartPanel({ title, unit, data, targets, colorMap, defaultColorMap, onColorChange, chartType, chartHeight, loading }) {
+function ChartPanel({ title, unit, data, targets, colorMap, defaultColorMap, onColorChange, chartType, chartHeight, loading, showLegend = true }) {
   const tooltipStyle = {
     contentStyle: { background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 },
     labelFormatter: formatTooltipLabel,
@@ -201,7 +219,7 @@ function ChartPanel({ title, unit, data, targets, colorMap, defaultColorMap, onC
     />
   );
   const grid = <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />;
-  const legend = (
+  const legend = showLegend ? (
     <Legend
       content={({ payload }) => (
         <CustomLegend
@@ -213,7 +231,7 @@ function ChartPanel({ title, unit, data, targets, colorMap, defaultColorMap, onC
         />
       )}
     />
-  );
+  ) : null;
 
   const commonProps = {
     data,
@@ -441,6 +459,15 @@ export default function UnifiedChart({
 
   const panelHeight = effectiveHeight;
 
+  // Active metric for the toggle in the multi-metric (main) view
+  const [activeMetric, setActiveMetric] = useState('latency');
+
+  const METRIC_TABS = [
+    { key: 'latency',     label: 'Latency',     unit: 'ms', chartType: 'line',  data: latencyData },
+    { key: 'jitter',      label: 'Jitter',      unit: 'ms', chartType: 'line',  data: jitterData },
+    { key: 'packet_loss', label: 'Packet Loss',  unit: '%',  chartType: 'area',  data: packetLossData },
+  ];
+
   if (singleMetric) {
     const data = singleMetric === 'latency' ? latencyData
       : singleMetric === 'jitter' ? jitterData
@@ -472,49 +499,57 @@ export default function UnifiedChart({
     );
   }
 
+  const activeTab = METRIC_TABS.find(t => t.key === activeMetric) || METRIC_TABS[0];
+
   return (
     <div ref={containerRef}>
-      <div className="flex justify-end mb-3">
+      {/* Top bar: metric toggle + time range selector */}
+      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+        <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
+          {METRIC_TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveMetric(tab.key)}
+              className={cn(
+                'px-3 py-1 rounded text-xs font-medium transition-colors',
+                activeMetric === tab.key
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <TimeRangeSelector value={range.key} onChange={setRange} />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <ChartPanel
-          title="Latency"
-          unit="ms"
-          data={latencyData}
-          targets={targets}
-          colorMap={colorMap}
-          defaultColorMap={defaultColorMap}
-          onColorChange={handleColorChange}
-          chartType="line"
-          chartHeight={panelHeight}
-          loading={loading}
-        />
-        <ChartPanel
-          title="Jitter"
-          unit="ms"
-          data={jitterData}
-          targets={targets}
-          colorMap={colorMap}
-          defaultColorMap={defaultColorMap}
-          onColorChange={handleColorChange}
-          chartType="line"
-          chartHeight={panelHeight}
-          loading={loading}
-        />
-        <ChartPanel
-          title="Packet Loss"
-          unit="%"
-          data={packetLossData}
-          targets={targets}
-          colorMap={colorMap}
-          defaultColorMap={defaultColorMap}
-          onColorChange={handleColorChange}
-          chartType="area"
-          chartHeight={panelHeight}
-          loading={loading}
-        />
-      </div>
+
+      {/* Shared legend (single legend for all targets) */}
+      {targets.length > 0 && (
+        <div className="mb-3">
+          <SharedLegend
+            targets={targets}
+            colorMap={colorMap}
+            defaultColorMap={defaultColorMap}
+            onColorChange={handleColorChange}
+          />
+        </div>
+      )}
+
+      {/* Full-width chart for the active metric */}
+      <ChartPanel
+        title={activeTab.label}
+        unit={activeTab.unit}
+        data={activeTab.data}
+        targets={targets}
+        colorMap={colorMap}
+        defaultColorMap={defaultColorMap}
+        onColorChange={handleColorChange}
+        chartType={activeTab.chartType}
+        chartHeight={panelHeight}
+        loading={loading}
+        showLegend={false}
+      />
     </div>
   );
 }

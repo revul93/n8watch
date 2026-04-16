@@ -369,22 +369,19 @@ export default function Dashboard() {
     ),
     hosts: (
       <div>
-        <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Hosts</h2>
-          {selectedTargetIds.length > 0 && (
+        {selectedTargetIds.length > 0 && (
+          <div className="flex items-center gap-3 mb-3">
             <span className="text-xs text-blue-400">
               {selectedTargetIds.length} selected — click a host again to deselect
             </span>
-          )}
-          {selectedTargetIds.length > 0 && (
             <button
               onClick={() => setSelectedTargetIds([])}
               className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
             >
               Clear selection
             </button>
-          )}
-        </div>
+          </div>
+        )}
         <HostGrid
           targets={targetList}
           lastPingResults={lastPingResults}
@@ -560,26 +557,33 @@ export default function Dashboard() {
       )}
 
       {/* Draggable sections */}
-      {sectionOrder.map(key => (
-        <div
-          key={key}
-          draggable
-          onDragStart={(e) => handleSectionDragStart(e, key)}
-          onDragEnter={() => handleSectionDragEnter(key)}
-          onDragOver={(e) => e.preventDefault()}
-          onDragEnd={handleSectionDragEnd}
-          className={cn(
-            "group relative rounded-xl transition-all",
-            dragOverSection === key && dragSectionRef.current !== key && "ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-950",
-          )}
-        >
-          {/* Drag handle indicator */}
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-60 transition-opacity pointer-events-none">
-            <GripVertical size={14} className="text-gray-500" />
+      <div>
+        {sectionOrder.map((key, idx) => (
+          <div
+            key={key}
+            draggable
+            onDragStart={(e) => handleSectionDragStart(e, key)}
+            onDragEnter={() => handleSectionDragEnter(key)}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnd={handleSectionDragEnd}
+            className={cn(
+              "group relative rounded-xl transition-all",
+              idx === 0 ? '' : (
+                key === 'hosts' && sectionOrder[idx - 1] === 'chart'
+                  ? 'mt-2'
+                  : 'mt-6'
+              ),
+              dragOverSection === key && dragSectionRef.current !== key && "ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-950",
+            )}
+          >
+            {/* Drag handle indicator */}
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-60 transition-opacity pointer-events-none">
+              <GripVertical size={14} className="text-gray-500" />
+            </div>
+            {sectionContent[key]}
           </div>
-          {sectionContent[key]}
-        </div>
-      ))}
+        ))}
+      </div>
 
       {fullscreen && (
         <FullscreenChartModal
