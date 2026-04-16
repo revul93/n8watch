@@ -175,7 +175,7 @@ function CustomLegend({ payload, targets, colorMap, defaultColorMap, onColorChan
 function SharedLegend({ targets, colorMap, defaultColorMap, onColorChange }) {
   const payload = targets.map(t => ({
     dataKey: String(t.id),
-    color: colorMap[t.id] || COLORS[0],
+    color: colorMap[t.id] || defaultColorMap[t.id] || COLORS[0],
   }));
   return (
     <CustomLegend
