@@ -7,7 +7,8 @@ import SummaryCards from '../components/SummaryCards';
 import UnifiedChart, { buildColorMap } from '../components/UnifiedChart';
 import HostGrid from '../components/HostGrid';
 import FullscreenChartModal from '../components/FullscreenChartModal';
-import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, GripVertical } from 'lucide-react';
+import GroupedView from '../components/GroupedView';
+import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const SECTION_KEYS = ['summary', 'chart', 'hosts'];
@@ -88,6 +89,20 @@ export default function Dashboard() {
   useEffect(() => {
     setNewTargetLifetimeDays(maxLifetimeDays);
   }, [maxLifetimeDays]);
+
+  // Groups section collapsed/expanded state (persisted to localStorage)
+  const [groupsPanelOpen, setGroupsPanelOpen] = useState(() => {
+    const saved = localStorage.getItem('groupsPanelOpen');
+    return saved === null ? true : saved === 'true';
+  });
+
+  const toggleGroupsPanel = useCallback(() => {
+    setGroupsPanelOpen(prev => {
+      const next = !prev;
+      localStorage.setItem('groupsPanelOpen', String(next));
+      return next;
+    });
+  }, []);
 
   // Confirmation dialog state
   const [deleteCandidate, setDeleteCandidate] = useState(null);
@@ -476,6 +491,28 @@ export default function Dashboard() {
           {sectionContent[key]}
         </div>
       ))}
+
+      {/* ── Groups section (non-draggable, always below hosts) ── */}
+      {targetList.length > 0 && (
+        <div>
+          <button
+            onClick={toggleGroupsPanel}
+            className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
+          >
+            {groupsPanelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            Groups
+          </button>
+          {groupsPanelOpen && (
+            <GroupedView
+              targets={targetList}
+              lastPingResults={lastPingResults}
+              selectedTargetIds={selectedTargetIds}
+              onTargetClick={handleTargetClick}
+              colorMap={colorMap}
+            />
+          )}
+        </div>
+      )}
 
       {fullscreen && (
         <FullscreenChartModal
