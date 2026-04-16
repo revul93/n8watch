@@ -4,7 +4,6 @@ import { Minimize2, PanelLeftClose, PanelLeftOpen, GripVertical, LayoutGrid, Ali
 import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
 import HostCard from './HostCard';
-import HostGrid from './HostGrid';
 import GroupedView from './GroupedView';
 
 const PANEL_MIN = 180;
@@ -283,18 +282,14 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
                     <div
                       key={t.id}
                       className={cn(
-                        'relative group/card select-none',
-                        !isDetail && cn(
-                          'rounded-lg border transition-colors cursor-pointer',
-                          isSelected
-                            ? 'border-blue-500 ring-1 ring-blue-500/40 bg-blue-950/20'
-                            : 'border-gray-800 hover:border-blue-700',
-                        ),
-                        isDetail && 'cursor-grab active:cursor-grabbing',
+                        'relative group/card select-none rounded-lg border transition-colors',
+                        isDetail ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                        isSelected
+                          ? 'border-blue-500 ring-1 ring-blue-500/40 bg-blue-950/20'
+                          : 'border-gray-800 hover:border-blue-700',
                         isDragOver && 'ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-900'
                       )}
-                      onClick={isDetail ? undefined : () => toggleTarget(t.id)}
-                      title={!isDetail ? (isSelected ? 'Click to deselect' : 'Click to filter charts to this target') : undefined}
+                      title={isSelected ? 'Click to deselect' : 'Click to filter charts to this target'}
                       draggable
                       onDragStart={(e) => handleTargetDragStart(e, t.id)}
                       onDragEnter={() => handleTargetDragEnter(t.id)}
@@ -315,7 +310,7 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
                         lastPingResult={lastPingResults[t.id]}
                         sparklineData={sparklineData[t.id] || []}
                         isSelected={isSelected}
-                        onTargetClick={isDetail ? undefined : toggleTarget}
+                        onTargetClick={toggleTarget}
                         hideExport
                         viewMode={isDetail ? 'detailed' : 'summary'}
                       />
@@ -348,7 +343,7 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
 
         {/* Main content area — flex column, fits the viewport without scrolling */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
-          <div className="flex flex-col h-full min-h-0 p-4 gap-4">
+          <div className="flex flex-col h-full min-h-0 p-3 gap-2">
             {/* Chart section */}
             <div className="flex-[3] min-h-0">
               <UnifiedChart
@@ -361,25 +356,12 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
               />
             </div>
 
-            {/* Host grid section */}
-            {targets.length > 0 && (
-              <div className="flex-[2] min-h-0 overflow-y-auto">
-                <HostGrid
-                  targets={targets}
-                  lastPingResults={lastPingResults}
-                  sparklineData={sparklineData}
-                  selectedTargetIds={selectedIds}
-                  onTargetClick={toggleTarget}
-                />
-              </div>
-            )}
-
             {/* Groups section */}
             {targets.length > 0 && (
               <div className="flex-[2] min-h-0 overflow-y-auto">
                 <button
                   onClick={toggleFsGroupsPanel}
-                  className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
+                  className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
                 >
                   {fsGroupsPanelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   Groups
