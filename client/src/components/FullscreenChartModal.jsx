@@ -507,7 +507,7 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
                 Groups
               </button>
               {fsGroupsPanelOpen && (
-                <div className="px-4 pb-4 overflow-y-auto max-h-72">
+                <div className="px-4 pb-4 overflow-y-auto max-h-72" aria-label="Groups list">
                   <GroupedView
                     targets={targets}
                     lastPingResults={lastPingResults}
