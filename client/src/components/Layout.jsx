@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { Activity, History, Bell, Menu, X, RefreshCw, PanelLeftClose, PanelLeftOpen, Archive } from "lucide-react";
+import { Activity, History, Bell, Menu, X, RefreshCw, PanelLeftClose, PanelLeftOpen, Archive, Settings } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 import ThemeToggle from "./ThemeToggle";
 import { cn } from "../lib/utils";
@@ -10,6 +10,7 @@ const navItems = [
   { to: "/history", label: "History", icon: History },
   { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/expired", label: "Expired", icon: Archive },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function Layout({
@@ -71,7 +72,7 @@ export default function Layout({
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
             <Activity size={16} className="text-white" />
           </div>
-          <span className="text-lg font-bold text-white tracking-tight">
+          <span className="text-2xl font-extrabold text-white tracking-tight">
             n8watch
           </span>
           <button
@@ -170,11 +171,11 @@ export default function Layout({
             </button>
           )}
           {!desktopSidebarVisible && (
-            <span className="hidden lg:inline text-base font-semibold text-white">
+            <span className="hidden lg:inline text-xl font-extrabold text-white">
               n8watch
             </span>
           )}
-          <span className="text-base font-semibold text-white lg:hidden">
+          <span className="text-xl font-extrabold text-white lg:hidden">
             n8watch
           </span>
           <div className="flex-1" />

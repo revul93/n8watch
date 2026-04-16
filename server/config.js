@@ -133,4 +133,28 @@ function watchConfig(onChange) {
   );
 }
 
-module.exports = { loadConfig, getConfig, watchConfig };
+/**
+ * saveConfig - write the in-memory config back to config.yaml.
+ * NOTE: js-yaml.dump() does not preserve comments from the original file.
+ * Users who manage config.yaml manually should be aware that saving via the
+ * Settings dashboard will replace it with a comment-free YAML representation.
+ * The file is written atomically (tmp → rename) to prevent corruption.
+ *
+ * @param {object} config  The config object to serialise
+ */
+function saveConfig(config) {
+  if (!_configPath) loadConfig();
+
+  const raw = yaml.dump(config, { lineWidth: 120, quotingType: '"', forceQuotes: false });
+
+  // Atomic write: write to a temp file then rename
+  const tmpPath = _configPath + '.tmp';
+  fs.writeFileSync(tmpPath, raw, 'utf8');
+  fs.renameSync(tmpPath, _configPath);
+
+  // Update the hash so the watcher does not re-trigger immediately
+  _lastContentHash = crypto.createHash('md5').update(raw).digest('hex');
+  _config = config;
+}
+
+module.exports = { loadConfig, getConfig, watchConfig, saveConfig };
