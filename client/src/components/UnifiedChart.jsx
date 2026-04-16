@@ -515,8 +515,9 @@ export default function UnifiedChart({
   return (
     <div ref={containerRef}>
       {/* Horizontally stacked charts for all active metrics */}
-      <div className={cn('grid gap-3', activeTabs.length > 1 ? 'grid-cols-' + activeTabs.length : 'grid-cols-1')}
-        style={{ gridTemplateColumns: activeTabs.length > 1 ? `repeat(${activeTabs.length}, minmax(0, 1fr))` : undefined }}
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${activeTabs.length}, minmax(0, 1fr))` }}
       >
         {activeTabs.map(tab => (
           <ChartPanel
@@ -549,21 +550,25 @@ export default function UnifiedChart({
       )}
       <div className="flex items-center justify-between mt-3 gap-3 flex-wrap">
         <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
-          {METRIC_TABS.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => toggleMetric(tab.key)}
-              className={cn(
-                'px-3 py-1 rounded text-xs font-medium transition-colors',
-                activeMetrics.includes(tab.key)
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              )}
-              title={activeMetrics.includes(tab.key) && activeMetrics.length > 1 ? 'Click to hide' : 'Click to show'}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {METRIC_TABS.map(tab => {
+            const isActive = activeMetrics.includes(tab.key);
+            const isOnlyActive = isActive && activeMetrics.length === 1;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => toggleMetric(tab.key)}
+                className={cn(
+                  'px-3 py-1 rounded text-xs font-medium transition-colors',
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-400 hover:text-white'
+                )}
+                title={isOnlyActive ? 'At least one metric must be selected' : isActive ? 'Click to hide' : 'Click to show'}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
         <TimeRangeSelector value={range.key} onChange={setRange} />
       </div>
