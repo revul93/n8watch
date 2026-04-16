@@ -402,31 +402,11 @@ export default function Dashboard() {
           Groups
         </button>
         {groupsPanelOpen && targetList.length > 0 && (
-          <div className="relative">
-            <div style={{ minHeight: groupsHeight, maxHeight: groupsHeight, overflowY: 'auto' }}>
-              <GroupedView
-                targets={targetList}
-                lastPingResults={lastPingResults}
-                colorMap={colorMap}
-              />
-            </div>
-            {/* Resize handle */}
-            <div
-              className="w-full h-2 flex items-center justify-center cursor-row-resize group mt-1"
-              onMouseDown={handleGroupsResizeMouseDown}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowUp') { setGroupsHeight(h => { const v = Math.max(GROUPS_HEIGHT_MIN, h - 20); groupsHeightRef.current = v; localStorage.setItem('dashGroupsHeight', v); return v; }); }
-                if (e.key === 'ArrowDown') { setGroupsHeight(h => { const v = Math.min(GROUPS_HEIGHT_MAX, h + 20); groupsHeightRef.current = v; localStorage.setItem('dashGroupsHeight', v); return v; }); }
-              }}
-              tabIndex={0}
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Drag or use arrow keys to resize groups height"
-              title="Drag or use arrow keys to resize groups"
-            >
-              <div className="h-1 w-16 rounded-full bg-gray-800 group-hover:bg-blue-600 transition-colors" />
-            </div>
-          </div>
+          <GroupedView
+            targets={targetList}
+            lastPingResults={lastPingResults}
+            colorMap={colorMap}
+          />
         )}
       </div>
     ),

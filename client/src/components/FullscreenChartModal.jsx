@@ -346,33 +346,37 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
           </>
         )}
 
-        {/* Main content area — mirrors the normal dashboard layout */}
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
-          <div className="p-4 space-y-6">
+        {/* Main content area — flex column, fits the viewport without scrolling */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex flex-col h-full min-h-0 p-4 gap-4">
             {/* Chart section */}
-            <UnifiedChart
-              targets={filteredTargets}
-              lastPingResults={lastPingResults}
-              colorMap={colorMap}
-              onColorChange={onColorChange}
-              fillHeight={false}
-              chartHeight={280}
-            />
+            <div className="flex-[3] min-h-0">
+              <UnifiedChart
+                targets={filteredTargets}
+                lastPingResults={lastPingResults}
+                colorMap={colorMap}
+                onColorChange={onColorChange}
+                fillHeight={true}
+                chartHeight={280}
+              />
+            </div>
 
             {/* Host grid section */}
             {targets.length > 0 && (
-              <HostGrid
-                targets={targets}
-                lastPingResults={lastPingResults}
-                sparklineData={sparklineData}
-                selectedTargetIds={selectedIds}
-                onTargetClick={toggleTarget}
-              />
+              <div className="flex-[2] min-h-0 overflow-y-auto">
+                <HostGrid
+                  targets={targets}
+                  lastPingResults={lastPingResults}
+                  sparklineData={sparklineData}
+                  selectedTargetIds={selectedIds}
+                  onTargetClick={toggleTarget}
+                />
+              </div>
             )}
 
             {/* Groups section */}
             {targets.length > 0 && (
-              <div>
+              <div className="flex-[2] min-h-0 overflow-y-auto">
                 <button
                   onClick={toggleFsGroupsPanel}
                   className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"

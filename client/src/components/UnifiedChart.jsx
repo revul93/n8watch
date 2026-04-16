@@ -514,41 +514,8 @@ export default function UnifiedChart({
 
   return (
     <div ref={containerRef}>
-      {/* Horizontally stacked charts for all active metrics */}
-      <div
-        className="grid gap-3"
-        style={{ gridTemplateColumns: `repeat(${activeTabs.length}, minmax(0, 1fr))` }}
-      >
-        {activeTabs.map(tab => (
-          <ChartPanel
-            key={tab.key}
-            title={tab.label}
-            unit={tab.unit}
-            data={tab.data}
-            targets={targets}
-            colorMap={colorMap}
-            defaultColorMap={defaultColorMap}
-            onColorChange={handleColorChange}
-            chartType={tab.chartType}
-            chartHeight={panelHeight}
-            loading={loading}
-            showLegend={false}
-          />
-        ))}
-      </div>
-
-      {/* Bottom bar: shared legend, metric toggles, and time range selector */}
-      {targets.length > 0 && (
-        <div className="mt-3">
-          <SharedLegend
-            targets={targets}
-            colorMap={colorMap}
-            defaultColorMap={defaultColorMap}
-            onColorChange={handleColorChange}
-          />
-        </div>
-      )}
-      <div className="flex items-center justify-between mt-3 gap-3 flex-wrap">
+      {/* Top-left bar: metric toggles and time range selector */}
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
         <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
           {METRIC_TABS.map(tab => {
             const isActive = activeMetrics.includes(tab.key);
@@ -572,6 +539,41 @@ export default function UnifiedChart({
         </div>
         <TimeRangeSelector value={range.key} onChange={setRange} />
       </div>
+
+      {/* Horizontally stacked charts for all active metrics */}
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${activeTabs.length}, minmax(0, 1fr))` }}
+      >
+        {activeTabs.map(tab => (
+          <ChartPanel
+            key={tab.key}
+            title={tab.label}
+            unit={tab.unit}
+            data={tab.data}
+            targets={targets}
+            colorMap={colorMap}
+            defaultColorMap={defaultColorMap}
+            onColorChange={handleColorChange}
+            chartType={tab.chartType}
+            chartHeight={panelHeight}
+            loading={loading}
+            showLegend={false}
+          />
+        ))}
+      </div>
+
+      {/* Shared legend */}
+      {targets.length > 0 && (
+        <div className="mt-3">
+          <SharedLegend
+            targets={targets}
+            colorMap={colorMap}
+            defaultColorMap={defaultColorMap}
+            onColorChange={handleColorChange}
+          />
+        </div>
+      )}
     </div>
   );
 }
