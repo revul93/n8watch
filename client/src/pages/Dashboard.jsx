@@ -8,14 +8,18 @@ import UnifiedChart, { buildColorMap } from '../components/UnifiedChart';
 import HostGrid from '../components/HostGrid';
 import FullscreenChartModal from '../components/FullscreenChartModal';
 import GroupedView from '../components/GroupedView';
-import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, GripVertical, ChevronDown, ChevronRight, Target } from 'lucide-react';
+import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const SECTION_KEYS = ['summary', 'chart', 'hosts'];
+const SECTION_KEYS = ['summary', 'chart', 'hosts', 'groups'];
 
 const CHART_HEIGHT_MIN = 180;
 const CHART_HEIGHT_MAX = 800;
 const CHART_HEIGHT_DEFAULT = 280;
+
+const GROUPS_HEIGHT_MIN = 150;
+const GROUPS_HEIGHT_MAX = 600;
+const GROUPS_HEIGHT_DEFAULT = 300;
 
 export default function Dashboard() {
   const { lastPingResults, configReloadedAt, targetsChangedAt, connected } = useWebSocket();
@@ -30,6 +34,13 @@ export default function Dashboard() {
     return isNaN(saved) ? CHART_HEIGHT_DEFAULT : Math.max(CHART_HEIGHT_MIN, Math.min(CHART_HEIGHT_MAX, saved));
   });
   const chartHeightRef = useRef(chartHeight);
+
+  // Resizable groups height
+  const [groupsHeight, setGroupsHeight] = useState(() => {
+    const saved = parseInt(localStorage.getItem('dashGroupsHeight'), 10);
+    return isNaN(saved) ? GROUPS_HEIGHT_DEFAULT : Math.max(GROUPS_HEIGHT_MIN, Math.min(GROUPS_HEIGHT_MAX, saved));
+  });
+  const groupsHeightRef = useRef(groupsHeight);
 
   const handleChartResizeMouseDown = useCallback((e) => {
     e.preventDefault();
@@ -46,6 +57,27 @@ export default function Dashboard() {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
       localStorage.setItem('dashChartHeight', chartHeightRef.current);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  const handleGroupsResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = groupsHeightRef.current;
+
+    const onMouseMove = (ev) => {
+      const newHeight = Math.max(GROUPS_HEIGHT_MIN, Math.min(GROUPS_HEIGHT_MAX, startHeight + ev.clientY - startY));
+      groupsHeightRef.current = newHeight;
+      setGroupsHeight(newHeight);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('dashGroupsHeight', groupsHeightRef.current);
     };
 
     document.addEventListener('mousemove', onMouseMove);
@@ -89,22 +121,6 @@ export default function Dashboard() {
   useEffect(() => {
     setNewTargetLifetimeDays(maxLifetimeDays);
   }, [maxLifetimeDays]);
-
-  // Target selector dropdown state
-  const [showTargetSelector, setShowTargetSelector] = useState(false);
-  const targetSelectorRef = useRef(null);
-
-  // Close target selector on outside click
-  useEffect(() => {
-    if (!showTargetSelector) return;
-    const handleOutside = (e) => {
-      if (targetSelectorRef.current && !targetSelectorRef.current.contains(e.target)) {
-        setShowTargetSelector(false);
-      }
-    };
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [showTargetSelector]);
 
   // Groups section collapsed/expanded state (persisted to localStorage)
   const [groupsPanelOpen, setGroupsPanelOpen] = useState(() => {
@@ -186,7 +202,24 @@ export default function Dashboard() {
   const targetList = targets || [];
 
   // Stable color map derived from the full target list (not the filtered subset)
-  const colorMap = useMemo(() => buildColorMap(targetList), [targetList]);
+  const baseColorMap = useMemo(() => buildColorMap(targetList), [targetList]);
+
+  // Custom colors from localStorage merged over base colors
+  const [customColors, setCustomColors] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('n8watchTargetColors') || '{}');
+    } catch { return {}; }
+  });
+
+  const colorMap = useMemo(() => ({ ...baseColorMap, ...customColors }), [baseColorMap, customColors]);
+
+  const handleColorChange = useCallback((targetId, color) => {
+    setCustomColors(prev => {
+      const next = { ...prev, [targetId]: color };
+      localStorage.setItem('n8watchTargetColors', JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   // Targets shown in the chart: use selection if any, otherwise all
   const chartTargets = selectedTargetIds.length > 0
@@ -313,94 +346,8 @@ export default function Dashboard() {
     ),
     chart: (
       <div>
-        {/* Chart toolbar: target selector */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="relative" ref={targetSelectorRef}>
-            <button
-              onClick={() => setShowTargetSelector(v => !v)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors',
-                selectedTargetIds.length > 0
-                  ? 'bg-blue-900/40 border-blue-700 text-blue-300 hover:bg-blue-900/60'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'
-              )}
-              title="Filter chart by target"
-            >
-              <Target size={14} />
-              Targets
-              {selectedTargetIds.length > 0 && (
-                <span className="ml-1 bg-blue-700 text-white text-xs font-bold rounded-full px-1.5 py-px leading-none">
-                  {selectedTargetIds.length}
-                </span>
-              )}
-              <ChevronDown size={12} className={cn('transition-transform', showTargetSelector && 'rotate-180')} />
-            </button>
-
-            {showTargetSelector && (
-              <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
-                <div className="px-3 py-2 border-b border-gray-800 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Select targets</span>
-                  {selectedTargetIds.length > 0 && (
-                    <button
-                      onClick={() => setSelectedTargetIds([])}
-                      className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-                    >
-                      Clear all
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-72 overflow-y-auto" role="listbox" aria-label="Select targets to filter chart">
-                  {targetList.map(t => {
-                    const isSelected = selectedTargetIds.includes(t.id);
-                    const result = lastPingResults[t.id] || t;
-                    const rawAlive = result?.is_alive;
-                    const isUp = rawAlive === null || rawAlive === undefined ? null : !!rawAlive;
-                    const ifaceAlias = t.interface_alias || null;
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => handleTargetClick(t.id)}
-                        role="option"
-                        aria-selected={isSelected}
-                        className={cn(
-                          'w-full text-left px-3 py-2 border-b border-gray-800 last:border-0 transition-colors',
-                          isSelected ? 'bg-blue-950/40' : 'hover:bg-gray-800'
-                        )}
-                      >
-                        {/* Line 1: status + name */}
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={cn(
-                            'w-1.5 h-1.5 rounded-full flex-shrink-0',
-                            isUp === true && 'bg-green-400',
-                            isUp === false && 'bg-red-400 animate-pulse',
-                            isUp === null && 'bg-gray-600'
-                          )} />
-                          <span className="text-xs font-semibold text-white truncate">{t.name}</span>
-                          {isSelected && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />}
-                        </div>
-                        {/* Line 2: IP */}
-                        <p className="text-xs text-gray-500 font-mono truncate pl-3 mt-0.5">{t.ip}</p>
-                        {/* Line 3: outgoing interface */}
-                        <p className="text-xs text-teal-400/80 truncate pl-3 mt-0.5">
-                          {ifaceAlias ? `↑ ${ifaceAlias}` : <span className="text-gray-600">—</span>}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {selectedTargetIds.length > 0 && (
-            <span className="text-xs text-blue-400">
-              {selectedTargetIds.length} selected
-            </span>
-          )}
-        </div>
-
         <div className="relative">
-          <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} colorMap={colorMap} chartHeight={chartHeight} />
+          <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} colorMap={colorMap} onColorChange={handleColorChange} chartHeight={chartHeight} />
           {/* Resize handle */}
           <div
             className="w-full h-2 flex items-center justify-center cursor-row-resize group mt-1"
@@ -418,28 +365,6 @@ export default function Dashboard() {
             <div className="h-1 w-16 rounded-full bg-gray-800 group-hover:bg-blue-600 transition-colors" />
           </div>
         </div>
-
-        {/* Groups section directly below the main chart */}
-        {targetList.length > 0 && (
-          <div className="mt-4">
-            <button
-              onClick={toggleGroupsPanel}
-              className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
-            >
-              {groupsPanelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              Groups
-            </button>
-            {groupsPanelOpen && (
-              <GroupedView
-                targets={targetList}
-                lastPingResults={lastPingResults}
-                selectedTargetIds={selectedTargetIds}
-                onTargetClick={handleTargetClick}
-                colorMap={colorMap}
-              />
-            )}
-          </div>
-        )}
       </div>
     ),
     hosts: (
@@ -470,13 +395,51 @@ export default function Dashboard() {
         />
       </div>
     ),
+    groups: (
+      <div>
+        <button
+          onClick={toggleGroupsPanel}
+          className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
+        >
+          {groupsPanelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          Groups
+        </button>
+        {groupsPanelOpen && targetList.length > 0 && (
+          <div className="relative">
+            <div style={{ minHeight: groupsHeight, maxHeight: groupsHeight, overflowY: 'auto' }}>
+              <GroupedView
+                targets={targetList}
+                lastPingResults={lastPingResults}
+                colorMap={colorMap}
+              />
+            </div>
+            {/* Resize handle */}
+            <div
+              className="w-full h-2 flex items-center justify-center cursor-row-resize group mt-1"
+              onMouseDown={handleGroupsResizeMouseDown}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowUp') { setGroupsHeight(h => { const v = Math.max(GROUPS_HEIGHT_MIN, h - 20); groupsHeightRef.current = v; localStorage.setItem('dashGroupsHeight', v); return v; }); }
+                if (e.key === 'ArrowDown') { setGroupsHeight(h => { const v = Math.min(GROUPS_HEIGHT_MAX, h + 20); groupsHeightRef.current = v; localStorage.setItem('dashGroupsHeight', v); return v; }); }
+              }}
+              tabIndex={0}
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Drag or use arrow keys to resize groups height"
+              title="Drag or use arrow keys to resize groups"
+            >
+              <div className="h-1 w-16 rounded-full bg-gray-800 group-hover:bg-blue-600 transition-colors" />
+            </div>
+          </div>
+        )}
+      </div>
+    ),
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">Real-time network monitoring</p>
         </div>
         <div className="flex gap-2">
@@ -623,6 +586,7 @@ export default function Dashboard() {
           targets={targetList}
           lastPingResults={lastPingResults}
           colorMap={colorMap}
+          onColorChange={handleColorChange}
           sparklineData={sparklineData}
           onClose={() => setFullscreen(false)}
         />

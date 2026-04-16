@@ -1,30 +1,42 @@
+import { useState } from 'react';
 import UnifiedChart from './UnifiedChart';
 import HostPill from './HostPill';
 
 /**
  * One panel per group, showing:
  *   1. Group header (name + interface alias badge + N up / M down count)
- *   2. Mini UnifiedChart scoped to this group's targets
+ *   2. Mini UnifiedChart scoped to this group's targets (latency only)
  *   3. Flex-wrap row of HostPill components
  *
  * Props:
- *   groupName        – display name for the group (e.g. "STC-70" or "Ungrouped")
+ *   groupName        – display name for the group
  *   targets          – array of target objects belonging to this group
  *   lastPingResults  – { [targetId]: pingResult } map from the dashboard
- *   selectedTargetIds – array of currently selected target IDs
- *   onTargetClick    – callback(targetId) to toggle selection
  *   colorMap         – { [targetId]: color } stable color map
- *   timeRange        – optional RANGES entry to inherit from the main chart
  */
 export default function GroupPanel({
   groupName,
   targets = [],
   lastPingResults = {},
-  selectedTargetIds = [],
-  onTargetClick,
   colorMap = {},
 }) {
-  // Determine shared interface alias (show badge only when all targets share one)
+  // Local selection state — only affects this group's mini chart
+  const [groupSelectedIds, setGroupSelectedIds] = useState([]);
+
+  function handlePillClick(targetId) {
+    setGroupSelectedIds(prev =>
+      prev.includes(targetId)
+        ? prev.filter(id => id !== targetId)
+        : [...prev, targetId]
+    );
+  }
+
+  // Filter targets for the mini chart
+  const chartTargets = groupSelectedIds.length > 0
+    ? targets.filter(t => groupSelectedIds.includes(t.id))
+    : targets;
+
+  // Determine shared interface alias
   const aliases = [...new Set(targets.map(t => t.interface_alias).filter(Boolean))];
   const sharedAlias = aliases.length === 1 ? aliases[0] : null;
 
@@ -67,14 +79,14 @@ export default function GroupPanel({
         </span>
       </div>
 
-      {/* ── Mini chart ── */}
+      {/* ── Mini chart (latency only) ── */}
       <div className="min-w-0">
         <UnifiedChart
-          targets={targets}
+          targets={chartTargets}
           lastPingResults={lastPingResults}
           colorMap={colorMap}
           chartHeight={150}
-          controlledMetric="latency"
+          singleMetric="latency"
         />
       </div>
 
@@ -85,8 +97,8 @@ export default function GroupPanel({
             key={target.id}
             target={target}
             lastPingResult={lastPingResults[target.id]}
-            isSelected={selectedTargetIds.includes(target.id)}
-            onTargetClick={onTargetClick}
+            isSelected={groupSelectedIds.includes(target.id)}
+            onTargetClick={handlePillClick}
           />
         ))}
       </div>
