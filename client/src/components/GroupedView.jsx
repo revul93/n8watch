@@ -37,7 +37,7 @@ export default function GroupedView({
   if (groupEntries.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-4 w-full">
+    <div className="grid grid-cols-12 gap-4 w-full">
       {groupEntries.map(([groupName, groupTargets]) => (
         <GroupPanel
           key={groupName}
