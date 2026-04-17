@@ -6,6 +6,7 @@ import { generatePDFReport, generateCSVReport } from '../lib/reportGenerator';
 import SummaryCards from '../components/SummaryCards';
 import UnifiedChart, { buildColorMap } from '../components/UnifiedChart';
 import HostGrid from '../components/HostGrid';
+import HostPill from '../components/HostPill';
 import FullscreenChartModal from '../components/FullscreenChartModal';
 import GroupedView from '../components/GroupedView';
 import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
@@ -345,7 +346,8 @@ export default function Dashboard() {
       <SummaryCards targets={targetList} lastPingResults={lastPingResults} />
     ),
     chart: (
-      <div>
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 min-w-0">
+        {/* Chart with legend + controls inside */}
         <div className="relative">
           <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} colorMap={colorMap} onColorChange={handleColorChange} chartHeight={chartHeight} />
           {/* Resize handle */}
@@ -365,32 +367,47 @@ export default function Dashboard() {
             <div className="h-1 w-16 rounded-full bg-gray-800 group-hover:bg-blue-600 transition-colors" />
           </div>
         </div>
+
+        {/* Target selection pills */}
+        <div className="border-t border-gray-800 pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-gray-500">
+              {selectedTargetIds.length > 0
+                ? `${selectedTargetIds.length} selected — filtering chart`
+                : 'Click a target to filter the chart'}
+            </span>
+            {selectedTargetIds.length > 0 && (
+              <button
+                onClick={() => setSelectedTargetIds([])}
+                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                Clear selection
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {targetList.map(target => (
+              <HostPill
+                key={target.id}
+                target={target}
+                lastPingResult={lastPingResults[target.id]}
+                isSelected={selectedTargetIds.includes(target.id)}
+                onTargetClick={handleTargetClick}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     ),
     hosts: (
-      <div>
-        {selectedTargetIds.length > 0 && (
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-xs text-blue-400">
-              {selectedTargetIds.length} selected — click a host again to deselect
-            </span>
-            <button
-              onClick={() => setSelectedTargetIds([])}
-              className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
-            >
-              Clear selection
-            </button>
-          </div>
-        )}
-        <HostGrid
-          targets={targetList}
-          lastPingResults={lastPingResults}
-          sparklineData={sparklineData}
-          selectedTargetIds={selectedTargetIds}
-          onTargetClick={handleTargetClick}
-          onDeleteUserTarget={handleDeleteRequest}
-        />
-      </div>
+      <HostGrid
+        targets={targetList}
+        lastPingResults={lastPingResults}
+        sparklineData={sparklineData}
+        selectedTargetIds={selectedTargetIds}
+        onTargetClick={handleTargetClick}
+        onDeleteUserTarget={handleDeleteRequest}
+      />
     ),
     groups: (
       <div>
