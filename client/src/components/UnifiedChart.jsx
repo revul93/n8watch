@@ -514,32 +514,6 @@ export default function UnifiedChart({
 
   return (
     <div ref={containerRef}>
-      {/* Top-left bar: metric toggles and time range selector */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
-        <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
-          {METRIC_TABS.map(tab => {
-            const isActive = activeMetrics.includes(tab.key);
-            const isOnlyActive = isActive && activeMetrics.length === 1;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => toggleMetric(tab.key)}
-                className={cn(
-                  'px-3 py-1 rounded text-xs font-medium transition-colors',
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:text-white'
-                )}
-                title={isOnlyActive ? 'At least one metric must be selected' : isActive ? 'Click to hide' : 'Click to show'}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        <TimeRangeSelector value={range.key} onChange={setRange} />
-      </div>
-
       {/* Horizontally stacked charts for all active metrics */}
       <div
         className="grid gap-3"
@@ -563,7 +537,7 @@ export default function UnifiedChart({
         ))}
       </div>
 
-      {/* Shared legend */}
+      {/* Shared legend immediately below charts */}
       {targets.length > 0 && (
         <div className="mt-3">
           <SharedLegend
@@ -574,6 +548,32 @@ export default function UnifiedChart({
           />
         </div>
       )}
+
+      {/* Bottom bar: metric toggles + time range selector (right-aligned) */}
+      <div className="flex items-center justify-end gap-3 mt-3 flex-wrap">
+        <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
+          {METRIC_TABS.map(tab => {
+            const isActive = activeMetrics.includes(tab.key);
+            const isOnlyActive = isActive && activeMetrics.length === 1;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => toggleMetric(tab.key)}
+                className={cn(
+                  'px-3 py-1 rounded text-xs font-medium transition-colors',
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-400 hover:text-white'
+                )}
+                title={isOnlyActive ? 'At least one metric must be selected' : isActive ? 'Click to hide' : 'Click to show'}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        <TimeRangeSelector value={range.key} onChange={setRange} />
+      </div>
     </div>
   );
 }
