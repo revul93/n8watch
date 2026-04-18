@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import HostCard from './HostCard';
-import { GripVertical, LayoutGrid, AlignJustify } from 'lucide-react';
+import { LayoutGrid, AlignJustify } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function HostGrid({ targets = [], lastPingResults = {}, sparklineData = {}, selectedTargetIds = [], onTargetClick, onDeleteUserTarget }) {
@@ -107,14 +107,10 @@ export default function HostGrid({ targets = [], lastPingResults = {}, sparkline
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onDragEnd={handleCardDragEnd}
             className={cn(
-              "relative group cursor-grab active:cursor-grabbing",
+              "relative cursor-grab active:cursor-grabbing",
               draggingId === target.id && "opacity-50",
             )}
           >
-            {/* Drag handle — visible on card hover */}
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none">
-              <GripVertical size={12} className="text-gray-400 rotate-90" />
-            </div>
             <HostCard
               target={target}
               lastPingResult={lastPingResults[target.id]}
