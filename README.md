@@ -26,10 +26,18 @@
   - [Direct Start](#direct-start)
   - [Production with PM2](#production-with-pm2)
 - [Utility Scripts](#utility-scripts)
+  - [Setting the Admin Password](#setting-the-admin-password)
   - [Flushing Database Data](#flushing-database-data)
   - [Nuking the Database](#nuking-the-database)
 - [Web Dashboard](#web-dashboard)
 - [API Reference](#api-reference)
+  - [Targets](#targets-1)
+  - [Interfaces](#interfaces-1)
+  - [Ping Results](#ping-results)
+  - [Alerts](#alerts)
+  - [Dashboard & Export](#dashboard--export)
+  - [Admin (Settings Panel)](#admin-settings-panel)
+  - [WebSocket](#websocket)
 - [Optional: Remote Desktop Setup](#optional-remote-desktop-setup-linux)
 - [Optional: Firewall Configuration](#optional-firewall-configuration)
 - [Tech Stack](#tech-stack)
@@ -50,6 +58,9 @@
 - 🌐 **Multi-Interface Support** — Declare named network interfaces in `config.yaml` and assign a specific outgoing interface to any target. A drop-down in the dashboard lets users choose an interface when adding temporary targets.
 - 🗄️ **Lightweight Persistence** — Uses SQLite via `better-sqlite3`; no external database server required.
 - 🔒 **HTTPS Support** — Optional TLS configuration in `config.yaml` for serving the dashboard over HTTPS.
+- ⚙️ **Settings Panel** — Password-protected admin UI (`/settings`) for managing targets, network interfaces, alert rules, SMTP settings, and server configuration — all saved directly to `config.yaml` without manual file editing.
+- 🌗 **Dark / Light Mode** — Toggle between dark and light themes from the dashboard header; preference is persisted in browser storage.
+- 🗑️ **Expired Targets Page** — Dedicated view listing user-defined targets that have expired or are nearing expiry.
 - 📋 **PDF Report** — A printable system guide is available under `docs/`.
 
 ---
@@ -469,6 +480,22 @@ Application logs are written to `logs/out.log` (stdout) and `logs/error.log` (st
 
 ## Utility Scripts
 
+### Setting the Admin Password
+
+The Settings panel (`/settings`) is password-protected. Before you can log in, you must set the admin password using the `set-password` script.
+
+```bash
+# Interactive — you will be prompted to enter the password
+npm run set-password
+
+# Non-interactive — supply the password via flag (useful in scripts)
+node scripts/set-password.js --password "myNewPassword"
+```
+
+The password is hashed with scrypt and stored in `data/.admin-credentials.json`. Once set, navigate to `/settings` in the dashboard and log in with the chosen password.
+
+---
+
 ### Flushing Database Data
 
 Use the flush script to clear stored records from the database **without** deleting the database file.
@@ -526,11 +553,15 @@ After nuking, start the application normally. Targets from `config.yaml` will be
 
 Once running, open `http://<host>:3000` in your browser.
 
-| Page      | URL        | Description                                                                 |
-|-----------|------------|-----------------------------------------------------------------------------|
-| Dashboard | `/`        | Live grid of all monitored hosts — status, latency, jitter, uptime          |
-| History   | `/history` | Paginated ping history with date filters and CSV export                     |
-| Alerts    | `/alerts`  | Active and historical alerts with acknowledgement; view configured rules    |
+| Page     | URL          | Description                                                                          |
+|----------|--------------|--------------------------------------------------------------------------------------|
+| Dashboard | `/`         | Live grid of all monitored hosts — status, latency, jitter, uptime                  |
+| History   | `/history`  | Paginated ping history with date filters and CSV export                              |
+| Alerts    | `/alerts`   | Active and historical alerts with acknowledgement; view configured rules             |
+| Expired   | `/expired`  | User-defined targets that have expired or are nearing their expiry date              |
+| Settings  | `/settings` | Password-protected admin panel — manage targets, interfaces, alert rules, SMTP, and server settings |
+
+> **Settings panel:** You must first set an admin password via `npm run set-password` before the Settings page can be accessed. See [Setting the Admin Password](#setting-the-admin-password).
 
 ---
 
@@ -574,6 +605,38 @@ All endpoints are prefixed with `/api` and return JSON.
 |--------|------------------|----------------------------------------------------------------------|
 | `GET`  | `/api/dashboard` | Summary statistics (overall uptime, average latency, active alerts)  |
 | `GET`  | `/api/export`    | Export metrics to CSV                                                |
+
+### Admin (Settings Panel)
+
+All admin endpoints require a `Bearer <token>` authorization header obtained from `POST /api/admin/login`. Set the admin password first with `npm run set-password`.
+
+#### Authentication
+
+| Method   | Endpoint                  | Description                                               |
+|----------|---------------------------|-----------------------------------------------------------|
+| `GET`    | `/api/admin/has-password` | Check whether an admin password has been configured       |
+| `POST`   | `/api/admin/login`        | Authenticate with password; returns a session `token`     |
+| `POST`   | `/api/admin/logout`       | Invalidate the current session token                      |
+| `GET`    | `/api/admin/verify`       | Check whether the current token is still valid            |
+
+#### Config Read
+
+| Method | Endpoint           | Description                                       |
+|--------|--------------------|---------------------------------------------------|
+| `GET`  | `/api/admin/config`| Return the full `config.yaml` contents as JSON    |
+
+#### Config Write (authenticated)
+
+| Method   | Endpoint                          | Description                                          |
+|----------|-----------------------------------|------------------------------------------------------|
+| `PUT`    | `/api/admin/config/targets`       | Replace the full system-target list                  |
+| `POST`   | `/api/admin/config/targets`       | Add a single system target                           |
+| `DELETE` | `/api/admin/config/targets/:index`| Remove a system target by its array index            |
+| `PUT`    | `/api/admin/config/interfaces`    | Replace the full network-interfaces list             |
+| `PUT`    | `/api/admin/config/alerts/rules`  | Replace the alert rules array                        |
+| `PUT`    | `/api/admin/config/alerts/smtp`   | Update SMTP settings and the email-notifications flag|
+| `PUT`    | `/api/admin/config/server`        | Update server port and bind host                     |
+| `PUT`    | `/api/admin/config/general`       | Update general settings (ping interval, retention …) |
 
 ### WebSocket
 

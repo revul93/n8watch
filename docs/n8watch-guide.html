@@ -254,6 +254,9 @@
     <li><strong>Multi-interface support</strong> — bind outgoing pings to a specific NIC per target.</li>
     <li><strong>System-defined &amp; user-defined targets</strong> — permanent config-based hosts plus ad-hoc dashboard targets.</li>
     <li><strong>HTTPS support</strong> — optional TLS configuration for serving the dashboard securely.</li>
+    <li><strong>Settings panel</strong> — password-protected admin UI (<code>/settings</code>) for managing targets, interfaces, alert rules, SMTP, and server settings directly from the browser — changes are saved to <code>config.yaml</code> without manual file editing.</li>
+    <li><strong>Dark / Light mode</strong> — toggle between dark and light themes from the dashboard header; preference is persisted in browser storage.</li>
+    <li><strong>Expired targets page</strong> — dedicated view listing user-defined targets that have expired or are nearing expiry.</li>
   </ul>
 
   <h2>Architecture at a Glance</h2>
@@ -595,11 +598,33 @@ npm run pm2:start</code></pre>
   <h1>5 · Utility Scripts</h1>
 
   <p>
-    n8watch ships two maintenance scripts in <code>scripts/</code>.
-    <strong>Always stop the application before running either script</strong> to avoid database conflicts.
+    n8watch ships three maintenance scripts in <code>scripts/</code>.
+    <strong>Always stop the application before running any of these scripts</strong> to avoid database conflicts.
   </p>
 
-  <h2>5.1 flush-data.js — Clear Rows</h2>
+  <h2>5.1 set-password.js — Set the Admin Password</h2>
+  <p>
+    The Settings panel (<code>/settings</code>) is password-protected. Run this script once after
+    installation to configure the admin password before the Settings page can be accessed.
+  </p>
+
+  <pre><code># Interactive — you will be prompted to enter the password
+npm run set-password
+
+# Non-interactive — supply the password via flag (useful in scripts)
+node scripts/set-password.js --password "myNewPassword"</code></pre>
+
+  <p>
+    The password is hashed with scrypt and stored in <code>data/.admin-credentials.json</code>. Once set, open
+    <code>http://&lt;host&gt;:3000/settings</code> and log in with the chosen password.
+  </p>
+
+  <div class="note">
+    The <code>--password</code> flag is intended for automated or non-interactive environments.
+    When possible, use the interactive prompt so the password is not recorded in shell history.
+  </div>
+
+  <h2>5.2 flush-data.js — Clear Rows</h2>
   <p>
     Deletes rows from the database without removing the database file.
     Useful for freeing disk space or resetting metrics without losing the schema.
@@ -627,7 +652,7 @@ node scripts/flush-data.js --all --yes            # non-interactive (skip confir
     <tr><td><code>--yes</code></td><td>Suppresses the confirmation prompt</td></tr>
   </table>
 
-  <h2>5.2 nuke-db.js — Complete Wipe &amp; Recreate</h2>
+  <h2>5.3 nuke-db.js — Complete Wipe &amp; Recreate</h2>
   <p>
     Deletes the database <em>file</em> entirely (including WAL and SHM sidecar files)
     and recreates an empty schema from scratch. Auto-increment counters are reset;
@@ -660,7 +685,14 @@ node scripts/nuke-db.js --yes</code></pre>
     <tr><td>Dashboard</td><td><code>/</code></td><td>Live grid of all monitored hosts — status, latency, jitter, packet loss, uptime</td></tr>
     <tr><td>History</td><td><code>/history</code></td><td>Paginated historical ping results with date/target filters and CSV export</td></tr>
     <tr><td>Alerts</td><td><code>/alerts</code></td><td>Active and historical alerts, acknowledgement, and configured rules viewer</td></tr>
+    <tr><td>Expired</td><td><code>/expired</code></td><td>User-defined targets that have expired or are nearing their expiry date</td></tr>
+    <tr><td>Settings</td><td><code>/settings</code></td><td>Password-protected admin panel — manage targets, interfaces, alert rules, SMTP, and server settings</td></tr>
   </table>
+
+  <div class="note">
+    <strong>Settings panel:</strong> You must first set an admin password with
+    <code>npm run set-password</code> (see Section 5.1) before the Settings page can be accessed.
+  </div>
 
   <h2>Adding a Temporary Target</h2>
   <ol>
@@ -685,6 +717,41 @@ node scripts/nuke-db.js --yes</code></pre>
     <tr><td>GET</td><td><code>/api/dashboard</code></td><td>Summary stats (uptime, avg latency, active alerts)</td></tr>
     <tr><td>GET</td><td><code>/api/export</code></td><td>Export metrics to CSV</td></tr>
     <tr><td>GET</td><td><code>/api/interfaces</code></td><td>List interfaces from <code>config.yaml</code></td></tr>
+  </table>
+
+  <h2>Admin API (Settings Panel)</h2>
+  <p>
+    All <code>/api/admin</code> endpoints require a <code>Bearer &lt;token&gt;</code> authorization header
+    obtained from <code>POST /api/admin/login</code>. Set the password first with
+    <code>npm run set-password</code>.
+  </p>
+
+  <h3>Authentication</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr><td>GET</td><td><code>/api/admin/has-password</code></td><td>Check whether an admin password has been configured</td></tr>
+    <tr><td>POST</td><td><code>/api/admin/login</code></td><td>Authenticate with password; returns a session <code>token</code></td></tr>
+    <tr><td>POST</td><td><code>/api/admin/logout</code></td><td>Invalidate the current session token</td></tr>
+    <tr><td>GET</td><td><code>/api/admin/verify</code></td><td>Check whether the current token is still valid</td></tr>
+  </table>
+
+  <h3>Config Read</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr><td>GET</td><td><code>/api/admin/config</code></td><td>Return the full <code>config.yaml</code> contents as JSON</td></tr>
+  </table>
+
+  <h3>Config Write (authenticated)</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr><td>PUT</td><td><code>/api/admin/config/targets</code></td><td>Replace the full system-target list</td></tr>
+    <tr><td>POST</td><td><code>/api/admin/config/targets</code></td><td>Add a single system target</td></tr>
+    <tr><td>DELETE</td><td><code>/api/admin/config/targets/:index</code></td><td>Remove a system target by its array index</td></tr>
+    <tr><td>PUT</td><td><code>/api/admin/config/interfaces</code></td><td>Replace the full network-interfaces list</td></tr>
+    <tr><td>PUT</td><td><code>/api/admin/config/alerts/rules</code></td><td>Replace the alert rules array</td></tr>
+    <tr><td>PUT</td><td><code>/api/admin/config/alerts/smtp</code></td><td>Update SMTP settings and the email-notifications flag</td></tr>
+    <tr><td>PUT</td><td><code>/api/admin/config/server</code></td><td>Update server port and bind host</td></tr>
+    <tr><td>PUT</td><td><code>/api/admin/config/general</code></td><td>Update general settings (ping interval, retention, etc.)</td></tr>
   </table>
 
   <h2>WebSocket Events</h2>
