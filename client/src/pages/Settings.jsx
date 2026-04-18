@@ -55,7 +55,7 @@ const ALERT_OPERATOR_OPTIONS = [
 function parseCondition(condition) {
   if (!condition) return { metric: 'packet_loss', operator: '>', value: '' };
   const match = condition.trim().match(/^(\w+)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
-  if (!match) return { metric: '', operator: '==', value: condition };
+  if (!match) return { metric: 'packet_loss', operator: '>', value: '' };
   return { metric: match[1], operator: match[2], value: match[3].trim() };
 }
 
@@ -411,7 +411,7 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
     update(i, 'condition', metric && value !== '' ? `${metric} ${operator} ${value}` : '');
   };
 
-  const addRow  = () => setRules(prev => [...prev, { name: '', condition: 'packet_loss > 0', severity: 'warning', cooldown: 300 }]);
+  const addRow  = () => setRules(prev => [...prev, { name: '', condition: `${ALERT_METRIC_OPTIONS[0].value} ${ALERT_OPERATOR_OPTIONS[1].value} 0`, severity: 'warning', cooldown: 300 }]);
   const remove  = (i) => setRules(prev => prev.filter((_, idx) => idx !== i));
 
   const handleSave = async () => {
