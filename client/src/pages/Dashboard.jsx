@@ -9,10 +9,10 @@ import HostGrid from '../components/HostGrid';
 import HostPill from '../components/HostPill';
 import FullscreenChartModal from '../components/FullscreenChartModal';
 import GroupedView from '../components/GroupedView';
-import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
+import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const SECTION_KEYS = ['summary', 'chart', 'hosts', 'groups'];
+const SECTION_KEYS = ['summary', 'chart', 'groups', 'hosts'];
 
 const CHART_HEIGHT_MIN = 180;
 const CHART_HEIGHT_MAX = 800;
@@ -564,19 +564,15 @@ export default function Dashboard() {
             onDragOver={(e) => e.preventDefault()}
             onDragEnd={handleSectionDragEnd}
             className={cn(
-              "group relative rounded-xl transition-all",
+              "relative rounded-xl transition-all",
               idx === 0 ? '' : (
-                key === 'hosts' && sectionOrder[idx - 1] === 'chart'
+                key === 'hosts' && sectionOrder[idx - 1] === 'groups'
                   ? 'mt-2'
                   : 'mt-6'
               ),
               dragOverSection === key && dragSectionRef.current !== key && "ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-950",
             )}
           >
-            {/* Drag handle indicator */}
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-60 transition-opacity pointer-events-none">
-              <GripVertical size={14} className="text-gray-500" />
-            </div>
             {sectionContent[key]}
           </div>
         ))}

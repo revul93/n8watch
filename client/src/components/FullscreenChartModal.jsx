@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import UnifiedChart from './UnifiedChart';
 import HostCard from './HostCard';
 import GroupedView from './GroupedView';
+import SummaryCards from './SummaryCards';
 
 const PANEL_MIN = 180;
 const PANEL_MAX = 520;
@@ -341,27 +342,29 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
           </>
         )}
 
-        {/* Main content area — flex column, fits the viewport without scrolling */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
-          <div className="flex flex-col h-full min-h-0 p-3 gap-2">
+        {/* Main content area — dashboard-like layout without host cards */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-y-auto">
+          <div className="flex flex-col p-3 gap-4">
+            {/* Summary cards */}
+            <SummaryCards targets={targets} lastPingResults={lastPingResults} />
+
             {/* Chart section */}
-            <div className="flex-[3] min-h-0">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-w-0">
               <UnifiedChart
                 targets={filteredTargets}
                 lastPingResults={lastPingResults}
                 colorMap={colorMap}
                 onColorChange={onColorChange}
-                fillHeight={true}
                 chartHeight={280}
               />
             </div>
 
             {/* Groups section */}
             {targets.length > 0 && (
-              <div className="flex-[2] min-h-0 overflow-y-auto">
+              <div>
                 <button
                   onClick={toggleFsGroupsPanel}
-                  className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
+                  className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
                 >
                   {fsGroupsPanelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   Groups

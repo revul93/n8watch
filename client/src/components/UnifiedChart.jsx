@@ -320,6 +320,7 @@ export default function UnifiedChart({
   colorMap = {},
   onColorChange,
   singleMetric,
+  chartType: chartTypeProp,
 }) {
   const [range, setRange] = useState(RANGES[2]); // 1h default
   const [latencyData, setLatencyData] = useState([]);
@@ -487,7 +488,7 @@ export default function UnifiedChart({
       : singleMetric === 'jitter' ? 'Jitter'
       : 'Packet Loss';
     const unit = singleMetric === 'packet_loss' ? '%' : 'ms';
-    const chartType = singleMetric === 'packet_loss' ? 'area' : 'line';
+    const chartType = chartTypeProp ?? (singleMetric === 'packet_loss' ? 'area' : 'line');
 
     return (
       <div ref={containerRef}>
