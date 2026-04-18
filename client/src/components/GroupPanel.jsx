@@ -24,8 +24,8 @@ export default function GroupPanel({
   // Local selection state — only affects this group's mini chart
   const [groupSelectedIds, setGroupSelectedIds] = useState([]);
 
-  // Chart type: 'line' | 'area'
-  const [chartType, setChartType] = useState('line');
+  // Active metric: 'latency' | 'jitter' | 'packet_loss'
+  const [selectedMetric, setSelectedMetric] = useState('latency');
 
   function handlePillClick(targetId) {
     setGroupSelectedIds(prev =>
@@ -80,20 +80,24 @@ export default function GroupPanel({
           {upCount === 0 && downCount === 0 && (
             <span className="text-gray-500">{targets.length} targets</span>
           )}
-          {/* ── Chart type toggle ── */}
+          {/* ── Metric type toggle ── */}
           <span className="flex items-center gap-0.5 ml-1 border border-gray-700 rounded-md overflow-hidden">
-            {['line', 'area'].map(type => (
+            {[
+              { key: 'latency', label: 'Latency' },
+              { key: 'jitter', label: 'Jitter' },
+              { key: 'packet_loss', label: 'Loss' },
+            ].map(tab => (
               <button
-                key={type}
-                onClick={() => setChartType(type)}
-                aria-pressed={chartType === type}
-                className={`px-1.5 py-0.5 text-xs capitalize transition-colors ${
-                  chartType === type
+                key={tab.key}
+                onClick={() => setSelectedMetric(tab.key)}
+                aria-pressed={selectedMetric === tab.key}
+                className={`px-1.5 py-0.5 text-xs transition-colors ${
+                  selectedMetric === tab.key
                     ? 'bg-blue-700 text-white'
                     : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
                 }`}
               >
-                {type}
+                {tab.label}
               </button>
             ))}
           </span>
@@ -107,8 +111,7 @@ export default function GroupPanel({
           lastPingResults={lastPingResults}
           colorMap={colorMap}
           chartHeight={150}
-          singleMetric="latency"
-          chartType={chartType}
+          singleMetric={selectedMetric}
         />
       </div>
 

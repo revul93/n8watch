@@ -33,17 +33,31 @@ function isValidIpOrHost(value) {
   return HOST_RE.test(v);
 }
 
-// ── Alert condition presets ───────────────────────────────────────────────────
-const CONDITION_PRESETS = [
-  'packet_loss == 100',
-  'packet_loss > 50',
-  'packet_loss > 10',
-  'avg_latency > 200',
-  'avg_latency > 500',
-  'jitter > 50',
-  'is_alive == 0',
-  'is_alive == 1',
+// ── Alert condition field/metric/operator options ─────────────────────────────
+const ALERT_METRIC_OPTIONS = [
+  { value: 'packet_loss',  label: 'Packet Loss' },
+  { value: 'avg_latency',  label: 'Avg Latency' },
+  { value: 'jitter',       label: 'Jitter' },
+  { value: 'is_alive',     label: 'Is Alive' },
+  { value: 'min_latency',  label: 'Min Latency' },
+  { value: 'max_latency',  label: 'Max Latency' },
 ];
+
+const ALERT_OPERATOR_OPTIONS = [
+  { value: '==', label: '==' },
+  { value: '>',  label: '>'  },
+  { value: '<',  label: '<'  },
+  { value: '>=', label: '>=' },
+  { value: '<=', label: '<=' },
+  { value: '!=', label: '!=' },
+];
+
+function parseCondition(condition) {
+  if (!condition) return { metric: 'packet_loss', operator: '>', value: '' };
+  const match = condition.trim().match(/^(\w+)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
+  if (!match) return { metric: 'packet_loss', operator: '>', value: '' };
+  return { metric: match[1], operator: match[2], value: match[3].trim() };
+}
 
 // ── Shared form field ─────────────────────────────────────────────────────────
 function Field({ label, type = 'text', value, onChange, placeholder, required, className, error }) {
@@ -80,27 +94,6 @@ function SelectField({ label, value, onChange, options, placeholder, required, c
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-    </div>
-  );
-}
-
-// ── Condition field with presets datalist ─────────────────────────────────────
-let _conditionFieldIdx = 0;
-function ConditionField({ label, value, onChange, required, className }) {
-  const [id] = useState(() => `condition-presets-${++_conditionFieldIdx}`);
-  return (
-    <div className={cn('flex flex-col gap-1', className)}>
-      <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
-      <datalist id={id}>
-        {CONDITION_PRESETS.map(p => <option key={p} value={p} />)}
-      </datalist>
-      <input
-        list={id}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder="packet_loss == 100"
-        className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-      />
     </div>
   );
 }
@@ -410,7 +403,15 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
   }, [config]);
 
   const update = (i, field, value) => setRules(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
-  const addRow  = () => setRules(prev => [...prev, { name: '', condition: '', severity: 'warning', cooldown: 300 }]);
+
+  const updateConditionPart = (i, part, val) => {
+    const parts = parseCondition(rules[i].condition);
+    parts[part] = val;
+    const { metric, operator, value } = parts;
+    update(i, 'condition', metric && value !== '' ? `${metric} ${operator} ${value}` : '');
+  };
+
+  const addRow  = () => setRules(prev => [...prev, { name: '', condition: `${ALERT_METRIC_OPTIONS[0].value} ${ALERT_OPERATOR_OPTIONS[1].value} 0`, severity: 'warning', cooldown: 300 }]);
   const remove  = (i) => setRules(prev => prev.filter((_, idx) => idx !== i));
 
   const handleSave = async () => {
@@ -424,39 +425,94 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
     finally { setSaving(false); }
   };
 
+  const inputCls = 'px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500';
+
   return (
     <SectionCard icon={Bell} title="Alert Rules">
       <div className="flex flex-col gap-3">
-        {rules.map((r, i) => (
-          <div key={i} className="grid grid-cols-[1fr_2fr_auto_auto_auto] gap-2 items-end">
-            <Field label={i === 0 ? 'Rule Name' : ''} value={r.name} onChange={v => update(i, 'name', v)} placeholder="Host Down" required />
-            <ConditionField label={i === 0 ? 'Condition' : ''} value={r.condition} onChange={v => update(i, 'condition', v)} required />
-            <div className={cn('flex flex-col gap-1', i === 0 ? '' : '')}>
-              {i === 0 && <label className="text-xs text-gray-400">Severity</label>}
-              <select
-                value={r.severity || 'warning'}
-                onChange={e => update(i, 'severity', e.target.value)}
-                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-              >
-                <option value="critical">critical</option>
-                <option value="warning">warning</option>
-                <option value="info">info</option>
-              </select>
+        {rules.map((r, i) => {
+          const { metric, operator, value } = parseCondition(r.condition);
+          return (
+            <div key={i} className="p-3 bg-gray-800/40 border border-gray-700/60 rounded-lg flex flex-col gap-3">
+              {/* Row 1: Name + Severity + Cooldown + Delete */}
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-end">
+                <Field label="Rule Name" value={r.name} onChange={v => update(i, 'name', v)} placeholder="Host Down" required />
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">Severity</label>
+                  <select
+                    value={r.severity || 'warning'}
+                    onChange={e => update(i, 'severity', e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="critical">critical</option>
+                    <option value="warning">warning</option>
+                    <option value="info">info</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">Cooldown (s)</label>
+                  <input
+                    type="number"
+                    value={r.cooldown ?? 300}
+                    onChange={e => update(i, 'cooldown', parseInt(e.target.value, 10) || 300)}
+                    className={cn(inputCls, 'w-24')}
+                  />
+                </div>
+                <button
+                  onClick={() => remove(i)}
+                  className="mb-0.5 p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
+                  title="Remove rule"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+
+              {/* Row 2: Condition builder — Metric + Operator + Value */}
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex flex-col gap-1 flex-1 min-w-32">
+                  <label className="text-xs text-gray-400">Metric</label>
+                  <select
+                    value={metric}
+                    onChange={e => updateConditionPart(i, 'metric', e.target.value)}
+                    className={inputCls}
+                  >
+                    {ALERT_METRIC_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">Operator</label>
+                  <select
+                    value={operator}
+                    onChange={e => updateConditionPart(i, 'operator', e.target.value)}
+                    className={cn(inputCls, 'w-20')}
+                  >
+                    {ALERT_OPERATOR_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1 flex-1 min-w-24">
+                  <label className="text-xs text-gray-400">Value</label>
+                  <input
+                    type="number"
+                    value={value}
+                    onChange={e => updateConditionPart(i, 'value', e.target.value)}
+                    placeholder="100"
+                    className={inputCls}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">Preview</label>
+                  <div className="px-3 py-2 bg-gray-800/50 border border-gray-700/40 rounded text-xs text-gray-400 font-mono whitespace-nowrap h-[38px] flex items-center">
+                    {r.condition || '—'}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              {i === 0 && <label className="text-xs text-gray-400">Cooldown (s)</label>}
-              <input
-                type="number"
-                value={r.cooldown ?? 300}
-                onChange={e => update(i, 'cooldown', parseInt(e.target.value, 10) || 300)}
-                className="w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <button onClick={() => remove(i)} className={cn('p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors', i === 0 ? 'mt-5' : '')}>
-              <Trash2 size={15} />
-            </button>
-          </div>
-        ))}
+          );
+        })}
         <button onClick={addRow} className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 mt-1 w-fit">
           <Plus size={13} /> Add Rule
         </button>
