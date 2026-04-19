@@ -11,6 +11,10 @@ const PANEL_MIN = 180;
 const PANEL_MAX = 520;
 const PANEL_DEFAULT = 280;
 
+const FS_CHART_HEIGHT_MIN = 180;
+const FS_CHART_HEIGHT_MAX = 800;
+const FS_CHART_HEIGHT_DEFAULT = 280;
+
 export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose, colorMap = {}, onColorChange, sparklineData = {} }) {
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -24,6 +28,34 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
     return isNaN(saved) ? PANEL_DEFAULT : Math.max(PANEL_MIN, Math.min(PANEL_MAX, saved));
   });
   const panelWidthRef = useRef(panelWidth);
+
+  // Main chart height (vertical stretch)
+  const [fsChartHeight, setFsChartHeight] = useState(() => {
+    const saved = parseInt(localStorage.getItem('fsChartHeight'), 10);
+    return isNaN(saved) ? FS_CHART_HEIGHT_DEFAULT : Math.max(FS_CHART_HEIGHT_MIN, Math.min(FS_CHART_HEIGHT_MAX, saved));
+  });
+  const fsChartHeightRef = useRef(fsChartHeight);
+
+  const handleFsChartResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = fsChartHeightRef.current;
+
+    const onMouseMove = (ev) => {
+      const newHeight = Math.max(FS_CHART_HEIGHT_MIN, Math.min(FS_CHART_HEIGHT_MAX, startHeight + ev.clientY - startY));
+      fsChartHeightRef.current = newHeight;
+      setFsChartHeight(newHeight);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('fsChartHeight', fsChartHeightRef.current);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   // Panel target order (manual sort by drag-and-drop, persisted in localStorage)
   const [panelOrder, setPanelOrder] = useState(() => {
@@ -355,8 +387,24 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
                 lastPingResults={lastPingResults}
                 colorMap={colorMap}
                 onColorChange={onColorChange}
-                chartHeight={280}
+                chartHeight={fsChartHeight}
               />
+              {/* Vertical resize handle */}
+              <div
+                className="w-full h-2 flex items-center justify-center cursor-row-resize group mt-1"
+                onMouseDown={handleFsChartResizeMouseDown}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp') { const v = Math.max(FS_CHART_HEIGHT_MIN, fsChartHeightRef.current - 20); fsChartHeightRef.current = v; setFsChartHeight(v); localStorage.setItem('fsChartHeight', v); }
+                  if (e.key === 'ArrowDown') { const v = Math.min(FS_CHART_HEIGHT_MAX, fsChartHeightRef.current + 20); fsChartHeightRef.current = v; setFsChartHeight(v); localStorage.setItem('fsChartHeight', v); }
+                }}
+                tabIndex={0}
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="Drag or use arrow keys to resize chart height"
+                title="Drag or use arrow keys to resize chart"
+              >
+                <div className="h-1 w-16 rounded-full bg-gray-800 group-hover:bg-blue-600 transition-colors" />
+              </div>
             </div>
 
             {/* Groups section */}
