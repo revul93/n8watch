@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import UnifiedChart from './UnifiedChart';
 import HostPill from './HostPill';
+import { ChevronLeft, ChevronRight, GripHorizontal } from 'lucide-react';
+
+const CHART_HEIGHT_MIN = 80;
+const CHART_HEIGHT_MAX = 600;
+const CHART_HEIGHT_DEFAULT = 150;
 
 /**
  * One panel per group, showing:
- *   1. Group header (name + interface alias badge + N up / M down count + chart type toggle)
- *   2. Mini UnifiedChart scoped to this group's targets
+ *   1. Group header (name + interface alias badge + N up / M down count + chart type toggle + span controls)
+ *   2. Mini UnifiedChart scoped to this group's targets (vertically resizable)
  *   3. Centered flex wrap of HostPill components
  *
  * Props:
@@ -13,6 +18,10 @@ import HostPill from './HostPill';
  *   targets          – array of target objects belonging to this group
  *   lastPingResults  – { [targetId]: pingResult } map from the dashboard
  *   colorMap         – { [targetId]: color } stable color map
+ *   colSpan          – current column span (1–maxCols)
+ *   onExpand         – callback to increase column span
+ *   onCollapse       – callback to decrease column span
+ *   maxCols          – maximum allowed column span
  */
 
 export default function GroupPanel({
@@ -20,12 +29,55 @@ export default function GroupPanel({
   targets = [],
   lastPingResults = {},
   colorMap = {},
+  colSpan = 1,
+  onExpand,
+  onCollapse,
+  maxCols = 4,
 }) {
   // Local selection state — only affects this group's mini chart
   const [groupSelectedIds, setGroupSelectedIds] = useState([]);
 
   // Active metric: 'latency' | 'jitter' | 'packet_loss'
   const [selectedMetric, setSelectedMetric] = useState('latency');
+
+  // Resizable chart height (vertical stretch)
+  const [chartHeight, setChartHeight] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('groupChartHeights') || '{}');
+      const h = saved[groupName];
+      return h ? Math.max(CHART_HEIGHT_MIN, Math.min(CHART_HEIGHT_MAX, h)) : CHART_HEIGHT_DEFAULT;
+    } catch { return CHART_HEIGHT_DEFAULT; }
+  });
+  const chartHeightRef = useRef(chartHeight);
+  const chartWrapperRef = useRef(null);
+
+  const handleChartResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startH = chartWrapperRef.current
+      ? chartWrapperRef.current.getBoundingClientRect().height
+      : chartHeightRef.current;
+
+    const onMouseMove = (ev) => {
+      const newH = Math.max(CHART_HEIGHT_MIN, Math.min(CHART_HEIGHT_MAX, Math.round(startH + ev.clientY - startY)));
+      chartHeightRef.current = newH;
+      setChartHeight(newH);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      try {
+        const saved = JSON.parse(localStorage.getItem('groupChartHeights') || '{}');
+        saved[groupName] = chartHeightRef.current;
+        localStorage.setItem('groupChartHeights', JSON.stringify(saved));
+      } catch {}
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [groupName]);
 
   function handlePillClick(targetId) {
     setGroupSelectedIds(prev =>
@@ -101,18 +153,57 @@ export default function GroupPanel({
               </button>
             ))}
           </span>
+          {/* ── Horizontal span controls ── */}
+          {(onCollapse || onExpand) && (
+            <span className="flex items-center gap-0.5 border border-gray-700 rounded-md overflow-hidden">
+              <button
+                onClick={onCollapse}
+                disabled={colSpan <= 1}
+                className="p-0.5 bg-gray-800 text-gray-400 hover:text-blue-400 hover:bg-gray-700 disabled:opacity-30 transition-colors"
+                title="Narrow panel"
+                aria-label="Narrow panel"
+              >
+                <ChevronLeft size={12} />
+              </button>
+              <button
+                onClick={onExpand}
+                disabled={colSpan >= maxCols}
+                className="p-0.5 bg-gray-800 text-gray-400 hover:text-blue-400 hover:bg-gray-700 disabled:opacity-30 transition-colors"
+                title="Widen panel"
+                aria-label="Widen panel"
+              >
+                <ChevronRight size={12} />
+              </button>
+            </span>
+          )}
         </span>
       </div>
 
-      {/* ── Mini chart ── */}
-      <div className="min-w-0">
+      {/* ── Mini chart (vertically resizable) ── */}
+      <div className="min-w-0" ref={chartWrapperRef}>
         <UnifiedChart
           targets={chartTargets}
           lastPingResults={lastPingResults}
           colorMap={colorMap}
-          chartHeight={150}
+          chartHeight={chartHeight}
           singleMetric={selectedMetric}
         />
+        {/* Vertical resize handle */}
+        <div
+          onMouseDown={handleChartResizeMouseDown}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp') { const v = Math.max(CHART_HEIGHT_MIN, chartHeightRef.current - 20); chartHeightRef.current = v; setChartHeight(v); try { const s = JSON.parse(localStorage.getItem('groupChartHeights') || '{}'); s[groupName] = v; localStorage.setItem('groupChartHeights', JSON.stringify(s)); } catch {} }
+            if (e.key === 'ArrowDown') { const v = Math.min(CHART_HEIGHT_MAX, chartHeightRef.current + 20); chartHeightRef.current = v; setChartHeight(v); try { const s = JSON.parse(localStorage.getItem('groupChartHeights') || '{}'); s[groupName] = v; localStorage.setItem('groupChartHeights', JSON.stringify(s)); } catch {} }
+          }}
+          tabIndex={0}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Drag or use arrow keys to resize chart height"
+          className="w-full h-2 flex items-center justify-center cursor-row-resize group/resize mt-1 focus:outline-none"
+          title="Drag or use arrow keys to resize chart height"
+        >
+          <GripHorizontal size={12} className="text-gray-700 group-hover/resize:text-blue-500 transition-colors" />
+        </div>
       </div>
 
       {/* ── Host pills (centered flex wrap) ── */}

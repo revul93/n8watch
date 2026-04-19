@@ -9,7 +9,7 @@ import HostGrid from '../components/HostGrid';
 import HostPill from '../components/HostPill';
 import FullscreenChartModal from '../components/FullscreenChartModal';
 import GroupedView from '../components/GroupedView';
-import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, ChevronDown, ChevronRight } from 'lucide-react';
+import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const SECTION_KEYS = ['summary', 'chart', 'groups', 'hosts'];
@@ -17,6 +17,9 @@ const SECTION_KEYS = ['summary', 'chart', 'groups', 'hosts'];
 const CHART_HEIGHT_MIN = 180;
 const CHART_HEIGHT_MAX = 800;
 const CHART_HEIGHT_DEFAULT = 280;
+
+const CHART_WIDTH_MIN = 30; // percent
+const CHART_WIDTH_DEFAULT = 100; // percent
 
 const GROUPS_HEIGHT_MIN = 150;
 const GROUPS_HEIGHT_MAX = 600;
@@ -35,6 +38,14 @@ export default function Dashboard() {
     return isNaN(saved) ? CHART_HEIGHT_DEFAULT : Math.max(CHART_HEIGHT_MIN, Math.min(CHART_HEIGHT_MAX, saved));
   });
   const chartHeightRef = useRef(chartHeight);
+
+  // Resizable chart width (percentage)
+  const [chartWidthPct, setChartWidthPct] = useState(() => {
+    const saved = parseFloat(localStorage.getItem('dashChartWidthPct'));
+    return isNaN(saved) ? CHART_WIDTH_DEFAULT : Math.max(CHART_WIDTH_MIN, Math.min(100, saved));
+  });
+  const chartWidthPctRef = useRef(chartWidthPct);
+  const chartSectionRef = useRef(null);
 
   // Resizable groups height
   const [groupsHeight, setGroupsHeight] = useState(() => {
@@ -62,6 +73,44 @@ export default function Dashboard() {
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  const handleChartWidthResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startPct = chartWidthPctRef.current;
+    const parentWidth = chartSectionRef.current?.parentElement?.getBoundingClientRect().width || window.innerWidth;
+
+    const onMouseMove = (ev) => {
+      const deltaPct = ((ev.clientX - startX) / parentWidth) * 100;
+      const newPct = Math.max(CHART_WIDTH_MIN, Math.min(100, startPct + deltaPct));
+      chartWidthPctRef.current = newPct;
+      setChartWidthPct(newPct);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('dashChartWidthPct', chartWidthPctRef.current);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  const handleChartWidthKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowLeft') {
+      const v = Math.max(CHART_WIDTH_MIN, chartWidthPctRef.current - 5);
+      chartWidthPctRef.current = v;
+      setChartWidthPct(v);
+      localStorage.setItem('dashChartWidthPct', v);
+    }
+    if (e.key === 'ArrowRight') {
+      const v = Math.min(100, chartWidthPctRef.current + 5);
+      chartWidthPctRef.current = v;
+      setChartWidthPct(v);
+      localStorage.setItem('dashChartWidthPct', v);
+    }
   }, []);
 
   const handleGroupsResizeMouseDown = useCallback((e) => {
@@ -346,11 +395,29 @@ export default function Dashboard() {
       <SummaryCards targets={targetList} lastPingResults={lastPingResults} />
     ),
     chart: (
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 min-w-0">
+      <div
+        ref={chartSectionRef}
+        className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 min-w-0 relative"
+        style={chartWidthPct < 100 ? { width: `${chartWidthPct}%` } : undefined}
+      >
+        {/* Right-side horizontal resize handle */}
+        <div
+          className="absolute inset-y-2 right-0 w-2 cursor-col-resize group/colresize flex items-center justify-center z-10"
+          onMouseDown={handleChartWidthResizeMouseDown}
+          onKeyDown={handleChartWidthKeyDown}
+          tabIndex={0}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Drag or use arrow keys to resize chart width"
+          title="Drag or use arrow keys to resize chart width"
+        >
+          <div className="h-8 w-1 rounded-full bg-gray-800 group-hover/colresize:bg-blue-600 transition-colors" />
+        </div>
+
         {/* Chart with legend + controls inside */}
         <div className="relative">
           <UnifiedChart targets={chartTargets} lastPingResults={lastPingResults} colorMap={colorMap} onColorChange={handleColorChange} chartHeight={chartHeight} />
-          {/* Resize handle */}
+          {/* Vertical resize handle */}
           <div
             className="w-full h-2 flex items-center justify-center cursor-row-resize group mt-1"
             onMouseDown={handleChartResizeMouseDown}
