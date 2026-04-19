@@ -15,6 +15,9 @@ const FS_CHART_HEIGHT_MIN = 180;
 const FS_CHART_HEIGHT_MAX = 800;
 const FS_CHART_HEIGHT_DEFAULT = 280;
 
+const FS_CHART_WIDTH_MIN = 30; // percent
+const FS_CHART_WIDTH_DEFAULT = 100; // percent
+
 export default function FullscreenChartModal({ targets = [], lastPingResults = {}, onClose, colorMap = {}, onColorChange, sparklineData = {} }) {
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -36,6 +39,14 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
   });
   const fsChartHeightRef = useRef(fsChartHeight);
 
+  // Main chart width (horizontal stretch, percentage)
+  const [fsChartWidthPct, setFsChartWidthPct] = useState(() => {
+    const saved = parseFloat(localStorage.getItem('fsChartWidthPct'));
+    return isNaN(saved) ? FS_CHART_WIDTH_DEFAULT : Math.max(FS_CHART_WIDTH_MIN, Math.min(100, saved));
+  });
+  const fsChartWidthPctRef = useRef(fsChartWidthPct);
+  const fsChartSectionRef = useRef(null);
+
   const handleFsChartResizeMouseDown = useCallback((e) => {
     e.preventDefault();
     const startY = e.clientY;
@@ -55,6 +66,59 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  const handleFsChartWidthResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startPct = fsChartWidthPctRef.current;
+    const parentWidth = fsChartSectionRef.current?.parentElement?.getBoundingClientRect().width || window.innerWidth;
+
+    const onMouseMove = (ev) => {
+      const deltaPct = ((ev.clientX - startX) / parentWidth) * 100;
+      const newPct = Math.max(FS_CHART_WIDTH_MIN, Math.min(100, startPct + deltaPct));
+      fsChartWidthPctRef.current = newPct;
+      setFsChartWidthPct(newPct);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('fsChartWidthPct', fsChartWidthPctRef.current);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  const handleFsChartWidthKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowLeft') {
+      const v = Math.max(FS_CHART_WIDTH_MIN, fsChartWidthPctRef.current - 5);
+      fsChartWidthPctRef.current = v;
+      setFsChartWidthPct(v);
+      localStorage.setItem('fsChartWidthPct', v);
+    }
+    if (e.key === 'ArrowRight') {
+      const v = Math.min(100, fsChartWidthPctRef.current + 5);
+      fsChartWidthPctRef.current = v;
+      setFsChartWidthPct(v);
+      localStorage.setItem('fsChartWidthPct', v);
+    }
+  }, []);
+
+  const handleFsChartHeightKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowUp') {
+      const v = Math.max(FS_CHART_HEIGHT_MIN, fsChartHeightRef.current - 20);
+      fsChartHeightRef.current = v;
+      setFsChartHeight(v);
+      localStorage.setItem('fsChartHeight', v);
+    }
+    if (e.key === 'ArrowDown') {
+      const v = Math.min(FS_CHART_HEIGHT_MAX, fsChartHeightRef.current + 20);
+      fsChartHeightRef.current = v;
+      setFsChartHeight(v);
+      localStorage.setItem('fsChartHeight', v);
+    }
   }, []);
 
   // Panel target order (manual sort by drag-and-drop, persisted in localStorage)
@@ -381,7 +445,25 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
             <SummaryCards targets={targets} lastPingResults={lastPingResults} />
 
             {/* Chart section */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-w-0">
+            <div
+              ref={fsChartSectionRef}
+              className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-w-0 relative"
+              style={fsChartWidthPct < 100 ? { width: `${fsChartWidthPct}%` } : undefined}
+            >
+              {/* Right-side horizontal resize handle */}
+              <div
+                className="absolute inset-y-2 right-0 w-2 cursor-col-resize group/colresize flex items-center justify-center z-10"
+                onMouseDown={handleFsChartWidthResizeMouseDown}
+                onKeyDown={handleFsChartWidthKeyDown}
+                tabIndex={0}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Drag or use arrow keys to resize chart width"
+                title="Drag or use arrow keys to resize chart width"
+              >
+                <div className="h-8 w-1 rounded-full bg-gray-800 group-hover/colresize:bg-blue-600 transition-colors" />
+              </div>
+
               <UnifiedChart
                 targets={filteredTargets}
                 lastPingResults={lastPingResults}
@@ -393,10 +475,7 @@ export default function FullscreenChartModal({ targets = [], lastPingResults = {
               <div
                 className="w-full h-2 flex items-center justify-center cursor-row-resize group mt-1"
                 onMouseDown={handleFsChartResizeMouseDown}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowUp') { const v = Math.max(FS_CHART_HEIGHT_MIN, fsChartHeightRef.current - 20); fsChartHeightRef.current = v; setFsChartHeight(v); localStorage.setItem('fsChartHeight', v); }
-                  if (e.key === 'ArrowDown') { const v = Math.min(FS_CHART_HEIGHT_MAX, fsChartHeightRef.current + 20); fsChartHeightRef.current = v; setFsChartHeight(v); localStorage.setItem('fsChartHeight', v); }
-                }}
+                onKeyDown={handleFsChartHeightKeyDown}
                 tabIndex={0}
                 role="separator"
                 aria-orientation="horizontal"
