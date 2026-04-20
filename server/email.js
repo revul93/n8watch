@@ -45,37 +45,98 @@ async function sendAlertEmail(target, rule, metrics) {
     : [_smtpConfig.to];
   const subject = `[n8watch] ${rule.severity.toUpperCase()}: ${rule.name} — ${target.name} (${target.ip})`;
 
+  const accentColor = rule.severity === "critical" ? "#ef4444" : "#f97316";
+  const accentBg    = rule.severity === "critical" ? "#fef2f2" : "#fff7ed";
+  const accentBorder= rule.severity === "critical" ? "#fca5a5" : "#fdba74";
+
   const metricRows = Object.entries(metrics)
-    .map(
-      ([k, v]) =>
-        `<tr><td style="padding:4px 8px;border:1px solid #ddd">${k}</td><td style="padding:4px 8px;border:1px solid #ddd">${v !== null && v !== undefined ? v : "N/A"}</td></tr>`,
-    )
+    .map(([k, v], idx) => `
+      <tr style="background:${idx % 2 === 0 ? "#f9fafb" : "#ffffff"}">
+        <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb;width:40%">${k}</td>
+        <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb;font-family:monospace">${v !== null && v !== undefined ? v : "N/A"}</td>
+      </tr>`)
     .join("");
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px">
-      <h2 style="color:${rule.severity === "critical" ? "#d32f2f" : "#f57c00"}">
-        ⚠️ Alert: ${rule.name}
-      </h2>
-      <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Target</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${target.name}</td></tr>
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">IP</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${target.ip}</td></tr>
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Severity</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${rule.severity}</td></tr>
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Condition</td>
-            <td style="padding:4px 8px;border:1px solid #ddd"><code>${rule.condition}</code></td></tr>
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Time</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${formatDateTime(new Date())}</td></tr>
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+        <!-- Header bar -->
+        <tr>
+          <td style="background:#111827;border-radius:12px 12px 0 0;padding:20px 28px;text-align:left">
+            <span style="font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase">n8watch</span>
+            <span style="float:right;font-size:11px;background:${accentBg};color:${accentColor};border:1px solid ${accentBorder};border-radius:20px;padding:3px 10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase">${rule.severity}</span>
+          </td>
+        </tr>
+
+        <!-- Alert banner -->
+        <tr>
+          <td style="background:${accentBg};border-left:4px solid ${accentColor};border-right:1px solid #e5e7eb;padding:20px 28px">
+            <p style="margin:0;font-size:22px;font-weight:700;color:${accentColor}">⚠️ Alert: ${rule.name}</p>
+            <p style="margin:6px 0 0;font-size:14px;color:#6b7280">${target.name} &bull; ${target.ip}</p>
+          </td>
+        </tr>
+
+        <!-- Details table -->
+        <tr>
+          <td style="background:#ffffff;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:0">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid #e5e7eb;width:40%">Field</td>
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid #e5e7eb">Value</td>
+              </tr>
+              <tr style="background:#ffffff">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb">Target</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb">${target.name}</td>
+              </tr>
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb">IP</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb;font-family:monospace">${target.ip}</td>
+              </tr>
+              <tr style="background:#ffffff">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb">Severity</td>
+                <td style="padding:10px 16px;font-size:13px;border-bottom:1px solid #e5e7eb">
+                  <span style="background:${accentBg};color:${accentColor};border:1px solid ${accentBorder};border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;text-transform:uppercase">${rule.severity}</span>
+                </td>
+              </tr>
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb">Condition</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb;font-family:monospace">${rule.condition}</td>
+              </tr>
+              <tr style="background:#ffffff">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb">Time</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb">${formatDateTime(new Date())}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Metrics section -->
+        <tr>
+          <td style="background:#ffffff;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:20px 16px 0">
+            <p style="margin:0 0 12px 0;font-size:13px;font-weight:700;color:#374151;letter-spacing:0.04em;text-transform:uppercase">Current Metrics</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+              ${metricRows}
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 28px;text-align:center">
+            <p style="margin:0;font-size:12px;color:#9ca3af">Sent by <strong style="color:#6b7280">n8watch</strong></p>
+          </td>
+        </tr>
+
       </table>
-      <h3>Current Metrics</h3>
-      <table style="border-collapse:collapse;width:100%">
-        ${metricRows}
-      </table>
-      <p style="color:#888;font-size:12px;margin-top:24px">Sent by n8watch</p>
-    </div>
-  `;
+    </td></tr>
+  </table>
+</body>
+</html>`;
 
   try {
     await _transporter.sendMail({
@@ -99,22 +160,70 @@ async function sendRecoveryEmail(target, alert, downtimeDuration) {
   const subject = `[n8watch] RESOLVED: ${alert.rule_name} — ${target.name} (${target.ip})`;
   const downtime = formatDuration(downtimeDuration);
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px">
-      <h2 style="color:#388e3c">✅ Resolved: ${alert.rule_name}</h2>
-      <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Target</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${target.name}</td></tr>
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">IP</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${target.ip}</td></tr>
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Downtime Duration</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${downtime}</td></tr>
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Resolved At</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${formatDateTime(new Date())}</td></tr>
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+        <!-- Header bar -->
+        <tr>
+          <td style="background:#111827;border-radius:12px 12px 0 0;padding:20px 28px;text-align:left">
+            <span style="font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase">n8watch</span>
+            <span style="float:right;font-size:11px;background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:20px;padding:3px 10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase">Resolved</span>
+          </td>
+        </tr>
+
+        <!-- Recovery banner -->
+        <tr>
+          <td style="background:#f0fdf4;border-left:4px solid #22c55e;border-right:1px solid #e5e7eb;padding:20px 28px">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#16a34a">✅ Resolved: ${alert.rule_name}</p>
+            <p style="margin:6px 0 0;font-size:14px;color:#6b7280">${target.name} &bull; ${target.ip}</p>
+          </td>
+        </tr>
+
+        <!-- Details table -->
+        <tr>
+          <td style="background:#ffffff;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:0">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid #e5e7eb;width:40%">Field</td>
+                <td style="padding:10px 16px;font-size:11px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid #e5e7eb">Value</td>
+              </tr>
+              <tr style="background:#ffffff">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb">Target</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb">${target.name}</td>
+              </tr>
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb">IP</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb;font-family:monospace">${target.ip}</td>
+              </tr>
+              <tr style="background:#ffffff">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb">Downtime Duration</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb;font-weight:600">${downtime}</td>
+              </tr>
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500">Resolved At</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827">${formatDateTime(new Date())}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 28px;text-align:center">
+            <p style="margin:0;font-size:12px;color:#9ca3af">Sent by <strong style="color:#6b7280">n8watch</strong></p>
+          </td>
+        </tr>
+
       </table>
-      <p style="color:#888;font-size:12px;margin-top:24px">Sent by n8watch</p>
-    </div>
-  `;
+    </td></tr>
+  </table>
+</body>
+</html>`;
 
   try {
     await _transporter.sendMail({
@@ -138,17 +247,44 @@ async function sendSystemStartEmail() {
   const now = formatDateTime(new Date());
   const subject = "[n8watch] Monitoring System Started";
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px">
-      <h2 style="color:#1976d2">🚀 n8watch Started</h2>
-      <p>The n8watch monitoring system has started successfully.</p>
-      <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Started At</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${now}</td></tr>
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+        <tr>
+          <td style="background:#111827;border-radius:12px 12px 0 0;padding:20px 28px">
+            <span style="font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase">n8watch</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#eff6ff;border-left:4px solid #3b82f6;border-right:1px solid #e5e7eb;padding:20px 28px">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#1d4ed8">🚀 Monitoring System Started</p>
+            <p style="margin:6px 0 0;font-size:14px;color:#6b7280">n8watch is now actively monitoring your targets.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:0">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb;width:40%">Started At</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb">${now}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 28px;text-align:center">
+            <p style="margin:0;font-size:12px;color:#9ca3af">Sent by <strong style="color:#6b7280">n8watch</strong></p>
+          </td>
+        </tr>
       </table>
-      <p style="color:#888;font-size:12px;margin-top:24px">Sent by n8watch</p>
-    </div>
-  `;
+    </td></tr>
+  </table>
+</body>
+</html>`;
 
   try {
     await _transporter.sendMail({
@@ -172,17 +308,44 @@ async function sendSystemShutdownEmail() {
   const now = formatDateTime(new Date());
   const subject = "[n8watch] Monitoring System Shutting Down";
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px">
-      <h2 style="color:#f57c00">🛑 n8watch Shutting Down</h2>
-      <p>The n8watch monitoring system is shutting down.</p>
-      <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Shutdown At</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${now}</td></tr>
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+        <tr>
+          <td style="background:#111827;border-radius:12px 12px 0 0;padding:20px 28px">
+            <span style="font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase">n8watch</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#fff7ed;border-left:4px solid #f97316;border-right:1px solid #e5e7eb;padding:20px 28px">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#c2410c">🛑 Monitoring System Shutting Down</p>
+            <p style="margin:6px 0 0;font-size:14px;color:#6b7280">n8watch is shutting down and will no longer monitor your targets.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:0">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb;width:40%">Shutdown At</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb">${now}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 28px;text-align:center">
+            <p style="margin:0;font-size:12px;color:#9ca3af">Sent by <strong style="color:#6b7280">n8watch</strong></p>
+          </td>
+        </tr>
       </table>
-      <p style="color:#888;font-size:12px;margin-top:24px">Sent by n8watch</p>
-    </div>
-  `;
+    </td></tr>
+  </table>
+</body>
+</html>`;
 
   try {
     await _transporter.sendMail({
@@ -209,19 +372,48 @@ async function sendReconnectEmail(disconnectedAt) {
     ? formatDuration(Date.now() - disconnectedAt)
     : "unknown";
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px">
-      <h2 style="color:#388e3c">🌐 Network Connectivity Restored</h2>
-      <p>The n8watch monitoring system has regained network connectivity — monitored targets are reachable again.</p>
-      <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Reconnected At</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${now}</td></tr>
-        <tr><td style="padding:4px 8px;border:1px solid #ddd;font-weight:bold">Disconnection Duration</td>
-            <td style="padding:4px 8px;border:1px solid #ddd">${downtime}</td></tr>
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+        <tr>
+          <td style="background:#111827;border-radius:12px 12px 0 0;padding:20px 28px">
+            <span style="font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase">n8watch</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f0fdf4;border-left:4px solid #22c55e;border-right:1px solid #e5e7eb;padding:20px 28px">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#16a34a">🌐 Network Connectivity Restored</p>
+            <p style="margin:6px 0 0;font-size:14px;color:#6b7280">n8watch has regained network connectivity — monitored targets are reachable again.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:0">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr style="background:#ffffff">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500;border-bottom:1px solid #e5e7eb;width:40%">Reconnected At</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb">${now}</td>
+              </tr>
+              <tr style="background:#f9fafb">
+                <td style="padding:10px 16px;font-size:13px;color:#374151;font-weight:500">Disconnection Duration</td>
+                <td style="padding:10px 16px;font-size:13px;color:#111827;font-weight:600">${downtime}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 28px;text-align:center">
+            <p style="margin:0;font-size:12px;color:#9ca3af">Sent by <strong style="color:#6b7280">n8watch</strong></p>
+          </td>
+        </tr>
       </table>
-      <p style="color:#888;font-size:12px;margin-top:24px">Sent by n8watch</p>
-    </div>
-  `;
+    </td></tr>
+  </table>
+</body>
+</html>`;
 
   try {
     await _transporter.sendMail({
