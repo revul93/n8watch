@@ -125,6 +125,22 @@ async function main() {
       sslOptions.ca = fs.readFileSync(ssl.ca);
     }
     server = https.createServer(sslOptions, app);
+
+    // Start an HTTP→HTTPS redirect server when ssl.redirect_http is configured
+    if (ssl.redirect_http) {
+      const redirectPort = typeof ssl.redirect_http === "number" ? ssl.redirect_http : 80;
+      const redirectApp = express();
+      redirectApp.use((req, res) => {
+        const httpsPort = port === 443 ? "" : `:${port}`;
+        res.redirect(301, `https://${req.hostname}${httpsPort}${req.url}`);
+      });
+      const redirectServer = http.createServer(redirectApp);
+      redirectServer.listen(redirectPort, host, () => {
+        console.log(
+          `[App] HTTP→HTTPS redirect listening on http://${host}:${redirectPort}`,
+        );
+      });
+    }
   } else {
     server = http.createServer(app);
   }

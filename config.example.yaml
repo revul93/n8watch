@@ -61,7 +61,9 @@ alerts:
       condition: "packet_loss > 20"
       severity: "warning"
       cooldown: 600
-      # targets: apply to specific targets by name, IP, or numeric ID
+      # targets_operator controls how the targets list is applied:
+      #   "include" (default) — alert only for the listed targets
+      #   "exclude"           — alert for all targets EXCEPT the listed ones
       # targets:
       #   - "Google DNS"
       #   - "Cloudflare DNS"
@@ -69,6 +71,7 @@ alerts:
       condition: "avg_latency > 200"
       severity: "warning"
       cooldown: 600
+      # targets_operator: "exclude"   # fire for all targets except those listed below
       # targets:
       #   - "Core Router"
     - name: "High Jitter"
@@ -84,6 +87,8 @@ server:
   #   cert: "/etc/ssl/certs/n8watch.crt"   # Path to the PEM-encoded certificate
   #   key:  "/etc/ssl/private/n8watch.key" # Path to the PEM-encoded private key
   #   # ca: "/etc/ssl/certs/ca-chain.crt"  # Optional: CA bundle for self-signed certs
+  #   # redirect_http: 80                  # Optional: start an HTTP server on this port that
+  #   #                                    # redirects all requests to HTTPS automatically.
   #
   # Typical HTTPS setup (port 443 requires root or CAP_NET_BIND_SERVICE):
   # port: 443
@@ -92,3 +97,4 @@ server:
   #   enabled: true
   #   cert: "/etc/letsencrypt/live/yourdomain.com/fullchain.pem"
   #   key:  "/etc/letsencrypt/live/yourdomain.com/privkey.pem"
+  #   redirect_http: 80                    # redirect plain HTTP on port 80 → HTTPS on port 443
