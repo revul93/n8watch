@@ -1,6 +1,6 @@
-# n8watch
+# n8watch — Network Night Watch
 
-**Night Network Watch** — A self-hosted, real-time IP and network host monitoring system. n8watch continuously pings your targets, records latency, jitter, and packet loss in a local SQLite database, and exposes everything through a clean React dashboard with WebSocket live updates, configurable email alerts, and CSV/PDF export.
+**n8watch** is a self-hosted, real-time IP and network host monitoring system. It continuously pings your targets, records latency, jitter, and packet loss in a local SQLite database, and exposes everything through a clean React dashboard with WebSocket live updates, configurable email alerts, and CSV/PDF export.
 
 ---
 
@@ -28,6 +28,7 @@
 - [Utility Scripts](#utility-scripts)
   - [Flushing Database Data](#flushing-database-data)
   - [Nuking the Database](#nuking-the-database)
+- [Optional: Backup and Restore](#optional-backup-and-restore)
 - [Web Dashboard](#web-dashboard)
 - [API Reference](#api-reference)
 - [Optional: Remote Desktop Setup](#optional-remote-desktop-setup-linux)
@@ -51,6 +52,7 @@
 - 🗄️ **Lightweight Persistence** — Uses SQLite via `better-sqlite3`; no external database server required.
 - 🔒 **HTTPS Support** — Optional TLS configuration in `config.yaml` for serving the dashboard over HTTPS.
 - 📋 **PDF Report** — A printable system guide is available under `docs/`.
+- 💾 **Backup & Restore** — Optional shell script to archive and restore the database and configuration.
 
 ---
 
@@ -744,6 +746,70 @@ iptables -A INPUT -p icmp -j ACCEPT
 ```
 
 > **Tip:** To restrict access to a trusted network only (e.g. your LAN `192.168.1.0/24`), replace `-j ACCEPT` on the dashboard and VNC rules with `-s 192.168.1.0/24 -j ACCEPT`.
+
+---
+
+## Optional: Backup and Restore
+
+n8watch ships an optional `backup.sh` script that archives all critical data — the SQLite database, the YAML configuration, and generated logs — into a timestamped `.tar.gz` file. Backups can be restored to any compatible n8watch installation.
+
+> Stop the application before restoring a backup to avoid database conflicts.
+
+### Usage
+
+```bash
+# Create a backup (saved to ./backups/ by default)
+./backup.sh --backup
+
+# Dry-run — shows what would be backed up without writing anything
+./backup.sh --backup --dry-run
+
+# Dry-run with a custom output directory
+./backup.sh --backup --dry-run --output /path/to/dir
+
+# Create a backup in a specific directory
+./backup.sh --backup --output /path/to/dir
+
+# Restore from an existing backup archive
+./backup.sh --restore /path/to/file.tar.gz
+
+# Show help
+./backup.sh --help
+```
+
+### Flags
+
+| Flag                    | Description                                                               |
+|-------------------------|---------------------------------------------------------------------------|
+| `--backup`              | Create a compressed archive of the database, config, and logs             |
+| `--restore <file>`      | Restore the database, config, and logs from a `.tar.gz` backup archive    |
+| `--dry-run`             | Print what would be included in the backup without creating the archive   |
+| `--output <dir>`        | Override the default output directory (default: `./backups/`)             |
+| `--help`                | Display usage information                                                 |
+
+### What Is Backed Up
+
+| Item                | Path                   | Notes                                          |
+|---------------------|------------------------|------------------------------------------------|
+| SQLite database     | `data/n8watch.db`      | All targets, ping results, and alert records   |
+| WAL / SHM sidecars  | `data/n8watch.db-wal`  | Included when present                          |
+| Configuration file  | `config.yaml`          | Your current running configuration             |
+| Log files           | `logs/`                | `out.log` and `error.log`                      |
+
+### Restore
+
+```bash
+# Stop n8watch first
+npm run pm2:stop   # or press Ctrl+C if running directly with node
+
+# Restore
+./backup.sh --restore /path/to/n8watch-backup-2025-01-15T12-00-00.tar.gz
+
+# Restart
+npm run pm2:start
+```
+
+> ⚠️ **Warning:** Restoring a backup **overwrites** the current database and `config.yaml`. Create a fresh backup of your existing state before restoring if you want to be able to roll back.
 
 ---
 

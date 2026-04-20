@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>n8watch — Backup &amp; Restore Guide</title>
+  <style>
+    /* ── Base ─────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 0;
+    }
+
+    /* ── Page layout for print / PDF ─────────────────────────────────────── */
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+
+    @media print {
+      .page-break { page-break-before: always; }
+      .no-break   { page-break-inside: avoid; }
+      a           { color: inherit; text-decoration: none; }
+    }
+
+    /* ── Cover page ──────────────────────────────────────────────────────── */
+    .cover {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 60px 40px;
+    }
+
+    .cover-logo {
+      font-size: 72pt;
+      font-weight: 900;
+      color: #F05A28;
+      letter-spacing: -3px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .cover-subtitle {
+      font-size: 16pt;
+      font-weight: 300;
+      color: #1A3464;
+      margin-bottom: 16px;
+    }
+
+    .cover-doc-title {
+      font-size: 20pt;
+      font-weight: 700;
+      color: #1A3464;
+      margin-bottom: 40px;
+    }
+
+    .cover-tagline {
+      font-size: 13pt;
+      color: #4a5568;
+      max-width: 480px;
+      line-height: 1.7;
+      margin-bottom: 60px;
+    }
+
+    .cover-meta {
+      font-size: 9pt;
+      color: #94a3b8;
+    }
+
+    .cover-rule {
+      width: 100px;
+      height: 3px;
+      background: linear-gradient(90deg, #F05A28, #1A3464);
+      border: none;
+      margin: 24px auto 32px;
+      border-radius: 2px;
+    }
+
+    /* ── Section headings ────────────────────────────────────────────────── */
+    h1 {
+      font-size: 22pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 32px 0 10px;
+      border-bottom: 2.5px solid #F05A28;
+      padding-bottom: 6px;
+    }
+
+    h2 {
+      font-size: 15pt;
+      font-weight: 700;
+      color: #1A3464;
+      margin: 24px 0 8px;
+    }
+
+    h3 {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #334155;
+      margin: 18px 0 6px;
+    }
+
+    /* ── Body text ───────────────────────────────────────────────────────── */
+    p { margin: 6px 0 10px; }
+
+    ul, ol {
+      margin: 6px 0 10px 22px;
+    }
+
+    li { margin-bottom: 4px; }
+
+    strong { color: #0f172a; }
+
+    /* ── Inline code ─────────────────────────────────────────────────────── */
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 9.5pt;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* ── Code blocks ─────────────────────────────────────────────────────── */
+    pre {
+      background: #1A3464;
+      color: #e2e8f0;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 9pt;
+      padding: 12px 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 8px 0 14px;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background: none;
+      color: inherit;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    /* ── Callout / note boxes ────────────────────────────────────────────── */
+    .note {
+      background: #fff5f0;
+      border-left: 4px solid #F05A28;
+      padding: 10px 14px;
+      margin: 10px 0 14px;
+      border-radius: 0 6px 6px 0;
+      font-size: 10pt;
+      color: #7a2800;
+    }
+
+    .warning {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      padding: 10px 14px;
+      margin: 10px 0 14px;
+      border-radius: 0 6px 6px 0;
+      font-size: 10pt;
+      color: #78350f;
+    }
+
+    /* ── Tables ──────────────────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      font-size: 10pt;
+    }
+
+    th {
+      background: #1A3464;
+      color: #fff;
+      font-weight: 700;
+      padding: 7px 10px;
+      text-align: left;
+    }
+
+    td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    /* ── Section wrapper ─────────────────────────────────────────────────── */
+    .section {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    .footer {
+      font-size: 8pt;
+      color: #94a3b8;
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════ COVER -->
+<div class="cover">
+  <div class="cover-logo">n8watch</div>
+  <div class="cover-subtitle">Network Night Watch</div>
+  <hr class="cover-rule" />
+  <div class="cover-doc-title">Backup &amp; Restore Guide</div>
+  <p class="cover-tagline">
+    How to back up and restore your n8watch database, configuration,
+    and logs using the optional <code>backup.sh</code> script.
+  </p>
+  <p class="cover-meta">Supplementary Guide · Version 1.0 · Node.js 24 LTS</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 1 -->
+<div class="section page-break">
+
+  <h1>1 · Overview</h1>
+
+  <p>
+    n8watch ships an optional <code>backup.sh</code> shell script that archives all critical data
+    into a timestamped <code>.tar.gz</code> file. The archive includes the SQLite database,
+    the active <code>config.yaml</code>, and application log files. Backups can be restored to
+    any compatible n8watch installation.
+  </p>
+
+  <h2>What Is Backed Up</h2>
+  <table>
+    <tr><th>Item</th><th>Path</th><th>Notes</th></tr>
+    <tr><td>SQLite database</td><td><code>data/n8watch.db</code></td><td>All targets, ping results, and alert records</td></tr>
+    <tr><td>WAL sidecar</td><td><code>data/n8watch.db-wal</code></td><td>Included when present (uncommitted write-ahead log)</td></tr>
+    <tr><td>SHM sidecar</td><td><code>data/n8watch.db-shm</code></td><td>Included when present (shared-memory index)</td></tr>
+    <tr><td>Configuration</td><td><code>config.yaml</code></td><td>Your current running configuration file</td></tr>
+    <tr><td>Log files</td><td><code>logs/</code></td><td><code>out.log</code> and <code>error.log</code></td></tr>
+  </table>
+
+  <div class="note">
+    <strong>Tip:</strong> Run backups on a schedule (e.g. via <code>cron</code>) and store archives
+    on a separate host or cloud storage to protect against data loss.
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 2 -->
+<div class="section page-break">
+
+  <h1>2 · Usage</h1>
+
+  <h2>Command Synopsis</h2>
+  <pre><code>#
+# n8watch Backup / Restore Script
+#
+# Usage:
+#   ./backup.sh --backup
+#   ./backup.sh --backup --dry-run
+#   ./backup.sh --backup --dry-run --output /path
+#   ./backup.sh --restore /path/file.tar.gz
+#   ./backup.sh --help
+#</code></pre>
+
+  <h2>2.1 Create a Backup</h2>
+  <p>Create a compressed archive in the default <code>./backups/</code> directory:</p>
+  <pre><code>./backup.sh --backup</code></pre>
+
+  <p>
+    The archive is named with a UTC timestamp, for example:
+    <code>n8watch-backup-2025-01-15T12-00-00.tar.gz</code>
+  </p>
+
+  <h2>2.2 Dry Run</h2>
+  <p>
+    Preview what would be included in the backup without actually creating the archive.
+    Useful for verifying paths before committing to a backup.
+  </p>
+  <pre><code># Dry-run to default output location
+./backup.sh --backup --dry-run
+
+# Dry-run with a custom output directory
+./backup.sh --backup --dry-run --output /mnt/nas/backups</code></pre>
+
+  <h2>2.3 Custom Output Directory</h2>
+  <p>Save the archive to a directory of your choice:</p>
+  <pre><code>./backup.sh --backup --output /mnt/nas/backups</code></pre>
+
+  <h2>2.4 Restore from Archive</h2>
+
+  <div class="warning">
+    <strong>Stop the application before restoring.</strong> Restoring while n8watch is running
+    can corrupt the database. Use <code>npm run pm2:stop</code> or <kbd>Ctrl+C</kbd>.
+  </div>
+
+  <pre><code># Stop n8watch
+npm run pm2:stop
+
+# Restore from a backup archive
+./backup.sh --restore /path/to/n8watch-backup-2025-01-15T12-00-00.tar.gz
+
+# Restart n8watch
+npm run pm2:start</code></pre>
+
+  <h2>2.5 Help</h2>
+  <pre><code>./backup.sh --help</code></pre>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 3 -->
+<div class="section page-break">
+
+  <h1>3 · Flags Reference</h1>
+
+  <table>
+    <tr><th>Flag</th><th>Argument</th><th>Description</th></tr>
+    <tr>
+      <td><code>--backup</code></td>
+      <td>—</td>
+      <td>Create a compressed <code>.tar.gz</code> archive of the database, config, and logs</td>
+    </tr>
+    <tr>
+      <td><code>--restore</code></td>
+      <td><code>&lt;file&gt;</code></td>
+      <td>
+        Restore database, config, and logs from the specified <code>.tar.gz</code> archive.
+        Overwrites existing files.
+      </td>
+    </tr>
+    <tr>
+      <td><code>--dry-run</code></td>
+      <td>—</td>
+      <td>
+        Show what would be included in the backup without creating the archive.
+        Must be combined with <code>--backup</code>.
+      </td>
+    </tr>
+    <tr>
+      <td><code>--output</code></td>
+      <td><code>&lt;dir&gt;</code></td>
+      <td>
+        Directory where the backup archive is written.
+        Defaults to <code>./backups/</code> inside the n8watch installation directory.
+        Created automatically if it does not exist.
+      </td>
+    </tr>
+    <tr>
+      <td><code>--help</code></td>
+      <td>—</td>
+      <td>Print usage information and exit</td>
+    </tr>
+  </table>
+
+  <h2>Flag Combinations</h2>
+  <table>
+    <tr><th>Command</th><th>Effect</th></tr>
+    <tr><td><code>./backup.sh --backup</code></td><td>Backup to <code>./backups/</code></td></tr>
+    <tr><td><code>./backup.sh --backup --output /path</code></td><td>Backup to custom directory</td></tr>
+    <tr><td><code>./backup.sh --backup --dry-run</code></td><td>Preview backup (no file written)</td></tr>
+    <tr><td><code>./backup.sh --backup --dry-run --output /path</code></td><td>Preview backup to custom path</td></tr>
+    <tr><td><code>./backup.sh --restore /path/file.tar.gz</code></td><td>Restore from archive</td></tr>
+    <tr><td><code>./backup.sh --help</code></td><td>Show help and exit</td></tr>
+  </table>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 4 -->
+<div class="section page-break">
+
+  <h1>4 · Restore Procedure (Step by Step)</h1>
+
+  <ol>
+    <li>
+      <strong>Stop the application</strong> — prevent database corruption during restore:
+      <pre><code>npm run pm2:stop
+# or if running directly: Ctrl+C</code></pre>
+    </li>
+    <li>
+      <strong>Optionally back up your current state</strong> before overwriting:
+      <pre><code>./backup.sh --backup --output /tmp/pre-restore-snapshot</code></pre>
+    </li>
+    <li>
+      <strong>Run the restore</strong>:
+      <pre><code>./backup.sh --restore /path/to/n8watch-backup-2025-01-15T12-00-00.tar.gz</code></pre>
+      <p>
+        The script extracts the archive and places the database into <code>data/</code>,
+        the config into the project root, and logs into <code>logs/</code>.
+      </p>
+    </li>
+    <li>
+      <strong>Verify the restored config</strong>:
+      <pre><code>cat config.yaml</code></pre>
+      <p>Confirm that targets, SMTP settings, and interface definitions look correct.</p>
+    </li>
+    <li>
+      <strong>Restart n8watch</strong>:
+      <pre><code>npm run pm2:start</code></pre>
+    </li>
+  </ol>
+
+  <div class="warning">
+    <strong>Warning:</strong> Restore overwrites <code>data/n8watch.db</code> and
+    <code>config.yaml</code> in place. There is no automatic rollback. Always take a
+    pre-restore snapshot (step 2 above) if your current data has value.
+  </div>
+
+  <h2>Scheduled Backups with cron</h2>
+  <p>
+    To back up automatically every night at 02:00, add the following line to your crontab
+    (<code>crontab -e</code>):
+  </p>
+  <pre><code>0 2 * * * /opt/n8watch/backup.sh --backup --output /mnt/nas/n8watch-backups >> /var/log/n8watch-backup.log 2>&1</code></pre>
+
+  <div class="note">
+    Adjust the path (<code>/opt/n8watch/</code>) to match your installation directory.
+    Ensure the output directory is writable by the user running the cron job.
+  </div>
+
+  <div class="footer">
+    n8watch · Network Night Watch · Licensed under GNU GPL v3.0 ·
+    <a href="https://github.com/revul93/n8watch">github.com/revul93/n8watch</a>
+  </div>
+
+</div>
+
+</body>
+</html>
