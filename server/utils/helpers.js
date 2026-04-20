@@ -22,12 +22,22 @@ function formatDuration(ms) {
 }
 
 /**
- * formatDateTime - returns an ISO 8601 string for the given date.
+ * formatDateTime - returns a human-readable UTC date/time string for the given date.
  * @param {Date} date
  * @returns {string}
  */
 function formatDateTime(date) {
-  return (date instanceof Date ? date : new Date(date)).toISOString();
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
 }
 
 /**

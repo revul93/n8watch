@@ -10,20 +10,43 @@ const SEVERITY_STYLES = {
   info: 'bg-blue-900/40 text-blue-400 border-blue-800',
 };
 
-const STATUS_STYLES = {
-  active: 'text-red-400',
-  resolved: 'text-green-400',
-};
-
 export default function AlertsTable({ alerts = [], loading = false }) {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState('all');
 
+  // Group alerts by target_id + rule_name, keeping first occurrence time
+  const grouped = useMemo(() => {
+    const map = new Map();
+    // Sort by created_at ascending so first occurrence is encountered first
+    const sorted = [...alerts].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    for (const alert of sorted) {
+      const key = `${alert.target_id}__${alert.rule_name}`;
+      if (!map.has(key)) {
+        // Spread alert but override resolved_at to track the latest resolved time
+        map.set(key, { ...alert, resolved_at: alert.resolved_at, count: 1 });
+      } else {
+        const existing = map.get(key);
+        existing.count += 1;
+        // Keep the earliest created_at (already sorted, so existing is earlier)
+        // Update resolved_at to the latest resolved_at among the group;
+        // if any occurrence is still active, the group is active (resolved_at = null)
+        if (alert.resolved_at === null || alert.resolved_at === undefined) {
+          existing.resolved_at = null;
+        } else if (existing.resolved_at !== null) {
+          if (!existing.resolved_at || new Date(alert.resolved_at) > new Date(existing.resolved_at)) {
+            existing.resolved_at = alert.resolved_at;
+          }
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [alerts]);
+
   const filtered = useMemo(() => {
-    if (filter === 'all') return alerts;
-    if (filter === 'active') return alerts.filter(a => !a.resolved_at);
-    return alerts.filter(a => !!a.resolved_at);
-  }, [alerts, filter]);
+    if (filter === 'all') return grouped;
+    if (filter === 'active') return grouped.filter(a => !a.resolved_at);
+    return grouped.filter(a => !!a.resolved_at);
+  }, [grouped, filter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -84,15 +107,16 @@ export default function AlertsTable({ alerts = [], loading = false }) {
               <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
               <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Severity</th>
               <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-              <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Triggered</th>
-              <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Resolved</th>
+              <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">First Triggered</th>
+              <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Last Resolved</th>
+              <th className="text-right px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Count</th>
               <th className="text-right px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Duration</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-gray-500">No alerts found.</td>
+                <td colSpan={8} className="text-center py-10 text-gray-500">No alerts found.</td>
               </tr>
             )}
             {pageRows.map((alert, i) => {
@@ -125,6 +149,15 @@ export default function AlertsTable({ alerts = [], loading = false }) {
                   </td>
                   <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap">
                     {alert.resolved_at ? formatTs(alert.resolved_at) : <span className="text-gray-600">—</span>}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    {alert.count > 1 ? (
+                      <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 rounded-full bg-yellow-900/40 text-yellow-400 border border-yellow-800 text-xs font-bold px-1.5">
+                        {alert.count}×
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-600">1×</span>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-right text-xs text-gray-400 whitespace-nowrap">
                     {duration(alert)}
