@@ -53,12 +53,19 @@ async function processAlerts(target, pingResult) {
   // Collect all applicable rules that are triggered for this target
   const triggeredRules = [];
   for (const rule of _rules) {
-    // If the rule has a targets list, skip targets not in that list
+    // Apply target filtering when a targets list is specified
     if (Array.isArray(rule.targets) && rule.targets.length > 0) {
       const targetMatch = rule.targets.some(
         t => String(t) === String(target.id) || t === target.name || t === target.ip
       );
-      if (!targetMatch) continue;
+      const operator = rule.targets_operator === 'exclude' ? 'exclude' : 'include';
+      if (operator === 'exclude') {
+        // Skip this target if it is in the exclusion list
+        if (targetMatch) continue;
+      } else {
+        // Skip this target if it is NOT in the inclusion list
+        if (!targetMatch) continue;
+      }
     }
     if (evaluateCondition(rule.condition, metrics)) {
       triggeredRules.push(rule);

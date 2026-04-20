@@ -9,6 +9,11 @@ const SEVERITY_STYLES = {
   info:     'bg-blue-900/40 text-blue-400 border-blue-800',
 };
 
+const OPERATOR_LABELS = {
+  include: 'Include',
+  exclude: 'Exclude',
+};
+
 export default function AlertRules() {
   const [rules, setRules] = useState([]);
   const [targets, setTargets] = useState([]);
@@ -33,7 +38,8 @@ export default function AlertRules() {
     if (!Array.isArray(rule.targets) || rule.targets.length === 0) {
       return 'All targets';
     }
-    return rule.targets.join(', ');
+    const op = OPERATOR_LABELS[rule.targets_operator] || 'Include';
+    return `${op}: ${rule.targets.join(', ')}`;
   }
 
   if (loading) {
@@ -64,9 +70,10 @@ export default function AlertRules() {
         {rules.map(rule => {
           const isOpen = expanded === rule.name;
           const severityStyle = SEVERITY_STYLES[rule.severity] || SEVERITY_STYLES.info;
+          const isExclude = rule.targets_operator === 'exclude';
 
           // Which targets this rule applies to
-          const appliedTargetIds = Array.isArray(rule.targets) && rule.targets.length > 0
+          const listedTargets = Array.isArray(rule.targets) && rule.targets.length > 0
             ? targets.filter(t =>
                 rule.targets.some(
                   rt => String(rt) === String(t.id) || rt === t.name || rt === t.ip
@@ -93,9 +100,7 @@ export default function AlertRules() {
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span className="text-xs text-gray-400 hidden sm:block">
                     Applies to:{' '}
-                    <span className="text-gray-200">
-                      {appliedTargetIds ? appliedTargetIds.map(t => t.name).join(', ') : 'All targets'}
-                    </span>
+                    <span className="text-gray-200">{getAppliesTo(rule)}</span>
                   </span>
                   {isOpen ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
                 </div>
@@ -111,24 +116,40 @@ export default function AlertRules() {
                     </div>
 
                     <div>
-                      <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">
-                        Target Assignment
-                      </p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                          Target Assignment
+                        </p>
+                        {listedTargets && (
+                          <span className={cn(
+                            'text-xs border px-2 py-0.5 rounded-full',
+                            isExclude
+                              ? 'bg-orange-900/40 text-orange-400 border-orange-800'
+                              : 'bg-blue-900/40 text-blue-400 border-blue-700',
+                          )}>
+                            {isExclude ? 'Exclude' : 'Include'}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         <span
                           className={cn(
                             'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border',
-                            !appliedTargetIds
+                            !listedTargets
                               ? 'bg-blue-900/50 text-blue-300 border-blue-700'
-                              : 'bg-gray-800 text-gray-400 border-gray-700'
+                              : 'bg-gray-800 text-gray-400 border-gray-700',
                           )}
                         >
-                          <span className={cn('w-1.5 h-1.5 rounded-full', !appliedTargetIds ? 'bg-blue-400' : 'bg-gray-600')} />
+                          <span className={cn('w-1.5 h-1.5 rounded-full', !listedTargets ? 'bg-blue-400' : 'bg-gray-600')} />
                           All targets
                         </span>
                         {targets.map(t => {
-                          const active = appliedTargetIds
-                            ? appliedTargetIds.some(at => at.id === t.id)
+                          const inList = listedTargets
+                            ? listedTargets.some(at => at.id === t.id)
+                            : false;
+                          // active = receives this alert
+                          const active = listedTargets
+                            ? (isExclude ? !inList : inList)
                             : true;
                           return (
                             <span
@@ -147,7 +168,7 @@ export default function AlertRules() {
                         })}
                       </div>
                       <p className="text-xs text-gray-600 mt-2">
-                        To change target assignments, edit the <code className="text-gray-500">targets</code> field under this rule in <code className="text-gray-500">config.yaml</code>.
+                        To change target assignments, edit the <code className="text-gray-500">targets</code> and <code className="text-gray-500">targets_operator</code> fields under this rule in <code className="text-gray-500">config.yaml</code>, or use the Settings panel.
                       </p>
                     </div>
                   </div>

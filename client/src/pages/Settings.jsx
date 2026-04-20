@@ -63,7 +63,9 @@ function parseCondition(condition) {
 function Field({ label, type = 'text', value, onChange, placeholder, required, className, error }) {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
+      {(label !== undefined && label !== null) && (
+        <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
+      )}
       <input
         type={type}
         value={value}
@@ -83,7 +85,9 @@ function Field({ label, type = 'text', value, onChange, placeholder, required, c
 function SelectField({ label, value, onChange, options, placeholder, required, className }) {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
+      {(label !== undefined && label !== null) && (
+        <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
+      )}
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -295,26 +299,33 @@ function TargetsSection({ config, token, onConfigRefresh }) {
   return (
     <SectionCard icon={Target} title="System Targets">
       <div className="flex flex-col gap-3">
+        {/* Column headers */}
+        <div className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 px-0.5">
+          <span className="text-xs text-gray-400">Name<span className="text-red-400 ml-0.5">*</span></span>
+          <span className="text-xs text-gray-400">IP / Host<span className="text-red-400 ml-0.5">*</span></span>
+          <span className="text-xs text-gray-400">Group</span>
+          <span className="text-xs text-gray-400">Interface</span>
+          <span />
+        </div>
+
         {targets.map((t, i) => (
-          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-start">
-            <Field label={i === 0 ? 'Name' : ''} value={t.name} onChange={v => updateTarget(i, 'name', v)} placeholder="Google DNS" required />
+          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
+            <Field value={t.name} onChange={v => updateTarget(i, 'name', v)} placeholder="Google DNS" required />
             <Field
-              label={i === 0 ? 'IP / Host' : ''}
               value={t.ip}
               onChange={v => updateTarget(i, 'ip', v)}
               placeholder="8.8.8.8"
               required
               error={ipErrors[i]}
             />
-            <Field label={i === 0 ? 'Group' : ''} value={t.group || ''} onChange={v => updateTarget(i, 'group', v)} placeholder="DNS Servers" />
+            <Field value={t.group || ''} onChange={v => updateTarget(i, 'group', v)} placeholder="DNS Servers" />
             <SelectField
-              label={i === 0 ? 'Interface' : ''}
               value={t.interface || ''}
               onChange={v => updateTarget(i, 'interface', v)}
               options={ifaceOptions}
               placeholder="— any —"
             />
-            <button onClick={() => handleDelete(i)} className={cn('p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors', i === 0 ? 'mt-5' : '')} title="Remove">
+            <button onClick={() => handleDelete(i)} className="mb-0.5 p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors" title="Remove">
               <Trash2 size={15} />
             </button>
           </div>
@@ -374,11 +385,20 @@ function InterfacesSection({ config, token, onConfigRefresh }) {
   return (
     <SectionCard icon={Wifi} title="Network Interfaces">
       <div className="flex flex-col gap-3">
+        {/* Column headers */}
+        {ifaces.length > 0 && (
+          <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 px-0.5">
+            <span className="text-xs text-gray-400">Interface Name<span className="text-red-400 ml-0.5">*</span></span>
+            <span className="text-xs text-gray-400">Alias</span>
+            <span className="text-xs text-gray-400">IPv4 Address</span>
+            <span />
+          </div>
+        )}
         {ifaces.map((f, i) => (
           <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
-            <Field label={i === 0 ? 'Interface Name' : ''} value={f.name} onChange={v => update(i, 'name', v)} placeholder="eth0" required />
-            <Field label={i === 0 ? 'Alias' : ''} value={f.alias || ''} onChange={v => update(i, 'alias', v)} placeholder="Primary LAN" />
-            <Field label={i === 0 ? 'IPv4 Address' : ''} value={f.ipv4 || ''} onChange={v => update(i, 'ipv4', v)} placeholder="192.168.1.1" />
+            <Field value={f.name} onChange={v => update(i, 'name', v)} placeholder="eth0" required />
+            <Field value={f.alias || ''} onChange={v => update(i, 'alias', v)} placeholder="Primary LAN" />
+            <Field value={f.ipv4 || ''} onChange={v => update(i, 'ipv4', v)} placeholder="192.168.1.1" />
             <button onClick={() => remove(i)} className="mb-0.5 p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"><Trash2 size={15} /></button>
           </div>
         ))}
@@ -398,6 +418,8 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
   const [saved, setSaved]   = useState(false);
   const [error, setError]   = useState('');
 
+  const availableTargets = config?.targets || [];
+
   useEffect(() => {
     if (config?.alerts?.rules) setRules(config.alerts.rules.map(r => ({ ...r })));
   }, [config]);
@@ -409,6 +431,26 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
     parts[part] = val;
     const { metric, operator, value } = parts;
     update(i, 'condition', metric && value !== '' ? `${metric} ${operator} ${value}` : '');
+  };
+
+  const updateTargetScope = (i, mode) => {
+    setRules(prev => prev.map((r, idx) => {
+      if (idx !== i) return r;
+      if (mode === 'all') {
+        const { targets: _t, targets_operator: _op, ...rest } = r;
+        return rest;
+      }
+      return { ...r, targets_operator: mode, targets: r.targets || [] };
+    }));
+  };
+
+  const toggleTarget = (i, targetName) => {
+    setRules(prev => prev.map((r, idx) => {
+      if (idx !== i) return r;
+      const current = r.targets || [];
+      const exists = current.includes(targetName);
+      return { ...r, targets: exists ? current.filter(t => t !== targetName) : [...current, targetName] };
+    }));
   };
 
   const addRow  = () => setRules(prev => [...prev, { name: '', condition: `${ALERT_METRIC_OPTIONS[0].value} ${ALERT_OPERATOR_OPTIONS[1].value} 0`, severity: 'warning', cooldown: 300 }]);
@@ -432,6 +474,8 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
       <div className="flex flex-col gap-3">
         {rules.map((r, i) => {
           const { metric, operator, value } = parseCondition(r.condition);
+          const scope = r.targets_operator || 'all';
+          const hasTargetFilter = scope !== 'all';
           return (
             <div key={i} className="p-3 bg-gray-800/40 border border-gray-700/60 rounded-lg flex flex-col gap-3">
               {/* Row 1: Name + Severity + Cooldown + Delete */}
@@ -509,6 +553,40 @@ function AlertRulesSection({ config, token, onConfigRefresh }) {
                     {r.condition || '—'}
                   </div>
                 </div>
+              </div>
+
+              {/* Row 3: Target scope */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="text-xs text-gray-400 shrink-0">Applies to:</label>
+                  <select
+                    value={scope}
+                    onChange={e => updateTargetScope(i, e.target.value)}
+                    className={cn(inputCls, 'w-44')}
+                  >
+                    <option value="all">All targets</option>
+                    <option value="include">Include specific targets</option>
+                    <option value="exclude">Exclude specific targets</option>
+                  </select>
+                </div>
+                {hasTargetFilter && availableTargets.length > 0 && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 pl-1">
+                    {availableTargets.map(t => (
+                      <label key={t.name} className="flex items-center gap-1.5 text-xs text-gray-300 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={(r.targets || []).includes(t.name)}
+                          onChange={() => toggleTarget(i, t.name)}
+                          className="rounded border-gray-600 bg-gray-800 accent-blue-500"
+                        />
+                        {t.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {hasTargetFilter && availableTargets.length === 0 && (
+                  <p className="text-xs text-gray-500 pl-1">No system targets defined.</p>
+                )}
               </div>
             </div>
           );
