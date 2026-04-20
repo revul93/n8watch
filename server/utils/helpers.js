@@ -22,7 +22,7 @@ function formatDuration(ms) {
 }
 
 /**
- * formatDateTime - returns a human-readable date/time string in local server timezone.
+ * formatDateTime - returns a human-readable UTC date/time string for the given date.
  * @param {Date} date
  * @returns {string}
  */
@@ -35,6 +35,7 @@ function formatDateTime(date) {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
+    timeZone: 'UTC',
     timeZoneName: 'short',
   });
 }

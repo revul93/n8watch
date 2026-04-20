@@ -22,19 +22,20 @@ export default function AlertsTable({ alerts = [], loading = false }) {
     for (const alert of sorted) {
       const key = `${alert.target_id}__${alert.rule_name}`;
       if (!map.has(key)) {
-        map.set(key, { ...alert, count: 1, last_resolved_at: alert.resolved_at });
+        // Spread alert but override resolved_at to track the latest resolved time
+        map.set(key, { ...alert, resolved_at: alert.resolved_at, count: 1 });
       } else {
         const existing = map.get(key);
         existing.count += 1;
         // Keep the earliest created_at (already sorted, so existing is earlier)
-        // Update resolved_at to the latest resolved_at among the group
-        if (alert.resolved_at) {
-          if (!existing.last_resolved_at || new Date(alert.resolved_at) > new Date(existing.last_resolved_at)) {
-            existing.last_resolved_at = alert.resolved_at;
+        // Update resolved_at to the latest resolved_at among the group;
+        // if any occurrence is still active, the group is active (resolved_at = null)
+        if (alert.resolved_at === null || alert.resolved_at === undefined) {
+          existing.resolved_at = null;
+        } else if (existing.resolved_at !== null) {
+          if (!existing.resolved_at || new Date(alert.resolved_at) > new Date(existing.resolved_at)) {
+            existing.resolved_at = alert.resolved_at;
           }
-        } else {
-          // If any occurrence is still active, the group is active
-          existing.last_resolved_at = null;
         }
       }
     }
@@ -43,8 +44,8 @@ export default function AlertsTable({ alerts = [], loading = false }) {
 
   const filtered = useMemo(() => {
     if (filter === 'all') return grouped;
-    if (filter === 'active') return grouped.filter(a => !a.last_resolved_at);
-    return grouped.filter(a => !!a.last_resolved_at);
+    if (filter === 'active') return grouped.filter(a => !a.resolved_at);
+    return grouped.filter(a => !!a.resolved_at);
   }, [grouped, filter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -58,7 +59,7 @@ export default function AlertsTable({ alerts = [], loading = false }) {
   function duration(alert) {
     if (!alert.created_at) return '—';
     const start = new Date(alert.created_at);
-    const end = alert.last_resolved_at ? new Date(alert.last_resolved_at) : new Date();
+    const end = alert.resolved_at ? new Date(alert.resolved_at) : new Date();
     const ms = end - start;
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
@@ -119,7 +120,7 @@ export default function AlertsTable({ alerts = [], loading = false }) {
               </tr>
             )}
             {pageRows.map((alert, i) => {
-              const isActive = !alert.last_resolved_at;
+              const isActive = !alert.resolved_at;
               const severity = alert.severity || 'warning';
               return (
                 <tr key={alert.id ?? i} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
@@ -147,7 +148,7 @@ export default function AlertsTable({ alerts = [], loading = false }) {
                     {formatTs(alert.created_at)}
                   </td>
                   <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap">
-                    {alert.last_resolved_at ? formatTs(alert.last_resolved_at) : <span className="text-gray-600">—</span>}
+                    {alert.resolved_at ? formatTs(alert.resolved_at) : <span className="text-gray-600">—</span>}
                   </td>
                   <td className="px-4 py-2 text-right">
                     {alert.count > 1 ? (
