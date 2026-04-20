@@ -168,7 +168,7 @@ export default function AlertRules() {
                         })}
                       </div>
                       <p className="text-xs text-gray-600 mt-2">
-                        To change target assignments, edit the <code className="text-gray-500">targets</code> and <code className="text-gray-500">targets_operator</code> fields under this rule in <code className="text-gray-500">config.yaml</code>, or use the Settings panel.
+                        To change target assignments, use the <strong className="text-gray-500">Settings → Alert Rules</strong> panel or edit the <code className="text-gray-500">targets</code> and <code className="text-gray-500">targets_operator</code> fields in <code className="text-gray-500">config.yaml</code>.
                       </p>
                     </div>
                   </div>

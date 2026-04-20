@@ -63,7 +63,7 @@ function parseCondition(condition) {
 function Field({ label, type = 'text', value, onChange, placeholder, required, className, error }) {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      {(label !== undefined && label !== null) && (
+      {label && (
         <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
       )}
       <input
@@ -85,7 +85,7 @@ function Field({ label, type = 'text', value, onChange, placeholder, required, c
 function SelectField({ label, value, onChange, options, placeholder, required, className }) {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      {(label !== undefined && label !== null) && (
+      {label && (
         <label className="text-xs text-gray-400">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
       )}
       <select
