@@ -43,7 +43,7 @@
     .cover-logo {
       font-size: 72pt;
       font-weight: 900;
-      color: #0ea5e9;
+      color: #F05A28;
       letter-spacing: -3px;
       line-height: 1;
       margin-bottom: 8px;
@@ -52,13 +52,13 @@
     .cover-subtitle {
       font-size: 16pt;
       font-weight: 300;
-      color: #475569;
+      color: #1A3464;
       margin-bottom: 40px;
     }
 
     .cover-tagline {
       font-size: 13pt;
-      color: #64748b;
+      color: #4a5568;
       max-width: 520px;
       line-height: 1.7;
       margin-bottom: 60px;
@@ -72,7 +72,7 @@
     .cover-rule {
       width: 100px;
       height: 3px;
-      background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+      background: linear-gradient(90deg, #F05A28, #1A3464);
       border: none;
       margin: 24px auto 32px;
       border-radius: 2px;
@@ -84,14 +84,14 @@
       font-weight: 800;
       color: #0f172a;
       margin: 32px 0 10px;
-      border-bottom: 2.5px solid #0ea5e9;
+      border-bottom: 2.5px solid #F05A28;
       padding-bottom: 6px;
     }
 
     h2 {
       font-size: 15pt;
       font-weight: 700;
-      color: #1e3a5f;
+      color: #1A3464;
       margin: 24px 0 8px;
     }
 
@@ -133,7 +133,7 @@
 
     /* ── Code blocks ─────────────────────────────────────────────────────── */
     pre {
-      background: #0f172a;
+      background: #1A3464;
       color: #e2e8f0;
       font-family: "Consolas", "Courier New", monospace;
       font-size: 9pt;
@@ -154,13 +154,13 @@
 
     /* ── Callout / note boxes ────────────────────────────────────────────── */
     .note {
-      background: #f0f9ff;
-      border-left: 4px solid #0ea5e9;
+      background: #fff5f0;
+      border-left: 4px solid #F05A28;
       padding: 10px 14px;
       margin: 10px 0 14px;
       border-radius: 0 6px 6px 0;
       font-size: 10pt;
-      color: #0c4a6e;
+      color: #7a2800;
     }
 
     .warning {
@@ -182,7 +182,7 @@
     }
 
     th {
-      background: #1e3a5f;
+      background: #1A3464;
       color: #fff;
       font-weight: 700;
       padding: 7px 10px;
@@ -220,7 +220,7 @@
 <!-- ═══════════════════════════════════════════════════════════════════ COVER -->
 <div class="cover">
   <div class="cover-logo">n8watch</div>
-  <div class="cover-subtitle">Night Network Watch</div>
+  <div class="cover-subtitle">Network Night Watch</div>
   <hr class="cover-rule" />
   <p class="cover-tagline">
     Real-time IP and network host monitoring with a web dashboard,
@@ -849,7 +849,84 @@ iptables -A INPUT -p icmp -j ACCEPT</code></pre>
   </div>
 
   <div class="footer">
-    n8watch · Night Network Watch · Licensed under GNU GPL v3.0 ·
+    n8watch · Network Night Watch · Licensed under GNU GPL v3.0 ·
+    <a href="https://github.com/revul93/n8watch">github.com/revul93/n8watch</a>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SECTION 9 -->
+<div class="section page-break">
+
+  <h1>9 · Optional: Backup &amp; Restore</h1>
+
+  <p>
+    n8watch ships an optional <code>backup.sh</code> shell script that archives all critical data —
+    the SQLite database, the YAML configuration, and application logs — into a timestamped
+    <code>.tar.gz</code> file. Backups can be restored to any compatible n8watch installation.
+  </p>
+
+  <div class="warning">
+    <strong>Important:</strong> Stop the application before restoring a backup to avoid
+    database conflicts. Use <code>npm run pm2:stop</code> or <kbd>Ctrl+C</kbd> if running directly.
+  </div>
+
+  <h2>9.1 Usage</h2>
+  <pre><code># Create a backup (saved to ./backups/ by default)
+./backup.sh --backup
+
+# Dry-run — shows what would be backed up without writing anything
+./backup.sh --backup --dry-run
+
+# Dry-run with a custom output directory
+./backup.sh --backup --dry-run --output /path/to/dir
+
+# Create a backup in a specific directory
+./backup.sh --backup --output /path/to/dir
+
+# Restore from an existing backup archive
+./backup.sh --restore /path/to/file.tar.gz
+
+# Show help
+./backup.sh --help</code></pre>
+
+  <h2>9.2 Flags</h2>
+  <table>
+    <tr><th>Flag</th><th>Description</th></tr>
+    <tr><td><code>--backup</code></td><td>Create a compressed archive of the database, config, and logs</td></tr>
+    <tr><td><code>--restore &lt;file&gt;</code></td><td>Restore database, config, and logs from a <code>.tar.gz</code> backup archive</td></tr>
+    <tr><td><code>--dry-run</code></td><td>Print what would be included in the backup without creating the archive</td></tr>
+    <tr><td><code>--output &lt;dir&gt;</code></td><td>Override the default output directory (default: <code>./backups/</code>)</td></tr>
+    <tr><td><code>--help</code></td><td>Display usage information</td></tr>
+  </table>
+
+  <h2>9.3 What Is Backed Up</h2>
+  <table>
+    <tr><th>Item</th><th>Path</th><th>Notes</th></tr>
+    <tr><td>SQLite database</td><td><code>data/n8watch.db</code></td><td>All targets, ping results, and alert records</td></tr>
+    <tr><td>WAL / SHM sidecars</td><td><code>data/n8watch.db-wal</code></td><td>Included when present</td></tr>
+    <tr><td>Configuration file</td><td><code>config.yaml</code></td><td>Your current running configuration</td></tr>
+    <tr><td>Log files</td><td><code>logs/</code></td><td><code>out.log</code> and <code>error.log</code></td></tr>
+  </table>
+
+  <h2>9.4 Restore Procedure</h2>
+  <pre><code># 1. Stop n8watch
+npm run pm2:stop
+
+# 2. Restore from archive
+./backup.sh --restore /path/to/n8watch-backup-2025-01-15T12-00-00.tar.gz
+
+# 3. Restart n8watch
+npm run pm2:start</code></pre>
+
+  <div class="warning">
+    <strong>Warning:</strong> Restoring a backup <strong>overwrites</strong> the current database
+    and <code>config.yaml</code>. Create a fresh backup of your existing state before restoring
+    if you need the ability to roll back.
+  </div>
+
+  <div class="footer">
+    n8watch · Network Night Watch · Licensed under GNU GPL v3.0 ·
     <a href="https://github.com/revul93/n8watch">github.com/revul93/n8watch</a>
   </div>
 
