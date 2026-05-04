@@ -10,8 +10,7 @@ let _configPath = null;
 let _lastContentHash = null;
 
 function loadConfig() {
-  // When running inside Electron, prefer config.yaml from the user-data directory
-  // so users can edit it without touching the installation folder.
+  // If n8watch_DATA_DIR is set, use it as the base directory for config.yaml.
   const baseDir = process.env.n8watch_DATA_DIR
     ? path.resolve(process.env.n8watch_DATA_DIR)
     : path.join(__dirname, "..");
