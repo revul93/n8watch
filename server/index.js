@@ -182,12 +182,12 @@ async function main() {
   });
 
   // 12. Handle 404 for unmatched /api routes
-  app.use("/api/*", (req, res) => {
+  app.use("/api", (req, res) => {
     res.status(404).json({ error: `API route not found: ${req.originalUrl}` });
   });
 
   // 13. SPA fallback — serve index.html for all non-API routes
-  app.get("*", (req, res) => {
+  app.get(/.*/, (req, res) => {
     const indexPath = path.join(distPath, "index.html");
     res.sendFile(indexPath, (err) => {
       if (err) {
