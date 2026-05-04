@@ -38,6 +38,9 @@ router.get('/config', (req, res) => {
     const config = getConfig();
     res.json({
       max_user_target_lifetime_days: config.general.max_user_target_lifetime_days,
+      visibility: config.dashboard && config.dashboard.visibility
+        ? config.dashboard.visibility
+        : { summary: true, chart: true, groups: true, hosts: true },
     });
   } catch (err) {
     console.error('[Routes/dashboard] GET /config:', err.message);

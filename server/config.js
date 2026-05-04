@@ -48,10 +48,26 @@ function loadConfig() {
   config.general.ping_interval = config.general.ping_interval || 30;
   config.general.ping_count = config.general.ping_count || 5;
   config.general.ping_timeout = config.general.ping_timeout || 5;
+  config.general.ping_concurrency = config.general.ping_concurrency || 0;
   config.general.data_retention_days = config.general.data_retention_days || 90;
   config.general.max_user_target_lifetime_days = config.general.max_user_target_lifetime_days || 7;
   config.server.port = config.server.port || 3000;
   config.server.host = config.server.host || "0.0.0.0";
+
+  // Security — optional section, defaults to allowlist disabled
+  if (!config.security) config.security = {};
+  if (!config.security.ip_allowlist) config.security.ip_allowlist = { enabled: false, entries: [] };
+  if (typeof config.security.ip_allowlist.enabled !== 'boolean') config.security.ip_allowlist.enabled = false;
+  if (!Array.isArray(config.security.ip_allowlist.entries)) config.security.ip_allowlist.entries = [];
+
+  // Dashboard visibility — optional section, defaults to all visible
+  if (!config.dashboard) config.dashboard = {};
+  if (!config.dashboard.visibility) config.dashboard.visibility = {};
+  const vis = config.dashboard.visibility;
+  if (vis.summary  === undefined) vis.summary  = true;
+  if (vis.chart    === undefined) vis.chart    = true;
+  if (vis.groups   === undefined) vis.groups   = true;
+  if (vis.hosts    === undefined) vis.hosts    = true;
 
   // Validate SSL config when enabled
   if (config.server.ssl && config.server.ssl.enabled) {
@@ -88,7 +104,7 @@ let _watchActive = false;
  * that many editors and platforms emit for a single save. For production systems
  * on network drives, consider replacing with the chokidar package.
  *
- * Additionally, a 5-second polling interval is used as a fallback to catch
+ * Additionally, a 30-second polling interval is used as a fallback to catch
  * changes that fs.watch may miss (e.g. on network drives, certain editors, or
  * platforms where inotify events are unreliable).
  *
@@ -125,11 +141,11 @@ function watchConfig(onChange) {
     tryReload("fs.watch");
   });
 
-  // Fallback: poll every 5 seconds for environments where fs.watch is unreliable
-  setInterval(() => tryReload("poll"), 5000);
+  // Fallback: poll every 30 seconds for environments where fs.watch is unreliable
+  setInterval(() => tryReload("poll"), 30000);
 
   console.log(
-    `[Config] Watching ${_configPath} for changes (fs.watch + 5s poll)`,
+    `[Config] Watching ${_configPath} for changes (fs.watch + 30s poll)`,
   );
 }
 

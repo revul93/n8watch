@@ -251,12 +251,16 @@ router.put('/config/server', requireAuth, (req, res) => {
 // PUT /api/admin/config/general  — update general settings
 router.put('/config/general', requireAuth, (req, res) => {
   try {
-    const allowed = ['ping_interval', 'ping_count', 'ping_timeout', 'data_retention_days', 'max_user_target_lifetime_days'];
+    const allowed = ['ping_interval', 'ping_count', 'ping_timeout', 'data_retention_days', 'max_user_target_lifetime_days', 'ping_concurrency'];
     const config = getConfig();
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         const v = parseInt(req.body[key], 10);
-        if (isNaN(v) || v < 1) {
+        if (key === 'ping_concurrency') {
+          if (isNaN(v) || v < 0 || v > 1000) {
+            return res.status(400).json({ error: `${key} must be between 0 and 1000 (0 = unlimited)` });
+          }
+        } else if (isNaN(v) || v < 1) {
           return res.status(400).json({ error: `${key} must be a positive integer` });
         }
         config.general[key] = v;
@@ -266,6 +270,70 @@ router.put('/config/general', requireAuth, (req, res) => {
     res.json({ success: true, general: config.general });
   } catch (err) {
     console.error('[Admin] PUT /config/general:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Security settings ─────────────────────────────────────────────────────────
+// Rate limiting is intentionally omitted: access is controlled by the IP
+// allowlist middleware (apiFilter/adminFilter) mounted in index.js. Localhost
+// is always allowed as a fail-safe, and these routes require a valid session
+// token via requireAuth.
+
+// PUT /api/admin/config/security  — update IP allowlist settings
+router.put('/config/security', requireAuth, (req, res) => {
+  try {
+    const { ip_allowlist } = req.body || {};
+    if (ip_allowlist === undefined) {
+      return res.status(400).json({ error: 'ip_allowlist is required' });
+    }
+    if (typeof ip_allowlist !== 'object' || ip_allowlist === null) {
+      return res.status(400).json({ error: 'ip_allowlist must be an object' });
+    }
+    if (ip_allowlist.entries !== undefined && !Array.isArray(ip_allowlist.entries)) {
+      return res.status(400).json({ error: 'ip_allowlist.entries must be an array' });
+    }
+    const config = getConfig();
+    if (!config.security) config.security = {};
+    config.security.ip_allowlist = {
+      enabled: typeof ip_allowlist.enabled === 'boolean' ? ip_allowlist.enabled : false,
+      entries: Array.isArray(ip_allowlist.entries)
+        ? ip_allowlist.entries.map(e => ({
+            address:     String(e.address || '').trim(),
+            allow_admin: typeof e.allow_admin === 'boolean' ? e.allow_admin : false,
+          })).filter(e => e.address)
+        : [],
+    };
+    saveConfig(config);
+    res.json({ success: true, security: config.security });
+  } catch (err) {
+    console.error('[Admin] PUT /config/security:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Dashboard settings ────────────────────────────────────────────────────────
+
+// PUT /api/admin/config/dashboard  — update dashboard visibility settings
+router.put('/config/dashboard', requireAuth, (req, res) => {
+  try {
+    const { visibility } = req.body || {};
+    if (!visibility || typeof visibility !== 'object') {
+      return res.status(400).json({ error: 'visibility must be an object' });
+    }
+    const config = getConfig();
+    if (!config.dashboard) config.dashboard = {};
+    if (!config.dashboard.visibility) config.dashboard.visibility = {};
+    for (const key of ['summary', 'chart', 'groups', 'hosts']) {
+      if (typeof visibility[key] === 'boolean') {
+        config.dashboard.visibility[key] = visibility[key];
+      }
+    }
+    saveConfig(config);
+    broadcast('config_reloaded', {});
+    res.json({ success: true, dashboard: config.dashboard });
+  } catch (err) {
+    console.error('[Admin] PUT /config/dashboard:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

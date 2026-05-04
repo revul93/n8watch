@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Lock, LogOut, Plus, Trash2, Save, RefreshCw, ChevronDown, ChevronUp,
-  Server, Wifi, Bell, Mail, Settings2, Target
+  Server, Wifi, Bell, Mail, Settings2, Target, Shield, Eye
 } from 'lucide-react';
 import {
   adminHasPassword, adminLogin, adminLogout, adminVerify, adminGetConfig,
   adminSaveTargets, adminAddTarget, adminDeleteTarget,
   adminSaveInterfaces, adminSaveAlertRules, adminSaveSmtp,
-  adminSaveServer, adminSaveGeneral,
+  adminSaveServer, adminSaveGeneral, adminSaveSecurity, adminSaveDashboard,
 } from '../lib/api';
 import { cn } from '../lib/utils';
 
@@ -744,6 +744,253 @@ function ServerSection({ config, token, onConfigRefresh }) {
   );
 }
 
+function ServerSection({ config, token, onConfigRefresh }) {
+  const server  = config?.server  || {};
+  const general = config?.general || {};
+
+  const [port, setPort]           = useState(server.port || 3000);
+  const [host, setHost]           = useState(server.host || '0.0.0.0');
+  const [pingInterval, setPingInterval] = useState(general.ping_interval || 30);
+  const [pingCount, setPingCount]       = useState(general.ping_count || 5);
+  const [pingTimeout, setPingTimeout]   = useState(general.ping_timeout || 5);
+  const [pingConcurrency, setPingConcurrency] = useState(general.ping_concurrency ?? 0);
+  const [retentionDays, setRetentionDays] = useState(general.data_retention_days || 90);
+  const [maxLifetime, setMaxLifetime]   = useState(general.max_user_target_lifetime_days || 7);
+
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const [error, setError]   = useState('');
+
+  useEffect(() => {
+    if (!config) return;
+    const s = config.server  || {};
+    const g = config.general || {};
+    setPort(s.port || 3000);
+    setHost(s.host || '0.0.0.0');
+    setPingInterval(g.ping_interval || 30);
+    setPingCount(g.ping_count || 5);
+    setPingTimeout(g.ping_timeout || 5);
+    setPingConcurrency(g.ping_concurrency ?? 0);
+    setRetentionDays(g.data_retention_days || 90);
+    setMaxLifetime(g.max_user_target_lifetime_days || 7);
+  }, [config]);
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      await adminSaveServer(token, { port: parseInt(port, 10), host });
+      await adminSaveGeneral(token, {
+        ping_interval: parseInt(pingInterval, 10),
+        ping_count: parseInt(pingCount, 10),
+        ping_timeout: parseInt(pingTimeout, 10),
+        ping_concurrency: parseInt(pingConcurrency, 10) || 0,
+        data_retention_days: parseInt(retentionDays, 10),
+        max_user_target_lifetime_days: parseInt(maxLifetime, 10),
+      });
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <SectionCard icon={Server} title="Server & General Settings">
+      <div className="flex flex-col gap-4">
+        <p className="text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800 rounded px-3 py-2">
+          ⚠ Changes to port/host take effect after restarting n8watch.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Listen Port" type="number" value={port} onChange={setPort} placeholder="3000" />
+          <Field label="Listen Host" value={host} onChange={setHost} placeholder="0.0.0.0" />
+        </div>
+        <hr className="border-gray-800" />
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Ping Settings</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Interval (s)" type="number" value={pingInterval} onChange={setPingInterval} placeholder="30" />
+          <Field label="Packets per ping" type="number" value={pingCount} onChange={setPingCount} placeholder="5" />
+          <Field label="Timeout (s)" type="number" value={pingTimeout} onChange={setPingTimeout} placeholder="5" />
+          <div className="flex flex-col gap-1">
+            <Field label="Concurrency (0 = unlimited)" type="number" value={pingConcurrency} onChange={setPingConcurrency} placeholder="0" />
+            <span className="text-xs text-gray-500">Max parallel pings. Set to 0 to ping all targets simultaneously.</span>
+          </div>
+        </div>
+        <hr className="border-gray-800" />
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Data Retention</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Data retention (days)" type="number" value={retentionDays} onChange={setRetentionDays} placeholder="90" />
+          <Field label="Max user target lifetime (days)" type="number" value={maxLifetime} onChange={setMaxLifetime} placeholder="7" />
+        </div>
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Security section ──────────────────────────────────────────────────────────
+function SecuritySection({ config, token, onConfigRefresh }) {
+  const al = config?.security?.ip_allowlist || { enabled: false, entries: [] };
+
+  const [enabled, setEnabled] = useState(al.enabled || false);
+  const [entries, setEntries] = useState((al.entries || []).map(e => ({ ...e })));
+  const [newAddress, setNewAddress] = useState('');
+  const [newAllowAdmin, setNewAllowAdmin] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const [error, setError]     = useState('');
+
+  useEffect(() => {
+    if (!config) return;
+    const a = config.security?.ip_allowlist || { enabled: false, entries: [] };
+    setEnabled(a.enabled || false);
+    setEntries((a.entries || []).map(e => ({ ...e })));
+  }, [config]);
+
+  const removeEntry = (i) => setEntries(prev => prev.filter((_, idx) => idx !== i));
+  const toggleAdmin = (i) => setEntries(prev => prev.map((e, idx) => idx === i ? { ...e, allow_admin: !e.allow_admin } : e));
+
+  const addEntry = () => {
+    const addr = newAddress.trim();
+    if (!addr) { setError('Address is required'); return; }
+    setEntries(prev => [...prev, { address: addr, allow_admin: newAllowAdmin }]);
+    setNewAddress('');
+    setNewAllowAdmin(false);
+    setError('');
+  };
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      await adminSaveSecurity(token, { ip_allowlist: { enabled, entries } });
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <SectionCard icon={Shield} title="Security — IP Allowlist">
+      <div className="flex flex-col gap-4">
+        <Toggle label="Enable IP allowlist" checked={enabled} onChange={setEnabled} />
+        <p className="text-xs text-blue-300 bg-blue-900/20 border border-blue-800 rounded px-3 py-2">
+          ℹ localhost (127.0.0.1 / ::1) is <strong>always allowed</strong> regardless of this setting, so you can never lock yourself out.
+        </p>
+
+        {entries.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-0.5">
+              <span className="text-xs text-gray-400">Address (IP, CIDR, or range)</span>
+              <span className="text-xs text-gray-400 text-center w-24">Allow Admin</span>
+              <span />
+            </div>
+            {entries.map((e, i) => (
+              <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                <div className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 font-mono truncate">{e.address}</div>
+                <div className="flex justify-center w-24">
+                  <input
+                    type="checkbox"
+                    checked={!!e.allow_admin}
+                    onChange={() => toggleAdmin(i)}
+                    className="w-4 h-4 accent-blue-500 cursor-pointer"
+                  />
+                </div>
+                <button onClick={() => removeEntry(i)} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors" title="Remove">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="pt-2 border-t border-gray-800">
+          <p className="text-xs text-gray-500 mb-2 font-medium">Add Entry</p>
+          <div className="flex gap-2 items-end flex-wrap">
+            <div className="flex flex-col gap-1 flex-1 min-w-48">
+              <label className="text-xs text-gray-400">Address <span className="text-gray-600">(e.g. 192.168.1.0/24, 10.0.0.5, 10.0.0.1-10.0.0.50)</span></label>
+              <input
+                type="text"
+                value={newAddress}
+                onChange={e => setNewAddress(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addEntry()}
+                placeholder="192.168.1.0/24"
+                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-300 pb-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newAllowAdmin}
+                onChange={e => setNewAllowAdmin(e.target.checked)}
+                className="w-4 h-4 accent-blue-500"
+              />
+              Allow Admin
+            </label>
+            <button
+              onClick={addEntry}
+              className="flex items-center gap-2 px-3 py-2 text-xs text-blue-400 hover:text-blue-300 border border-blue-800 hover:bg-blue-900/20 rounded transition-colors mb-0.5"
+            >
+              <Plus size={13} /> Add
+            </button>
+          </div>
+        </div>
+
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Dashboard View section ────────────────────────────────────────────────────
+function ViewSection({ config, token, onConfigRefresh }) {
+  const vis = config?.dashboard?.visibility || {};
+
+  const [summary, setSummary] = useState(vis.summary !== false);
+  const [chart, setChart]     = useState(vis.chart   !== false);
+  const [groups, setGroups]   = useState(vis.groups  !== false);
+  const [hosts, setHosts]     = useState(vis.hosts   !== false);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const [error, setError]     = useState('');
+
+  useEffect(() => {
+    if (!config) return;
+    const v = config.dashboard?.visibility || {};
+    setSummary(v.summary !== false);
+    setChart(v.chart   !== false);
+    setGroups(v.groups  !== false);
+    setHosts(v.hosts   !== false);
+  }, [config]);
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      await adminSaveDashboard(token, { visibility: { summary, chart, groups, hosts } });
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <SectionCard icon={Eye} title="Dashboard Visibility">
+      <div className="flex flex-col gap-4">
+        <p className="text-xs text-gray-500">
+          Control which sections are shown on the main dashboard. Changes take effect immediately for all connected clients.
+        </p>
+        <div className="flex flex-col gap-3">
+          <Toggle label="Summary Cards (up/down counts, avg latency…)" checked={summary} onChange={setSummary} />
+          <Toggle label="Network Chart (latency / packet-loss over time)" checked={chart} onChange={setChart} />
+          <Toggle label="Groups (grouped target overview)" checked={groups} onChange={setGroups} />
+          <Toggle label="Host Cards (individual target cards)" checked={hosts} onChange={setHosts} />
+        </div>
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'targets',    label: 'Targets',    icon: Target  },
@@ -751,6 +998,8 @@ const TABS = [
   { id: 'rules',      label: 'Alert Rules',icon: Bell    },
   { id: 'smtp',       label: 'SMTP',       icon: Mail    },
   { id: 'server',     label: 'Server',     icon: Server  },
+  { id: 'security',   label: 'Security',   icon: Shield  },
+  { id: 'view',       label: 'View',       icon: Eye     },
 ];
 
 // ── Main Settings page ────────────────────────────────────────────────────────
@@ -842,6 +1091,8 @@ export default function Settings() {
           {activeTab === 'rules'      && <AlertRulesSection config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
           {activeTab === 'smtp'       && <SmtpSection       config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
           {activeTab === 'server'     && <ServerSection     config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
+          {activeTab === 'security'   && <SecuritySection   config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
+          {activeTab === 'view'       && <ViewSection       config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
         </>
       )}
     </div>

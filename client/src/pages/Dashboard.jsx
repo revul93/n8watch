@@ -163,9 +163,11 @@ export default function Dashboard() {
   // Available interfaces from config
   const { data: interfaces } = useApi(getInterfaces, []);
 
-  // Max lifetime days from server config
+  // Max lifetime days + dashboard visibility from server config
   const { data: serverConfig } = useApi(getDashboardConfig, []);
   const maxLifetimeDays = serverConfig?.max_user_target_lifetime_days || 7;
+  // Fall back to all-visible so the dashboard is always usable if config fetch fails
+  const visibility = serverConfig?.visibility || { summary: true, chart: true, groups: true, hosts: true };
 
   // Sync lifetime days default once server config is loaded
   useEffect(() => {
@@ -622,7 +624,7 @@ export default function Dashboard() {
 
       {/* Draggable sections */}
       <div>
-        {sectionOrder.map((key, idx) => (
+        {sectionOrder.filter(key => visibility[key] !== false).map((key, idx) => (
           <div
             key={key}
             draggable
