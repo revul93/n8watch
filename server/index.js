@@ -187,18 +187,18 @@ async function main() {
   });
 
   // 13. SPA fallback — serve index.html for all non-API routes
-  app.get(/.*/, (req, res) => {
+  app.get(/.*/, async (req, res) => {
     const indexPath = path.join(distPath, "index.html");
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        // No frontend built yet — return a friendly message
-        res
-          .status(200)
-          .send(
-            "<html><body><h1>n8watch</h1><p>Backend running. Build the frontend or connect via API.</p></body></html>",
-          );
-      }
-    });
+    try {
+      await res.sendFile(indexPath);
+    } catch {
+      // No frontend built yet — return a friendly message
+      res
+        .status(200)
+        .send(
+          "<html><body><h1>n8watch</h1><p>Backend running. Build the frontend or connect via API.</p></body></html>",
+        );
+    }
   });
 
   // 14. Start HTTP/HTTPS server
