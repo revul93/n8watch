@@ -182,7 +182,7 @@ async function main() {
   });
 
   // 12. Handle 404 for unmatched /api routes
-  app.use("/api", (req, res) => {
+  app.use(/^\/api/, (req, res) => {
     res.status(404).json({ error: `API route not found: ${req.originalUrl}` });
   });
 
@@ -191,8 +191,8 @@ async function main() {
     const indexPath = path.join(distPath, "index.html");
     try {
       await res.sendFile(indexPath);
-    } catch {
-      // No frontend built yet — return a friendly message
+    } catch (_err) {
+      // index.html not built yet — return a friendly placeholder
       res
         .status(200)
         .send(
