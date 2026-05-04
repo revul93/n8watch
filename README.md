@@ -13,7 +13,6 @@
   - [Linux / macOS — One-line Install](#linux--macos--one-line-install)
   - [Linux / macOS — Manual Install](#linux--macos--manual-install)
   - [Windows](#windows)
-  - [Desktop App (Electron — Experimental)](#desktop-app-electron--experimental)
 - [Configuration](#configuration)
   - [General Settings](#general-settings)
   - [Interfaces](#interfaces)
@@ -188,28 +187,6 @@ node server\index.js
 ```powershell
 # Option C — PM2 (recommended for production)
 npm run pm2:start
-```
-
----
-
-### Desktop App (Electron — Experimental)
-
-> ⚠️ **Experimental.** The Electron wrapper is not actively maintained and may not work on all platforms. For stable deployments, use the server installation above.
-
-n8watch includes an experimental Electron wrapper that embeds the Express server and opens the dashboard in a native application window.
-
-```bash
-# Build the frontend first
-cd client && npm install && npm run build && cd ..
-
-# Install all dependencies (including Electron dev-deps)
-npm install
-
-# Rebuild native modules for Electron's Node.js version
-npm run electron:rebuild
-
-# Launch the desktop app
-npm run electron
 ```
 
 ---

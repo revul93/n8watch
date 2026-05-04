@@ -12,9 +12,7 @@ function getDb() {
 }
 
 function initDatabase() {
-  // When running inside Electron the main process sets n8watch_DATA_DIR to
-  // app.getPath('userData') so data is stored in the OS user-data directory
-  // instead of the application bundle (e.g. %APPDATA%\n8watch on Windows).
+  // If n8watch_DATA_DIR is set, use it as the directory for the SQLite database.
   const dataDir = process.env.n8watch_DATA_DIR
     ? require("path").resolve(process.env.n8watch_DATA_DIR)
     : path.join(__dirname, "..", "data");

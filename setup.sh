@@ -102,8 +102,6 @@ echo "✓ ping binary found at $(which ping)"
 
 echo ""
 echo "Installing backend dependencies..."
-# Use --omit=dev to skip Electron build tools (electron, electron-builder) which
-# are not needed for the server and pull in deprecated transitive dependencies.
 npm install --omit=dev
 
 echo ""
