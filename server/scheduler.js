@@ -27,20 +27,11 @@ function initScheduler(config, db, wss, alertEngine, emailSvc) {
   if (emailSvc) _emailSvcRef = emailSvc;
 
   // ── Ping cycle ───────────────────────────────────────────────────────────────
-  // node-cron seconds field only supports 1–59; warn if the configured interval
-  // exceeds that range, as the effective rate will differ from the configured one.
-  const cronInterval = Math.min(Math.max(Math.floor(interval), 1), 59);
-  if (interval > 59) {
-    console.warn(
-      `[Scheduler] ping_interval (${interval}s) exceeds the 59s maximum for ` +
-      'the cron seconds field. Clamped to 59s. Use a value ≤59 for precise control.'
-    );
-  }
-  const pingPattern  = `*/${cronInterval} * * * * *`;
+  // node-cron seconds field only supports 1–59. For intervals > 59s we fall
+  // back to a plain setInterval so operators can use 90s, 120s, etc.
+  const intervalMs = Math.max(1, Math.floor(interval)) * 1000;
 
-  console.log(`[Scheduler] Ping job: every ${cronInterval}s (pattern: ${pingPattern})`);
-
-  const pingTask = cron.schedule(pingPattern, async () => {
+  async function runPingCycle() {
     try {
       // Archive any user targets whose lifetime has just ended, then notify
       // clients so the dashboard removes them without a page reload.
@@ -60,7 +51,7 @@ function initScheduler(config, db, wss, alertEngine, emailSvc) {
       const results = await pingAllTargets(targets, config.general);
 
       // Detect connectivity changes: check if all non-user targets are down
-      const nonUserResults = results.filter(r => !r.target.is_user_target);
+      const nonUserResults = results.filter(r => r.target && !r.target.is_user_target);
       const anyAlive = nonUserResults.some(r => r.metrics.is_alive);
 
       if (nonUserResults.length > 0) {
@@ -80,11 +71,10 @@ function initScheduler(config, db, wss, alertEngine, emailSvc) {
           }
           _disconnectedAt = null;
         }
-      } else {
-        // No non-user targets exist; connectivity tracking is not active
       }
 
       for (const { target, metrics } of results) {
+        if (!target) continue;
         const rowId = db.insertPingResult({
           target_id:        target.id,
           is_alive:         metrics.is_alive,
@@ -115,7 +105,22 @@ function initScheduler(config, db, wss, alertEngine, emailSvc) {
     } catch (err) {
       console.error('[Scheduler] Ping cycle error:', err.message);
     }
-  });
+  }
+
+  let pingTask;
+  if (interval <= 59) {
+    const cronInterval = Math.max(1, Math.floor(interval));
+    const pingPattern  = `*/${cronInterval} * * * * *`;
+    console.log(`[Scheduler] Ping job: every ${cronInterval}s (pattern: ${pingPattern})`);
+    pingTask = cron.schedule(pingPattern, runPingCycle);
+  } else {
+    console.log(`[Scheduler] Ping job: every ${interval}s (setInterval, interval > 59s)`);
+    // Wrap setInterval as a task-like object with a stop() method
+    const timerId = setInterval(runPingCycle, intervalMs);
+    pingTask = { stop: () => clearInterval(timerId) };
+    // Run immediately on start so the first result isn't delayed by `interval`
+    runPingCycle();
+  }
 
   _activeTasks.push(pingTask);
 

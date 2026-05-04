@@ -187,3 +187,11 @@ export function adminSaveServer(token, data) {
 export function adminSaveGeneral(token, data) {
   return adminRequest('/config/general', 'PUT', data, token);
 }
+
+export function adminSaveSecurity(token, data) {
+  return adminRequest('/config/security', 'PUT', data, token);
+}
+
+export function adminSaveDashboard(token, data) {
+  return adminRequest('/config/dashboard', 'PUT', data, token);
+}

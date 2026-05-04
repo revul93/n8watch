@@ -78,22 +78,39 @@ function buildDeadResult(count) {
 }
 
 /**
- * pingAllTargets - pings all targets sequentially, one after another,
- * so that simultaneous pings do not inflate response times.
+ * pingAllTargets - pings all targets concurrently (up to `ping_concurrency`
+ * parallel workers when configured, or all at once when concurrency is 0).
  *
  * @param {Array<object>} targets
- * @param {object} config
+ * @param {object} config  general config block; may contain `ping_concurrency`
  * @returns {Promise<Array<{ target: object, metrics: object }>>}
  */
 async function pingAllTargets(targets, config) {
-  const results = [];
-  for (const target of targets) {
+  const concurrency = config.ping_concurrency || 0; // 0 = unlimited
+
+  const pingOne = async (target) => {
     try {
       const metrics = await pingTarget(target, config);
-      results.push({ target, metrics });
+      return { target, metrics };
     } catch (err) {
       console.error(`[Ping] Unexpected error for ${target.ip}:`, err.message);
-      results.push({ target, metrics: buildDeadResult(config.ping_count || 5) });
+      return { target, metrics: buildDeadResult(config.ping_count || 5) };
+    }
+  };
+
+  if (!concurrency || concurrency >= targets.length) {
+    // Unlimited concurrency — fire all at once
+    const settled = await Promise.allSettled(targets.map(pingOne));
+    return settled.map(r => (r.status === 'fulfilled' ? r.value : { target: r.reason?.target, metrics: buildDeadResult(config.ping_count || 5) }));
+  }
+
+  // Capped concurrency — process in batches
+  const results = [];
+  for (let i = 0; i < targets.length; i += concurrency) {
+    const batch = targets.slice(i, i + concurrency);
+    const settled = await Promise.allSettled(batch.map(pingOne));
+    for (const r of settled) {
+      results.push(r.status === 'fulfilled' ? r.value : { target: undefined, metrics: buildDeadResult(config.ping_count || 5) });
     }
   }
   return results;

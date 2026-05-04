@@ -98,3 +98,27 @@ server:
   #   cert: "/etc/letsencrypt/live/yourdomain.com/fullchain.pem"
   #   key:  "/etc/letsencrypt/live/yourdomain.com/privkey.pem"
   #   redirect_http: 80                    # redirect plain HTTP on port 80 → HTTPS on port 443
+
+# security — IP-based access control for the API and admin interface.
+# localhost (127.0.0.1 / ::1) is ALWAYS allowed regardless of this setting,
+# so you can never accidentally lock yourself out.
+# When ip_allowlist.enabled is false (default), all traffic is permitted.
+security:
+  ip_allowlist:
+    enabled: false
+    entries:
+      - address: "192.168.1.0/24"   # CIDR notation — entire subnet
+        allow_admin: true            # allow_admin: true → this IP range can also access /api/admin
+      - address: "10.0.0.5"         # single IP address
+        allow_admin: false
+      # - address: "10.0.1.10-10.0.1.20"  # IPv4 range
+      #   allow_admin: false
+
+# dashboard — controls which sections are visible on the main dashboard.
+# All sections are shown by default. Set a value to false to hide that section.
+dashboard:
+  visibility:
+    summary: true   # Summary cards (up/down counts, avg latency…)
+    chart: true     # Network latency / packet-loss chart
+    groups: true    # Grouped target view
+    hosts: true     # Individual host cards

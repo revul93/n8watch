@@ -5,7 +5,7 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
-const rateLimit = require("express-rate-limit");
+const compression = require("compression");
 
 const { loadConfig, watchConfig } = require("./config");
 const db = require("./database");
@@ -13,6 +13,7 @@ const { initWebSocket, broadcast } = require("./websocket");
 const emailSvc = require("./email");
 const alertEngine = require("./alert-engine");
 const { initScheduler, stopAll: stopScheduler } = require("./scheduler");
+const { apiFilter, adminFilter } = require("./middleware/ip-filter");
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 const targetsRouter = require("./routes/targets");
@@ -83,21 +84,20 @@ async function main() {
 
   // 4. Create Express app
   const app = express();
+
+  // Compress all responses (gzip/deflate)
+  app.use(compression());
+
   app.use(express.json());
 
-  // Global rate limiter — 1000 requests per minute per IP
-  const globalLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 1000,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: "Too many requests, please try again later." },
-  });
-  app.use(globalLimiter);
+  // IP allowlist filters — read live from config so hot-reloads take effect
+  app.use("/api", apiFilter);
+  app.use("/api/admin", adminFilter);
 
   // 5. Serve static files from client/dist
+  // Vite produces content-hashed filenames, so assets can be cached aggressively.
   const distPath = path.join(__dirname, "..", "client", "dist");
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { maxAge: "7d", immutable: true }));
 
   // 6. Mount all API routes
   app.use("/api/targets", targetsRouter);
