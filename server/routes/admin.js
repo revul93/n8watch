@@ -257,8 +257,8 @@ router.put('/config/general', requireAuth, (req, res) => {
       if (req.body[key] !== undefined) {
         const v = parseInt(req.body[key], 10);
         if (key === 'ping_concurrency') {
-          if (isNaN(v) || v < 0) {
-            return res.status(400).json({ error: `${key} must be a non-negative integer (0 = unlimited)` });
+          if (isNaN(v) || v < 0 || v > 1000) {
+            return res.status(400).json({ error: `${key} must be between 0 and 1000 (0 = unlimited)` });
           }
         } else if (isNaN(v) || v < 1) {
           return res.status(400).json({ error: `${key} must be a positive integer` });
@@ -275,6 +275,10 @@ router.put('/config/general', requireAuth, (req, res) => {
 });
 
 // ── Security settings ─────────────────────────────────────────────────────────
+// Rate limiting is intentionally omitted: access is controlled by the IP
+// allowlist middleware (apiFilter/adminFilter) mounted in index.js. Localhost
+// is always allowed as a fail-safe, and these routes require a valid session
+// token via requireAuth.
 
 // PUT /api/admin/config/security  — update IP allowlist settings
 router.put('/config/security', requireAuth, (req, res) => {

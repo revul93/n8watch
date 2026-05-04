@@ -101,7 +101,7 @@ async function pingAllTargets(targets, config) {
   if (!concurrency || concurrency >= targets.length) {
     // Unlimited concurrency — fire all at once
     const settled = await Promise.allSettled(targets.map(pingOne));
-    return settled.map(r => (r.status === 'fulfilled' ? r.value : { target: r.reason?.target, metrics: buildDeadResult(config.ping_count || 5) }));
+    return settled.map(r => (r.status === 'fulfilled' ? r.value : { target: undefined, metrics: buildDeadResult(config.ping_count || 5) }));
   }
 
   // Capped concurrency — process in batches

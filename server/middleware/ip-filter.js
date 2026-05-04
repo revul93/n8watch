@@ -20,16 +20,25 @@ function ipv4ToInt(ip) {
   return ip.split('.').reduce((acc, octet) => (acc * 256 + parseInt(octet, 10)) >>> 0, 0);
 }
 
-/** Convert an IPv6 address string to a BigInt (128-bit). */
+/** Convert an IPv6 address string to a BigInt (128-bit). Returns null on parse failure. */
 function ipv6ToBigInt(ip) {
-  // Expand "::" shorthand
-  const halves = ip.split('::');
-  let left = halves[0] ? halves[0].split(':') : [];
-  let right = halves[1] ? halves[1].split(':') : [];
-  const missing = 8 - left.length - right.length;
-  const middle = new Array(missing).fill('0');
-  const groups = [...left, ...middle, ...right];
-  return groups.reduce((acc, g) => (acc << 16n) | BigInt(parseInt(g || '0', 16)), 0n);
+  try {
+    // Expand "::" shorthand
+    const halves = ip.split('::');
+    let left = halves[0] ? halves[0].split(':') : [];
+    let right = halves[1] ? halves[1].split(':') : [];
+    const missing = 8 - left.length - right.length;
+    const middle = new Array(missing).fill('0');
+    const groups = [...left, ...middle, ...right];
+    if (groups.length !== 8) return null;
+    return groups.reduce((acc, g) => {
+      const val = parseInt(g || '0', 16);
+      if (isNaN(val)) throw new Error('invalid group');
+      return (acc << 16n) | BigInt(val);
+    }, 0n);
+  } catch {
+    return null;
+  }
 }
 
 /** Return true when `ip` is a loopback address (IPv4 or IPv6). */
@@ -62,9 +71,13 @@ function matchesAddress(clientIp, address) {
     }
 
     if (net.isIPv6(base) && net.isIPv6(clientIp)) {
+      const clientBig = ipv6ToBigInt(clientIp);
+      const baseBig   = ipv6ToBigInt(base);
+      if (clientBig === null || baseBig === null) return false;
+      // prefix === 0 matches all (/0 CIDR — any address)
       const shift = BigInt(128 - prefix);
       const mask = prefix === 0 ? 0n : (~0n << shift) & ((1n << 128n) - 1n);
-      return (ipv6ToBigInt(clientIp) & mask) === (ipv6ToBigInt(base) & mask);
+      return (clientBig & mask) === (baseBig & mask);
     }
     return false;
   }

@@ -95,7 +95,10 @@ async function main() {
   app.use("/api/admin", adminFilter);
 
   // 5. Serve static files from client/dist
-  // Vite produces content-hashed filenames, so assets can be cached aggressively.
+  // Vite produces content-hashed filenames (e.g. main-Abc123.js), so JS/CSS
+  // assets can be cached aggressively. index.html is NOT given a long-lived cache
+  // by express.static (it has no content hash), ensuring clients always fetch
+  // the latest entry point that references the hashed assets.
   const distPath = path.join(__dirname, "..", "client", "dist");
   app.use(express.static(distPath, { maxAge: "7d", immutable: true }));
 
