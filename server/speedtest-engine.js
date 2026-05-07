@@ -49,16 +49,23 @@ function runSpeedtestCli(sourceIp) {
     const args = ['--json', '--secure'];
     if (sourceIp) args.push('--source', sourceIp);
 
-    const proc  = spawn('speedtest-cli', args, { timeout: 120000 });
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 120000);
+
+    const proc  = spawn('speedtest-cli', args, { signal: controller.signal });
     let stdout   = '';
     let stderr   = '';
 
     proc.stdout.on('data', chunk => { stdout += chunk; });
     proc.stderr.on('data', chunk => { stderr += chunk; });
 
-    proc.on('error', err => reject(new Error(`speedtest-cli spawn failed: ${err.message}`)));
+    proc.on('error', err => {
+      clearTimeout(timeoutId);
+      reject(new Error(`speedtest-cli spawn failed: ${err.message}`));
+    });
 
     proc.on('close', code => {
+      clearTimeout(timeoutId);
       if (code !== 0) {
         return reject(new Error(`speedtest-cli exited ${code}: ${stderr.trim() || 'no output'}`));
       }
@@ -83,16 +90,23 @@ function runSpeedtestCli(sourceIp) {
 function runFastCli(_sourceIp) {
   return new Promise((resolve, reject) => {
     // fast --upload outputs multiple JSON lines; we want the final result
-    const proc  = spawn('fast', ['--upload', '--json'], { timeout: 120000 });
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 120000);
+
+    const proc  = spawn('fast', ['--upload', '--json'], { signal: controller.signal });
     let stdout   = '';
     let stderr   = '';
 
     proc.stdout.on('data', chunk => { stdout += chunk; });
     proc.stderr.on('data', chunk => { stderr += chunk; });
 
-    proc.on('error', err => reject(new Error(`fast spawn failed: ${err.message}`)));
+    proc.on('error', err => {
+      clearTimeout(timeoutId);
+      reject(new Error(`fast spawn failed: ${err.message}`));
+    });
 
     proc.on('close', code => {
+      clearTimeout(timeoutId);
       if (code !== 0) {
         return reject(new Error(`fast exited ${code}: ${stderr.trim() || 'no output'}`));
       }

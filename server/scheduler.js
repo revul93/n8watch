@@ -146,7 +146,7 @@ function initScheduler(config, db, wss, alertEngine, emailSvc) {
     }
 
     let speedtestTask;
-    if (stInterval <= 59) {
+    if (stInterval < 60) {
       const pattern = `*/${stInterval} * * * * *`;
       console.log(`[Scheduler] Speedtest job: every ${stInterval}s (cron: ${pattern})`);
       speedtestTask = cron.schedule(pattern, runSpeedtestCycle);

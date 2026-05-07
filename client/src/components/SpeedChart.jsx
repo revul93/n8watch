@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { format, subHours, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '../lib/utils';
 
 // ── Time-range options (mirrors TimeRangeSelector style) ──────────────────────
@@ -58,15 +58,15 @@ export default function SpeedChart({ results = [], show = 'both', height = 260, 
   const [rangeIdx, setRangeIdx] = useState(0);
 
   const rangeMs = RANGES[rangeIdx].ms;
-  const now = Date.now();
 
   const filtered = useMemo(() => {
+    const cutoff = Date.now();
     const rows = rangeMs
-      ? results.filter(r => r.created_at >= now - rangeMs)
+      ? results.filter(r => r.created_at >= cutoff - rangeMs)
       : results;
     // chart expects ascending order
     return [...rows].reverse();
-  }, [results, rangeMs, now]);
+  }, [results, rangeMs]);
 
   // Build chart data — exclude rows that have only an error (no speed values)
   const chartData = useMemo(

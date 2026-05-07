@@ -1080,7 +1080,7 @@ function SpeedtestSection({ config, token, onConfigRefresh }) {
             {runResult && (
               <span className="text-xs text-green-400">
                 ↓ {runResult.download != null ? `${runResult.download} Mbps` : '—'}
-                {'  '}↑ {runResult.upload   != null ? `${runResult.upload}   Mbps` : '—'}
+                {'  '}↑ {runResult.upload != null ? `${runResult.upload} Mbps` : '—'}
               </span>
             )}
           </div>
