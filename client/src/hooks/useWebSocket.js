@@ -8,6 +8,7 @@ export function useWebSocket() {
   const [configReloadedAt, setConfigReloadedAt] = useState(null);
   const [lastConfigData, setLastConfigData] = useState(null);
   const [targetsChangedAt, setTargetsChangedAt] = useState(null);
+  const [lastSpeedtestResult, setLastSpeedtestResult] = useState(null);
 
   useEffect(() => {
     wsManager.connect();
@@ -38,11 +39,17 @@ export function useWebSocket() {
       setTargetsChangedAt(Date.now());
     };
 
+    const onSpeedtestResult = (data) => {
+      if (!data) return;
+      setLastSpeedtestResult({ ...data, _ts: Date.now() });
+    };
+
     wsManager.on('ping_result', onPingResult);
     wsManager.on('alert', onAlertTriggered);
     wsManager.on('recovery', onAlertResolved);
     wsManager.on('config_reloaded', onConfigReloaded);
     wsManager.on('targets_changed', onTargetsChanged);
+    wsManager.on('speedtest_result', onSpeedtestResult);
 
     return () => {
       removeStatus();
@@ -51,10 +58,11 @@ export function useWebSocket() {
       wsManager.off('recovery', onAlertResolved);
       wsManager.off('config_reloaded', onConfigReloaded);
       wsManager.off('targets_changed', onTargetsChanged);
+      wsManager.off('speedtest_result', onSpeedtestResult);
     };
   }, []);
 
   const clearLastAlert = useCallback(() => setLastAlert(null), []);
 
-  return { connected, lastPingResults, lastAlert, clearLastAlert, configReloadedAt, lastConfigData, targetsChangedAt };
+  return { connected, lastPingResults, lastAlert, clearLastAlert, configReloadedAt, lastConfigData, targetsChangedAt, lastSpeedtestResult };
 }

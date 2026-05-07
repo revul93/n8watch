@@ -24,6 +24,7 @@ const alertsRouter = require("./routes/alerts");
 const dashboardRouter = require("./routes/dashboard");
 const exportRouter = require("./routes/export");
 const interfacesRouter = require("./routes/interfaces");
+const speedtestRouter = require("./routes/speedtest");
 const versionRouter = require("./routes/version");
 const adminRouter   = require("./routes/admin");
 
@@ -113,6 +114,7 @@ async function main() {
   app.use("/api/alerts", alertsRouter);
   app.use("/api/dashboard", dashboardRouter);
   app.use("/api/interfaces", interfacesRouter);
+  app.use("/api/speedtest", speedtestRouter);
   app.use("/api/version", versionRouter);
   app.use("/api/admin", adminRouter);
 

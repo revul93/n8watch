@@ -118,7 +118,20 @@ security:
 # All sections are shown by default. Set a value to false to hide that section.
 dashboard:
   visibility:
-    summary: true   # Summary cards (up/down counts, avg latency…)
-    chart: true     # Network latency / packet-loss chart
-    groups: true    # Grouped target view
-    hosts: true     # Individual host cards
+    summary: true     # Summary cards (up/down counts, avg latency…)
+    chart: true       # Network latency / packet-loss chart
+    groups: true      # Grouped target view
+    hosts: true       # Individual host cards
+    speedtest: true   # Internet speed chart (download / upload)
+
+# speedtest — periodic internet speed measurements shown on the dashboard.
+# Requires speedtest-cli (https://github.com/sivel/speedtest-cli) and/or
+# fast-cli (https://github.com/sindresorhus/fast-cli) to be installed globally
+# on the host machine (e.g. `pip install speedtest-cli` / `npm i -g fast-cli`).
+# When disabled the widget is hidden and no tests are run.
+speedtest:
+  enabled: false        # set to true to activate periodic speed tests
+  interval: 3600        # seconds between tests (minimum 60; typical: 3600 = hourly)
+  interface: ""         # outgoing interface name (e.g. eth0); leave empty for default
+  tool: "speedtest"     # which tool to use: "speedtest", "fast", or "both" (average)
+  show: "both"          # which metrics to display: "download", "upload", or "both"

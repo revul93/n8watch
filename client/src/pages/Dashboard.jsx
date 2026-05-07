@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useApi } from '../hooks/useApi';
-import { getTargets, getPingResults, addUserTarget, deleteUserTarget, getReportData, getInterfaces, getDashboardConfig } from '../lib/api';
+import { getTargets, getPingResults, addUserTarget, deleteUserTarget, getReportData, getInterfaces, getDashboardConfig, getSpeedtestResults } from '../lib/api';
 import { generatePDFReport, generateCSVReport } from '../lib/reportGenerator';
 import SummaryCards from '../components/SummaryCards';
 import UnifiedChart, { buildColorMap } from '../components/UnifiedChart';
+import SpeedChart from '../components/SpeedChart';
 import HostGrid from '../components/HostGrid';
 import HostPill from '../components/HostPill';
 import FullscreenChartModal from '../components/FullscreenChartModal';
@@ -12,7 +13,7 @@ import GroupedView from '../components/GroupedView';
 import { RefreshCw, Maximize2, Plus, X, FileText, FileDown, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const SECTION_KEYS = ['summary', 'chart', 'groups', 'hosts'];
+const SECTION_KEYS = ['summary', 'chart', 'speedtest', 'groups', 'hosts'];
 
 const CHART_HEIGHT_MIN = 180;
 const CHART_HEIGHT_MAX = 800;
@@ -25,8 +26,12 @@ const GROUPS_HEIGHT_MIN = 150;
 const GROUPS_HEIGHT_MAX = 600;
 const GROUPS_HEIGHT_DEFAULT = 300;
 
+const SPEEDTEST_HEIGHT_MIN = 160;
+const SPEEDTEST_HEIGHT_MAX = 600;
+const SPEEDTEST_HEIGHT_DEFAULT = 260;
+
 export default function Dashboard() {
-  const { lastPingResults, configReloadedAt, targetsChangedAt, connected } = useWebSocket();
+  const { lastPingResults, configReloadedAt, targetsChangedAt, connected, lastSpeedtestResult } = useWebSocket();
   const { data: targets, loading, refetch } = useApi(getTargets, []);
   const [sparklineData, setSparklineData] = useState({});
   const [selectedTargetIds, setSelectedTargetIds] = useState([]);
@@ -53,6 +58,38 @@ export default function Dashboard() {
     return isNaN(saved) ? GROUPS_HEIGHT_DEFAULT : Math.max(GROUPS_HEIGHT_MIN, Math.min(GROUPS_HEIGHT_MAX, saved));
   });
   const groupsHeightRef = useRef(groupsHeight);
+
+  // Resizable speedtest chart height
+  const [speedtestHeight, setSpeedtestHeight] = useState(() => {
+    const saved = parseInt(localStorage.getItem('dashSpeedtestHeight'), 10);
+    return isNaN(saved) ? SPEEDTEST_HEIGHT_DEFAULT : Math.max(SPEEDTEST_HEIGHT_MIN, Math.min(SPEEDTEST_HEIGHT_MAX, saved));
+  });
+  const speedtestHeightRef = useRef(speedtestHeight);
+
+  const handleSpeedtestResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = speedtestHeightRef.current;
+
+    const onMouseMove = (ev) => {
+      const newHeight = Math.max(SPEEDTEST_HEIGHT_MIN, Math.min(SPEEDTEST_HEIGHT_MAX, startHeight + ev.clientY - startY));
+      speedtestHeightRef.current = newHeight;
+      setSpeedtestHeight(newHeight);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('dashSpeedtestHeight', speedtestHeightRef.current);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  // Speedtest history state
+  const [speedtestResults, setSpeedtestResults] = useState([]);
+  const [speedtestRunning, setSpeedtestRunning] = useState(false);
 
   const handleChartResizeMouseDown = useCallback((e) => {
     e.preventDefault();
@@ -167,7 +204,8 @@ export default function Dashboard() {
   const { data: serverConfig } = useApi(getDashboardConfig, []);
   const maxLifetimeDays = serverConfig?.max_user_target_lifetime_days || 7;
   // Fall back to all-visible so the dashboard is always usable if config fetch fails
-  const visibility = serverConfig?.visibility || { summary: true, chart: true, groups: true, hosts: true };
+  const visibility = serverConfig?.visibility || { summary: true, chart: true, groups: true, hosts: true, speedtest: true };
+  const speedtestConfig = serverConfig?.speedtest || {};
 
   // Sync lifetime days default once server config is loaded
   useEffect(() => {
@@ -232,6 +270,27 @@ export default function Dashboard() {
   useEffect(() => {
     if (targetsChangedAt) refetch();
   }, [targetsChangedAt, refetch]);
+
+  // ── Speedtest data ────────────────────────────────────────────────────────────
+
+  // Fetch historical speedtest results on mount
+  useEffect(() => {
+    getSpeedtestResults({ limit: 200 })
+      .then(rows => setSpeedtestResults(rows))
+      .catch(() => {});
+  }, []);
+
+  // Append new speedtest result from WebSocket
+  useEffect(() => {
+    if (!lastSpeedtestResult) return;
+    setSpeedtestRunning(false);
+    // Prepend (newest first) and deduplicate by id
+    setSpeedtestResults(prev => {
+      const id = lastSpeedtestResult.id;
+      if (id && prev.some(r => r.id === id)) return prev;
+      return [lastSpeedtestResult, ...prev].slice(0, 1000);
+    });
+  }, [lastSpeedtestResult]);
 
   // 15-second polling fallback — only active when WebSocket is disconnected to
   // ensure other browsers eventually see target changes even if they missed the
@@ -465,6 +524,32 @@ export default function Dashboard() {
               />
             ))}
           </div>
+        </div>
+      </div>
+    ),
+    speedtest: (
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-2">
+        <SpeedChart
+          results={speedtestResults}
+          show={speedtestConfig.show || 'both'}
+          height={speedtestHeight}
+          running={speedtestRunning}
+        />
+        {/* Vertical resize handle */}
+        <div
+          className="w-full h-2 flex items-center justify-center cursor-row-resize group mt-1"
+          onMouseDown={handleSpeedtestResizeMouseDown}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp') { setSpeedtestHeight(h => { const v = Math.max(SPEEDTEST_HEIGHT_MIN, h - 20); speedtestHeightRef.current = v; localStorage.setItem('dashSpeedtestHeight', v); return v; }); }
+            if (e.key === 'ArrowDown') { setSpeedtestHeight(h => { const v = Math.min(SPEEDTEST_HEIGHT_MAX, h + 20); speedtestHeightRef.current = v; localStorage.setItem('dashSpeedtestHeight', v); return v; }); }
+          }}
+          tabIndex={0}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Drag or use arrow keys to resize speedtest chart height"
+          title="Drag or use arrow keys to resize speedtest chart"
+        >
+          <div className="h-1 w-16 rounded-full bg-gray-800 group-hover:bg-blue-600 transition-colors" />
         </div>
       </div>
     ),
