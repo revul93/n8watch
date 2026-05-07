@@ -80,6 +80,7 @@ async function main() {
     auth.setPassword(password);
     console.log('\n✓ Admin password has been set successfully.');
     console.log('  You can now log in to the n8watch dashboard Settings page.');
+    process.exit(0);
   } catch (err) {
     console.error('\n✗ Failed to set password:', err.message);
     process.exit(1);

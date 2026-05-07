@@ -82,12 +82,15 @@ function destroySession(token) {
 }
 
 // Periodically clean up expired sessions
-setInterval(() => {
+const _sessionCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [token, exp] of _sessions.entries()) {
     if (now > exp) _sessions.delete(token);
   }
 }, 60 * 60 * 1000);
+if (typeof _sessionCleanupTimer.unref === 'function') {
+  _sessionCleanupTimer.unref();
+}
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

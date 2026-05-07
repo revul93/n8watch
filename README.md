@@ -21,6 +21,7 @@
   - [Server](#server)
   - [Alerts and Email Notifications](#alerts-and-email-notifications)
   - [Alert Rule Conditions](#alert-rule-conditions)
+  - [Internet Speed Tests](#internet-speed-tests)
 - [Running the Application](#running-the-application)
   - [Direct Start](#direct-start)
   - [Production with PM2](#production-with-pm2)
@@ -46,6 +47,7 @@
 - 📧 **Email Notifications** — Sends HTML-formatted SMTP emails when alert conditions fire, with per-rule cooldowns to suppress duplicate notifications.
 - 🔄 **Live Config Reload** — Edit `config.yaml` while the app is running; target changes, interval tweaks, and rule updates are applied within seconds — no restart required.
 - 🔌 **WebSocket Push** — Fresh metrics are broadcast to all connected browser tabs the instant each ping cycle completes.
+- ⚡ **Internet Speed Testing** — Optional scheduled download/upload checks using `speedtest-cli`, `fast-cli`, or both tools (averaged), with live chart updates.
 - 📤 **CSV Export** — Download raw ping data for any time range directly from the History page.
 - 🌐 **Multi-Interface Support** — Declare named network interfaces in `config.yaml` and assign a specific outgoing interface to any target. A drop-down in the dashboard lets users choose an interface when adding temporary targets.
 - 🗄️ **Lightweight Persistence** — Uses SQLite via `better-sqlite3`; no external database server required.
@@ -62,6 +64,8 @@
 | Node.js     | **24 LTS** (recommended) | v18+ minimum; v24 LTS strongly recommended     |
 | npm         | Bundled with Node.js | —                                                  |
 | `ping`      | System binary        | Pre-installed on Linux, macOS, and Windows         |
+| `speedtest-cli` | Optional CLI tool | Used for Internet speed tests (download/upload)    |
+| `fast-cli` (`fast`) | Optional CLI tool | Used for Internet speed tests (download/upload)    |
 
 > **Linux note:** If `ping` is not available, install it with:
 > ```bash
@@ -120,10 +124,12 @@ This clones the repository into an `n8watch/` directory in the current working d
 The setup script will:
 
 1. Verify (and optionally install) Node.js v24 and `ping`.
-2. Install backend dependencies (`npm install --omit=dev`).
-3. Install and build the React frontend (`cd client && npm install && npm run build`).
-4. Detect your network interfaces via `ip addr` (Linux) or `ifconfig` (macOS) and write them into `config.yaml`.
-5. Offer to start the app under PM2 and configure auto-start on boot.
+2. Install optional speedtest tools (`speedtest-cli` and `fast-cli`) used by the Internet Speed widget.
+3. Install backend dependencies (`npm install --omit=dev`).
+4. Install and build the React frontend (`cd client && npm install && npm run build`).
+5. Detect your network interfaces via `ip addr` (Linux) or `ifconfig` (macOS) and write them into `config.yaml`.
+6. Prompt for an admin dashboard password.
+7. Offer to start the app under PM2 and configure auto-start on boot.
 
 ---
 
@@ -384,6 +390,26 @@ condition: "is_alive == 0"        # Host not responding
 
 ---
 
+### Internet Speed Tests
+
+n8watch can run periodic internet speed tests and show results on the dashboard.
+
+```yaml
+speedtest:
+  enabled: false        # set true to enable scheduled tests
+  interval: 3600        # seconds between tests (minimum 60)
+  interface: ""         # optional outgoing interface name (used by speedtest-cli)
+  tool: "speedtest"     # "speedtest", "fast", or "both" (average)
+  show: "both"          # "download", "upload", or "both"
+```
+
+Notes:
+- `speedtest-cli` supports binding to a source IP (derived from the selected interface).
+- `fast-cli` does not support source-interface binding.
+- When `tool: "both"` is selected, n8watch runs both CLIs and averages successful results.
+
+---
+
 ## Running the Application
 
 ### Direct Start
@@ -554,12 +580,22 @@ All endpoints are prefixed with `/api` and return JSON.
 | `GET`  | `/api/dashboard` | Summary statistics (overall uptime, average latency, active alerts)  |
 | `GET`  | `/api/export`    | Export metrics to CSV                                                |
 
+### Speedtest
+
+| Method | Endpoint                 | Description                                      |
+|--------|--------------------------|--------------------------------------------------|
+| `GET`  | `/api/speedtest/results` | List historical speed test results               |
+| `GET`  | `/api/speedtest/latest`  | Get the most recent speed test result            |
+| `GET`  | `/api/speedtest/tools`   | Check if `speedtest-cli` and `fast` are present  |
+| `POST` | `/api/admin/speedtest/run` | Trigger an immediate speed test (admin auth)   |
+
 ### WebSocket
 
 Connect to `ws://<host>:3000` (use `wss://` behind a TLS-terminating proxy) to receive real-time push events:
 
 - **`ping_result`** — Emitted after each ping cycle with fresh metrics for all targets.
 - **`alert`** — Emitted when an alert rule fires.
+- **`speedtest_result`** — Emitted when a speed test run completes.
 - **`config_reloaded`** — Emitted when `config.yaml` is reloaded.
 
 ---
