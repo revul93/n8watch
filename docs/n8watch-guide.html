@@ -251,6 +251,7 @@
     <li><strong>Email notifications</strong> — HTML-formatted SMTP alerts with deduplication via cooldown timers.</li>
     <li><strong>Live config reload</strong> — edit <code>config.yaml</code> while running; targets and rules are applied within one second.</li>
     <li><strong>WebSocket push</strong> — all connected browsers receive updated metrics immediately after each ping cycle.</li>
+    <li><strong>Internet speed tests</strong> — optional scheduled download/upload measurements using <code>speedtest-cli</code>, <code>fast-cli</code>, or both.</li>
     <li><strong>Multi-interface support</strong> — bind outgoing pings to a specific NIC per target.</li>
     <li><strong>System-defined &amp; user-defined targets</strong> — permanent config-based hosts plus ad-hoc dashboard targets.</li>
     <li><strong>HTTPS support</strong> — optional TLS configuration for serving the dashboard securely.</li>
@@ -278,6 +279,8 @@
     <tr><td>Node.js</td><td><strong>24 LTS</strong> (v18+ minimum)</td><td><a href="https://nodejs.org">nodejs.org</a> — setup scripts install v24 automatically when absent</td></tr>
     <tr><td>npm</td><td>Bundled with Node.js</td><td>No separate install needed</td></tr>
     <tr><td><code>ping</code></td><td>System binary</td><td>Pre-installed on Linux, macOS, Windows. On Debian/Ubuntu: <code>sudo apt install iputils-ping</code></td></tr>
+    <tr><td><code>speedtest-cli</code></td><td>Optional CLI</td><td>Used for the Internet speed widget (download/upload)</td></tr>
+    <tr><td><code>fast-cli</code> (<code>fast</code>)</td><td>Optional CLI</td><td>Used for the Internet speed widget (download/upload)</td></tr>
     <tr><td>Git</td><td>Any recent version</td><td>Required for the one-line install scripts</td></tr>
   </table>
 
@@ -335,9 +338,11 @@ powershell -ExecutionPolicy Bypass -File setup.ps1</code></pre>
   <p>The setup script performs the following steps automatically:</p>
   <ol>
     <li>Checks for Node.js v24 LTS and installs it (via <code>nvm</code> or the platform package manager) if missing.</li>
+    <li>Installs optional speedtest tools (<code>speedtest-cli</code> and <code>fast-cli</code>) for the Internet speed widget.</li>
     <li>Installs backend Node.js dependencies (<code>npm install --omit=dev</code>).</li>
     <li>Installs and builds the React frontend (<code>cd client &amp;&amp; npm install &amp;&amp; npm run build</code>).</li>
     <li>Detects real network interfaces and writes them into <code>config.yaml</code>; falls back to copying <code>config.example.yaml</code>.</li>
+    <li>Prompts for an admin dashboard password.</li>
     <li>Optionally installs PM2, starts the application, and configures system-boot auto-startup.</li>
   </ol>
 
@@ -525,6 +530,19 @@ condition: "avg_latency > 200"    # Latency exceeds 200 ms
 condition: "jitter > 50"          # Jitter exceeds 50 ms
 condition: "is_alive == 0"        # Host not responding</code></pre>
 
+  <h2>3.7 Internet Speed Tests</h2>
+  <pre><code>speedtest:
+  enabled: false        # set true to enable scheduled tests
+  interval: 3600        # seconds between tests (minimum 60)
+  interface: ""         # optional outgoing interface name (used by speedtest-cli)
+  tool: "speedtest"     # "speedtest", "fast", or "both" (average)
+  show: "both"          # "download", "upload", or "both"</code></pre>
+  <ul>
+    <li><code>speedtest-cli</code> supports source IP binding (mapped from the selected interface).</li>
+    <li><code>fast-cli</code> does not support source-interface binding.</li>
+    <li><code>tool: "both"</code> runs both CLIs and averages successful results.</li>
+  </ul>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ SECTION 4 -->
@@ -685,6 +703,10 @@ node scripts/nuke-db.js --yes</code></pre>
     <tr><td>GET</td><td><code>/api/dashboard</code></td><td>Summary stats (uptime, avg latency, active alerts)</td></tr>
     <tr><td>GET</td><td><code>/api/export</code></td><td>Export metrics to CSV</td></tr>
     <tr><td>GET</td><td><code>/api/interfaces</code></td><td>List interfaces from <code>config.yaml</code></td></tr>
+    <tr><td>GET</td><td><code>/api/speedtest/results</code></td><td>List historical speed test results</td></tr>
+    <tr><td>GET</td><td><code>/api/speedtest/latest</code></td><td>Get latest speed test result</td></tr>
+    <tr><td>GET</td><td><code>/api/speedtest/tools</code></td><td>Check installed speed test CLI tools</td></tr>
+    <tr><td>POST</td><td><code>/api/admin/speedtest/run</code></td><td>Run an immediate speed test (admin auth)</td></tr>
   </table>
 
   <h2>WebSocket Events</h2>
@@ -696,6 +718,7 @@ node scripts/nuke-db.js --yes</code></pre>
     <tr><th>Event</th><th>Emitted when</th></tr>
     <tr><td><code>ping_result</code></td><td>After each full ping cycle — contains fresh metrics for all targets</td></tr>
     <tr><td><code>alert</code></td><td>An alert rule fires for a target</td></tr>
+    <tr><td><code>speedtest_result</code></td><td>A speed test run completes</td></tr>
     <tr><td><code>config_reloaded</code></td><td><code>config.yaml</code> is saved and reloaded</td></tr>
   </table>
 

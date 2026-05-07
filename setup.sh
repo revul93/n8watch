@@ -100,6 +100,53 @@ echo "✓ Node.js $(node -v) detected"
 echo "✓ npm $(npm --version) detected"
 echo "✓ ping binary found at $(which ping)"
 
+# ── Optional speedtest CLI tools (recommended for Internet Speed widget) ──────
+install_speedtest_tools() {
+  echo ""
+  echo "Checking optional speedtest tools (speedtest-cli + fast-cli)..."
+
+  if command -v speedtest-cli &> /dev/null; then
+    echo "✓ speedtest-cli found at $(which speedtest-cli)"
+  else
+    echo "speedtest-cli not found. Installing..."
+    if command -v pip3 &> /dev/null; then
+      if pip3 install --user speedtest-cli; then
+        export PATH="$HOME/.local/bin:$PATH"
+      else
+        echo "  WARNING: Failed to install speedtest-cli via pip3."
+      fi
+    elif command -v apt-get &> /dev/null && command -v sudo &> /dev/null; then
+      sudo apt-get update -qq
+      sudo apt-get install -y speedtest-cli || echo "  WARNING: apt install speedtest-cli failed."
+    elif command -v dnf &> /dev/null && command -v sudo &> /dev/null; then
+      sudo dnf install -y speedtest-cli || echo "  WARNING: dnf install speedtest-cli failed."
+    elif command -v yum &> /dev/null && command -v sudo &> /dev/null; then
+      sudo yum install -y speedtest-cli || echo "  WARNING: yum install speedtest-cli failed."
+    else
+      echo "  WARNING: No supported package manager found to install speedtest-cli automatically."
+    fi
+
+    if command -v speedtest-cli &> /dev/null; then
+      echo "✓ speedtest-cli installed"
+    else
+      echo "  WARNING: speedtest-cli is still not available. Internet speed tests using speedtest may fail."
+    fi
+  fi
+
+  if command -v fast &> /dev/null; then
+    echo "✓ fast-cli found at $(which fast)"
+  else
+    echo "fast-cli not found. Installing globally with npm..."
+    if npm install -g fast-cli; then
+      echo "✓ fast-cli installed"
+    else
+      echo "  WARNING: Failed to install fast-cli. Internet speed tests using fast may fail."
+    fi
+  fi
+}
+
+install_speedtest_tools
+
 echo ""
 echo "Installing backend dependencies..."
 npm install --omit=dev
