@@ -3,6 +3,7 @@
 const cron = require('node-cron');
 const { pingAllTargets } = require('./ping-engine');
 const { broadcast }      = require('./websocket');
+const speedtestEngine    = require('./speedtest-engine');
 
 let _activeTasks = [];
 
@@ -123,6 +124,42 @@ function initScheduler(config, db, wss, alertEngine, emailSvc) {
   }
 
   _activeTasks.push(pingTask);
+
+  // ── Speedtest cycle ───────────────────────────────────────────────────────────
+  if (config.speedtest && config.speedtest.enabled) {
+    const stInterval = Math.max(60, Math.floor(config.speedtest.interval || 3600));
+    const stIntervalMs = stInterval * 1000;
+
+    async function runSpeedtestCycle() {
+      console.log('[Scheduler] Running internet speed test…');
+      try {
+        const result = await speedtestEngine.runSpeedtest(config);
+        const rowId  = db.insertSpeedtestResult(result);
+        broadcast('speedtest_result', { id: rowId, ...result });
+        console.log(`[Scheduler] Speed test done — ↓${result.download} Mbps  ↑${result.upload} Mbps`);
+      } catch (err) {
+        console.error('[Scheduler] Speed test error:', err.message);
+        try {
+          db.insertSpeedtestResult({ error: err.message, created_at: Date.now() });
+        } catch (_) {}
+      }
+    }
+
+    let speedtestTask;
+    if (stInterval < 60) {
+      const pattern = `*/${stInterval} * * * * *`;
+      console.log(`[Scheduler] Speedtest job: every ${stInterval}s (cron: ${pattern})`);
+      speedtestTask = cron.schedule(pattern, runSpeedtestCycle);
+    } else {
+      console.log(`[Scheduler] Speedtest job: every ${stInterval}s (setInterval)`);
+      const timerId = setInterval(runSpeedtestCycle, stIntervalMs);
+      speedtestTask = { stop: () => clearInterval(timerId) };
+      // Run immediately so the dashboard has data on first load
+      runSpeedtestCycle();
+    }
+
+    _activeTasks.push(speedtestTask);
+  }
 
   // ── Data retention cleanup — daily at 02:00 ──────────────────────────────────
   const cleanupTask = cron.schedule('0 2 * * *', () => {

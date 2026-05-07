@@ -324,7 +324,7 @@ router.put('/config/dashboard', requireAuth, (req, res) => {
     const config = getConfig();
     if (!config.dashboard) config.dashboard = {};
     if (!config.dashboard.visibility) config.dashboard.visibility = {};
-    for (const key of ['summary', 'chart', 'groups', 'hosts']) {
+    for (const key of ['summary', 'chart', 'groups', 'hosts', 'speedtest']) {
       if (typeof visibility[key] === 'boolean') {
         config.dashboard.visibility[key] = visibility[key];
       }
@@ -335,6 +335,76 @@ router.put('/config/dashboard', requireAuth, (req, res) => {
   } catch (err) {
     console.error('[Admin] PUT /config/dashboard:', err.message);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Speedtest settings ────────────────────────────────────────────────────────
+
+// PUT /api/admin/config/speedtest  — update speedtest settings
+router.put('/config/speedtest', requireAuth, (req, res) => {
+  try {
+    const { enabled, interval, interface: iface, tool, show } = req.body || {};
+    const config = getConfig();
+    if (!config.speedtest) config.speedtest = {};
+
+    if (typeof enabled === 'boolean') {
+      config.speedtest.enabled = enabled;
+    }
+    if (interval !== undefined) {
+      const v = parseInt(interval, 10);
+      if (isNaN(v) || v < 60) {
+        return res.status(400).json({ error: 'interval must be at least 60 seconds' });
+      }
+      config.speedtest.interval = v;
+    }
+    if (iface !== undefined) {
+      config.speedtest.interface = typeof iface === 'string' ? iface.trim() : '';
+    }
+    if (tool !== undefined) {
+      if (!['speedtest', 'fast', 'both'].includes(tool)) {
+        return res.status(400).json({ error: 'tool must be "speedtest", "fast", or "both"' });
+      }
+      config.speedtest.tool = tool;
+    }
+    if (show !== undefined) {
+      if (!['download', 'upload', 'both'].includes(show)) {
+        return res.status(400).json({ error: 'show must be "download", "upload", or "both"' });
+      }
+      config.speedtest.show = show;
+    }
+
+    saveConfig(config);
+    broadcast('config_reloaded', {});
+    res.json({ success: true, speedtest: config.speedtest });
+  } catch (err) {
+    console.error('[Admin] PUT /config/speedtest:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/speedtest/run  — trigger an immediate speed test
+router.post('/speedtest/run', requireAuth, async (req, res) => {
+  try {
+    const { runSpeedtest } = require('../speedtest-engine');
+    const { insertSpeedtestResult } = require('../database');
+    const config = getConfig();
+
+    if (!config.speedtest?.enabled) {
+      return res.status(400).json({ error: 'Speedtest is disabled in config' });
+    }
+
+    const result = await runSpeedtest(config);
+    const id = insertSpeedtestResult(result);
+    broadcast('speedtest_result', { id, ...result });
+    res.json({ success: true, result: { id, ...result } });
+  } catch (err) {
+    console.error('[Admin] POST /speedtest/run:', err.message);
+    // Persist the failure so the chart shows an error marker
+    try {
+      const { insertSpeedtestResult } = require('../database');
+      insertSpeedtestResult({ error: err.message, created_at: Date.now() });
+    } catch (_) {}
+    res.status(500).json({ error: err.message || 'Speed test failed' });
   }
 });
 

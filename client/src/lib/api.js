@@ -195,3 +195,25 @@ export function adminSaveSecurity(token, data) {
 export function adminSaveDashboard(token, data) {
   return adminRequest('/config/dashboard', 'PUT', data, token);
 }
+
+export function adminSaveSpeedtest(token, data) {
+  return adminRequest('/config/speedtest', 'PUT', data, token);
+}
+
+export function adminRunSpeedtest(token) {
+  return adminRequest('/speedtest/run', 'POST', undefined, token);
+}
+
+// ── Speedtest API ─────────────────────────────────────────────────────────────
+
+export function getSpeedtestResults(params) {
+  return request('/speedtest/results', params).then(res => res.results || []);
+}
+
+export function getLatestSpeedtestResult() {
+  return request('/speedtest/latest').then(res => res.result || null);
+}
+
+export function getSpeedtestTools() {
+  return request('/speedtest/tools');
+}

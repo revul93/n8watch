@@ -36,11 +36,13 @@ router.get('/config', (req, res) => {
   try {
     const { getConfig } = require('../config');
     const config = getConfig();
+    const defaultVis = { summary: true, chart: true, groups: true, hosts: true, speedtest: true };
     res.json({
       max_user_target_lifetime_days: config.general.max_user_target_lifetime_days,
       visibility: config.dashboard && config.dashboard.visibility
-        ? config.dashboard.visibility
-        : { summary: true, chart: true, groups: true, hosts: true },
+        ? { ...defaultVis, ...config.dashboard.visibility }
+        : defaultVis,
+      speedtest: config.speedtest || {},
     });
   } catch (err) {
     console.error('[Routes/dashboard] GET /config:', err.message);

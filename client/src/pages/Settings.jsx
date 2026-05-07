@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Lock, LogOut, Plus, Trash2, Save, RefreshCw, ChevronDown, ChevronUp,
-  Server, Wifi, Bell, Mail, Settings2, Target, Shield, Eye
+  Server, Wifi, Bell, Mail, Settings2, Target, Shield, Eye, Gauge, Play
 } from 'lucide-react';
 import {
   adminHasPassword, adminLogin, adminLogout, adminVerify, adminGetConfig,
   adminSaveTargets, adminAddTarget, adminDeleteTarget,
   adminSaveInterfaces, adminSaveAlertRules, adminSaveSmtp,
   adminSaveServer, adminSaveGeneral, adminSaveSecurity, adminSaveDashboard,
+  adminSaveSpeedtest, adminRunSpeedtest, getSpeedtestTools, getInterfaces,
 } from '../lib/api';
 import { cn } from '../lib/utils';
 
@@ -869,27 +870,29 @@ function SecuritySection({ config, token, onConfigRefresh }) {
 function ViewSection({ config, token, onConfigRefresh }) {
   const vis = config?.dashboard?.visibility || {};
 
-  const [summary, setSummary] = useState(vis.summary !== false);
-  const [chart, setChart]     = useState(vis.chart   !== false);
-  const [groups, setGroups]   = useState(vis.groups  !== false);
-  const [hosts, setHosts]     = useState(vis.hosts   !== false);
-  const [saving, setSaving]   = useState(false);
-  const [saved, setSaved]     = useState(false);
-  const [error, setError]     = useState('');
+  const [summary,   setSummary]   = useState(vis.summary    !== false);
+  const [chart,     setChart]     = useState(vis.chart      !== false);
+  const [groups,    setGroups]    = useState(vis.groups     !== false);
+  const [hosts,     setHosts]     = useState(vis.hosts      !== false);
+  const [speedtest, setSpeedtest] = useState(vis.speedtest  !== false);
+  const [saving, setSaving]       = useState(false);
+  const [saved, setSaved]         = useState(false);
+  const [error, setError]         = useState('');
 
   useEffect(() => {
     if (!config) return;
     const v = config.dashboard?.visibility || {};
-    setSummary(v.summary !== false);
-    setChart(v.chart   !== false);
-    setGroups(v.groups  !== false);
-    setHosts(v.hosts   !== false);
+    setSummary(v.summary    !== false);
+    setChart(v.chart        !== false);
+    setGroups(v.groups      !== false);
+    setHosts(v.hosts        !== false);
+    setSpeedtest(v.speedtest !== false);
   }, [config]);
 
   const handleSave = async () => {
     setSaving(true); setError(''); setSaved(false);
     try {
-      await adminSaveDashboard(token, { visibility: { summary, chart, groups, hosts } });
+      await adminSaveDashboard(token, { visibility: { summary, chart, groups, hosts, speedtest } });
       setSaved(true);
       onConfigRefresh();
       setTimeout(() => setSaved(false), 3000);
@@ -904,12 +907,187 @@ function ViewSection({ config, token, onConfigRefresh }) {
           Control which sections are shown on the main dashboard. Changes take effect immediately for all connected clients.
         </p>
         <div className="flex flex-col gap-3">
-          <Toggle label="Summary Cards (up/down counts, avg latency…)" checked={summary} onChange={setSummary} />
-          <Toggle label="Network Chart (latency / packet-loss over time)" checked={chart} onChange={setChart} />
-          <Toggle label="Groups (grouped target overview)" checked={groups} onChange={setGroups} />
-          <Toggle label="Host Cards (individual target cards)" checked={hosts} onChange={setHosts} />
+          <Toggle label="Summary Cards (up/down counts, avg latency…)" checked={summary}   onChange={setSummary} />
+          <Toggle label="Network Chart (latency / packet-loss over time)" checked={chart}   onChange={setChart} />
+          <Toggle label="Internet Speed Chart (download / upload)"       checked={speedtest} onChange={setSpeedtest} />
+          <Toggle label="Groups (grouped target overview)"               checked={groups}   onChange={setGroups} />
+          <Toggle label="Host Cards (individual target cards)"           checked={hosts}    onChange={setHosts} />
         </div>
         <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Speedtest section ─────────────────────────────────────────────────────────
+function SpeedtestSection({ config, token, onConfigRefresh }) {
+  const st = config?.speedtest || {};
+
+  const [enabled,   setEnabled]   = useState(st.enabled  || false);
+  const [interval,  setInterval_] = useState(st.interval || 3600);
+  const [iface,     setIface]     = useState(st.interface || '');
+  const [tool,      setTool]      = useState(st.tool      || 'speedtest');
+  const [show,      setShow]      = useState(st.show      || 'both');
+  const [saving,    setSaving]    = useState(false);
+  const [saved,     setSaved]     = useState(false);
+  const [error,     setError]     = useState('');
+  const [runResult, setRunResult] = useState(null);
+  const [running,   setRunning]   = useState(false);
+
+  // Available tools & interfaces
+  const [tools, setTools]       = useState({ speedtest: null, fast: null }); // null = unknown
+  const [interfaces, setIfaces] = useState([]);
+
+  useEffect(() => {
+    getSpeedtestTools()
+      .then(t => setTools(t))
+      .catch(() => {});
+    getInterfaces()
+      .then(list => setIfaces(list || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    const s = config.speedtest || {};
+    setEnabled(s.enabled  || false);
+    setInterval_(s.interval || 3600);
+    setIface(s.interface   || '');
+    setTool(s.tool         || 'speedtest');
+    setShow(s.show         || 'both');
+  }, [config]);
+
+  const handleSave = async () => {
+    const iv = parseInt(interval, 10);
+    if (isNaN(iv) || iv < 60) { setError('Interval must be at least 60 seconds'); return; }
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      await adminSaveSpeedtest(token, {
+        enabled,
+        interval: iv,
+        interface: iface,
+        tool,
+        show,
+      });
+      setSaved(true);
+      onConfigRefresh();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleRunNow = async () => {
+    setRunning(true); setRunResult(null); setError('');
+    try {
+      const { result } = await adminRunSpeedtest(token);
+      setRunResult(result);
+    } catch (err) {
+      setError(err.message || 'Speed test failed');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const toolLabel = (name) => {
+    if (tools[name] === null) return name === 'speedtest' ? 'speedtest-cli' : 'fast-cli';
+    return tools[name]
+      ? (name === 'speedtest' ? 'speedtest-cli ✓' : 'fast-cli ✓')
+      : (name === 'speedtest' ? 'speedtest-cli (not installed)' : 'fast-cli (not installed)');
+  };
+
+  const ifaceOptions = [
+    { value: '', label: '— system default —' },
+    ...interfaces.map(f => ({ value: f.name, label: f.alias ? `${f.name} — ${f.alias}` : f.name })),
+  ];
+
+  return (
+    <SectionCard icon={Gauge} title="Internet Speedtest">
+      <div className="flex flex-col gap-4">
+        <p className="text-xs text-gray-500">
+          Periodically measures download and upload speed using <code className="bg-gray-800 px-1 rounded">speedtest-cli</code> and/or <code className="bg-gray-800 px-1 rounded">fast-cli</code>.
+          Install the tools globally on the server before enabling.
+        </p>
+
+        <Toggle label="Enable periodic speed tests" checked={enabled} onChange={setEnabled} />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Test interval (seconds, min 60)</label>
+            <input
+              type="number"
+              value={interval}
+              onChange={e => setInterval_(e.target.value)}
+              min={60}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <SelectField
+            label="Outgoing interface"
+            value={iface}
+            onChange={setIface}
+            options={ifaceOptions}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Tool</label>
+            <select
+              value={tool}
+              onChange={e => setTool(e.target.value)}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+            >
+              <option value="speedtest">{toolLabel('speedtest')}</option>
+              <option value="fast">{toolLabel('fast')}</option>
+              <option value="both">Both (average of speedtest-cli + fast-cli)</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Show on dashboard</label>
+            <select
+              value={show}
+              onChange={e => setShow(e.target.value)}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+            >
+              <option value="both">Download + Upload</option>
+              <option value="download">Download only</option>
+              <option value="upload">Upload only</option>
+            </select>
+          </div>
+        </div>
+
+        <SaveBar saving={saving} saved={saved} error={error} onSave={handleSave} />
+
+        <hr className="border-gray-800" />
+
+        {/* Run Now */}
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-gray-400 font-medium">Manual Test</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={handleRunNow}
+              disabled={running || !enabled}
+              title={!enabled ? 'Enable speedtest first' : 'Run a speed test immediately'}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+            >
+              {running
+                ? <RefreshCw size={14} className="animate-spin" />
+                : <Play size={14} />}
+              {running ? 'Running…' : 'Run Test Now'}
+            </button>
+            {runResult && (
+              <span className="text-xs text-green-400">
+                ↓ {runResult.download != null ? `${runResult.download} Mbps` : '—'}
+                {'  '}↑ {runResult.upload != null ? `${runResult.upload} Mbps` : '—'}
+              </span>
+            )}
+          </div>
+          {!enabled && (
+            <p className="text-xs text-gray-500">Enable speedtest and save before running a manual test.</p>
+          )}
+        </div>
       </div>
     </SectionCard>
   );
@@ -923,6 +1101,7 @@ const TABS = [
   { id: 'smtp',       label: 'SMTP',       icon: Mail    },
   { id: 'server',     label: 'Server',     icon: Server  },
   { id: 'security',   label: 'Security',   icon: Shield  },
+  { id: 'speedtest',  label: 'Speedtest',  icon: Gauge   },
   { id: 'view',       label: 'View',       icon: Eye     },
 ];
 
@@ -1016,6 +1195,7 @@ export default function Settings() {
           {activeTab === 'smtp'       && <SmtpSection       config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
           {activeTab === 'server'     && <ServerSection     config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
           {activeTab === 'security'   && <SecuritySection   config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
+          {activeTab === 'speedtest'  && <SpeedtestSection  config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
           {activeTab === 'view'       && <ViewSection       config={config} token={token} onConfigRefresh={() => fetchConfig(token)} />}
         </>
       )}

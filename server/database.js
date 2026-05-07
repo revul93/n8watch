@@ -102,6 +102,20 @@ function initDatabase() {
 
     CREATE INDEX IF NOT EXISTS idx_expired_targets_expired_at
       ON expired_targets(expired_at DESC);
+
+    -- Speedtest results: periodic internet speed measurements
+    CREATE TABLE IF NOT EXISTS speedtest_results (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      download    REAL,       -- Mbps
+      upload      REAL,       -- Mbps
+      tool        TEXT,       -- "speedtest", "fast", or "both"
+      interface   TEXT,
+      error       TEXT,       -- non-null when the test failed
+      created_at  INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_speedtest_created
+      ON speedtest_results(created_at DESC);
   `);
 
   // Migrate existing databases: add columns if they don't exist yet
@@ -774,11 +788,15 @@ function deleteOldData(retentionDays) {
   const delAlerts = db
     .prepare("DELETE FROM alerts WHERE created_at < ? AND resolved = 1")
     .run(cutoff);
+  const delSpeedtest = db
+    .prepare("DELETE FROM speedtest_results WHERE created_at < ?")
+    .run(cutoff);
   const delUserTargets = cleanupExpiredUserTargets();
 
   return {
     deletedPings: delPings.changes,
     deletedAlerts: delAlerts.changes,
+    deletedSpeedtest: delSpeedtest.changes,
     deletedUserTargets: delUserTargets,
   };
 }
@@ -798,6 +816,52 @@ function getLatestPingResultForAll() {
   `,
     )
     .all();
+}
+
+// ── Speedtest helpers ─────────────────────────────────────────────────────────
+
+function insertSpeedtestResult(data) {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT INTO speedtest_results (download, upload, tool, interface, error, created_at)
+    VALUES (@download, @upload, @tool, @interface, @error, @created_at)
+  `);
+  const result = stmt.run({
+    download:   data.download   ?? null,
+    upload:     data.upload     ?? null,
+    tool:       data.tool       || null,
+    interface:  data.interface  || null,
+    error:      data.error      || null,
+    created_at: data.created_at ?? Date.now(),
+  });
+  return result.lastInsertRowid;
+}
+
+function getSpeedtestResults({ from, to, limit = 100 } = {}) {
+  const db    = getDb();
+  const fromMs = parseMs(from, 0);
+  const toMs   = parseMs(to, Date.now());
+  const lim    = Math.min(Number(limit) || 100, 1000);
+
+  return db
+    .prepare(
+      `SELECT * FROM speedtest_results
+       WHERE created_at >= ? AND created_at <= ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(fromMs, toMs, lim);
+}
+
+function getLatestSpeedtestResult() {
+  const db = getDb();
+  return (
+    db
+      .prepare(
+        `SELECT * FROM speedtest_results ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get() || null
+  );
 }
 
 module.exports = {
@@ -824,4 +888,7 @@ module.exports = {
   cleanupExpiredUserTargets,
   archiveExpiredUserTargets,
   getExpiredTargets,
+  insertSpeedtestResult,
+  getSpeedtestResults,
+  getLatestSpeedtestResult,
 };
