@@ -589,7 +589,7 @@ function drawN8Mark(doc, x, y, size) {
  */
 export function buildISPReportDoc(data, opts = {}) {
   const { target, period, summary, events = [], series = [], latency_threshold = 100, jitter_threshold = 0, outages_only = false, generated_at, events_truncated, log = [], log_total = 0, log_truncated = false } = data;
-  const { logoDataUrl = null, companyName = "" } = opts;
+  const { logoDataUrl = null, companyName = "", summaryOnly = false } = opts;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -665,18 +665,23 @@ export function buildISPReportDoc(data, opts = {}) {
 
   // ── Summary ─────────────────────────────────────────────────────────────────
   const s = summary || {};
+  const summaryBody = summaryOnly
+    ? [
+        ["Uptime", s.uptime_pct != null ? `${fmt(s.uptime_pct, 2)}%` : "N/A", "Samples", String(s.samples ?? 0)],
+      ]
+    : [
+        ["Uptime", s.uptime_pct != null ? `${fmt(s.uptime_pct, 2)}%` : "N/A", "Samples", String(s.samples ?? 0)],
+        ["Average latency", s.avg_latency != null ? `${fmt(s.avg_latency)} ms` : "N/A", "Packet loss", s.packet_loss_pct != null ? `${fmt(s.packet_loss_pct, 2)}%` : "N/A"],
+        ["Min / Max latency", `${fmt(s.min_latency)} / ${fmt(s.max_latency)} ms`, "Avg jitter", s.avg_jitter != null ? `${fmt(s.avg_jitter)} ms` : "N/A"],
+        ["Down samples", String(s.down ?? 0), "Longest outage", fmtDuration(s.longest_outage_ms)],
+        ["Outages", String(s.outage_count ?? 0), "Degraded periods", String(s.degraded_count ?? 0)],
+        ["Minor blips", String(s.minor_count ?? 0), "", ""],
+      ];
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
     theme: "grid",
-    body: [
-      ["Uptime", s.uptime_pct != null ? `${fmt(s.uptime_pct, 2)}%` : "N/A", "Samples", String(s.samples ?? 0)],
-      ["Average latency", s.avg_latency != null ? `${fmt(s.avg_latency)} ms` : "N/A", "Packet loss", s.packet_loss_pct != null ? `${fmt(s.packet_loss_pct, 2)}%` : "N/A"],
-      ["Min / Max latency", `${fmt(s.min_latency)} / ${fmt(s.max_latency)} ms`, "Avg jitter", s.avg_jitter != null ? `${fmt(s.avg_jitter)} ms` : "N/A"],
-      ["Down samples", String(s.down ?? 0), "Longest outage", fmtDuration(s.longest_outage_ms)],
-      ["Outages", String(s.outage_count ?? 0), "Degraded periods", String(s.degraded_count ?? 0)],
-      ["Minor blips", String(s.minor_count ?? 0), "", ""],
-    ],
+    body: summaryBody,
     styles: { fontSize: 8.5, textColor: [30, 41, 59], lineColor: [226, 232, 240], lineWidth: 0.15, cellPadding: 1.6 },
     columnStyles: {
       0: { fontStyle: "bold", textColor: [100, 116, 139], cellWidth: 38 },
@@ -685,6 +690,17 @@ export function buildISPReportDoc(data, opts = {}) {
     },
   });
   y = doc.lastAutoTable.finalY + 8;
+
+  if (summaryOnly) {
+    // Archived target with no retained per-sample data — show the caveat and stop.
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    const note = doc.splitTextToSize(
+      "This is a summary of an archived target. Per-sample latency history, availability events, and the detailed log were not retained and are unavailable for this period. The figures above are the retained lifetime summary.",
+      pageW - 2 * margin,
+    );
+    doc.text(note, margin, y);
+  } else {
 
   // ── Latency trend ─────────────────────────────────────────────────────────────
   doc.setFont("helvetica", "bold");
@@ -823,6 +839,8 @@ export function buildISPReportDoc(data, opts = {}) {
       },
     });
   }
+
+  } // end !summaryOnly
 
   // ── Footer on every page ──────────────────────────────────────────────────────
   const totalPages = doc.internal.getNumberOfPages();

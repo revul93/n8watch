@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useApi } from '../hooks/useApi';
-import { getExpiredTargets } from '../lib/api';
-import { RefreshCw, Archive, Clock } from 'lucide-react';
+import { getExpiredTargets, getLogReportData, getBrandingLogo, getReportConfig } from '../lib/api';
+import { generateISPReport } from '../lib/reportGenerator';
+import { RefreshCw, Archive, Clock, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 function formatDate(ms) {
@@ -36,12 +37,43 @@ export default function ExpiredTargets() {
   const { targetsChangedAt } = useWebSocket();
   const { data: targets, loading, refetch } = useApi(getExpiredTargets, []);
 
+  const [pdfBusyId, setPdfBusyId] = useState(null);
+  const [pdfError, setPdfError] = useState('');
+
   // Refresh when the scheduler broadcasts a targets_changed event (e.g. expiry)
   useEffect(() => {
     if (targetsChangedAt) refetch();
   }, [targetsChangedAt, refetch]);
 
   const rows = targets || [];
+
+  async function handleExportPdf(target) {
+    setPdfBusyId(target.target_id);
+    setPdfError('');
+    try {
+      const [cfg, logoDataUrl] = await Promise.all([
+        getReportConfig().catch(() => null),
+        getBrandingLogo().catch(() => null),
+      ]);
+      const rc = cfg || {};
+      const data = await getLogReportData(
+        target.target_id,
+        target.target_created_at || undefined,
+        target.expired_at || undefined,
+        {
+          latencyThreshold: rc.latency_threshold,
+          jitterThreshold: rc.jitter_threshold,
+          outagesOnly: rc.outages_only,
+          includeLog: rc.detailed_log !== false,
+        },
+      );
+      generateISPReport(data, { logoDataUrl });
+    } catch (e) {
+      setPdfError(`${target.name}: ${e.message || 'Failed to generate report'}`);
+    } finally {
+      setPdfBusyId(null);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -69,6 +101,7 @@ export default function ExpiredTargets() {
       {/* Stats bar */}
       <div className="flex items-center gap-3 text-sm text-gray-400">
         <span className="font-medium text-white">{rows.length}</span> archived target{rows.length !== 1 ? 's' : ''}
+        {pdfError && <span className="text-xs text-red-400">· {pdfError}</span>}
       </div>
 
       {/* Table */}
@@ -95,11 +128,12 @@ export default function ExpiredTargets() {
                   <th className="text-left px-4 py-3 font-medium">Expired</th>
                   <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">Pings</th>
                   <th className="text-right px-4 py-3 font-medium">Uptime</th>
+                  <th className="text-right px-4 py-3 font-medium">Report</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
-                {rows.map((target) => (
-                  <tr key={target.id} className="hover:bg-gray-800/50 transition-colors">
+                {rows.map((target, idx) => (
+                  <tr key={target.target_id ?? `legacy-${target.ip}-${target.expired_at}-${idx}`} className="hover:bg-gray-800/50 transition-colors">
                     {/* Composite display name: ip — hostname — expiry date */}
                     <td className="px-4 py-3">
                       <span className="font-mono text-gray-300 text-xs break-all">
@@ -123,6 +157,23 @@ export default function ExpiredTargets() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <UptimeBadge uptime={target.uptime_overall} />
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {target.reportable && (target.ping_count ?? 0) > 0 ? (
+                        <button
+                          onClick={() => handleExportPdf(target)}
+                          disabled={pdfBusyId != null}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-md text-xs text-white transition-colors"
+                          title="Download the availability report PDF for this expired target"
+                        >
+                          <FileText size={12} />
+                          {pdfBusyId === target.target_id ? 'Generating…' : 'PDF'}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-600" title="Per-sample history was not retained for this archived target">
+                          n/a
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

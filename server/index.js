@@ -106,8 +106,11 @@ async function main() {
   app.use(express.static(distPath, { maxAge: "7d", immutable: true }));
 
   // 6. Mount all API routes
-  app.use("/api/targets", targetsRouter);
+  // expiredTargetsRouter must be mounted before targetsRouter: the latter's
+  // GET /:id route would otherwise capture /api/targets/expired (id="expired")
+  // and reject it as an invalid id before the /expired handler is reached.
   app.use("/api/targets", expiredTargetsRouter);
+  app.use("/api/targets", targetsRouter);
   app.use("/api/targets", metricsRouter);
   app.use("/api/targets", exportRouter);
   app.use("/api/ping-results", pingResultsRouter);

@@ -35,6 +35,7 @@ function initDatabase() {
       interface_alias TEXT,
       is_user_target  INTEGER NOT NULL DEFAULT 0,
       expires_at      INTEGER,
+      archived_at     INTEGER,
       created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
       updated_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
     );
@@ -131,6 +132,9 @@ function initDatabase() {
   if (!targetCols.includes("expires_at")) {
     _db.exec("ALTER TABLE targets ADD COLUMN expires_at INTEGER");
   }
+  if (!targetCols.includes("archived_at")) {
+    _db.exec("ALTER TABLE targets ADD COLUMN archived_at INTEGER");
+  }
   if (!targetCols.includes("interface")) {
     _db.exec("ALTER TABLE targets ADD COLUMN interface TEXT");
   }
@@ -162,13 +166,14 @@ function initDatabase() {
         interface_alias TEXT,
         is_user_target  INTEGER NOT NULL DEFAULT 0,
         expires_at      INTEGER,
+        archived_at     INTEGER,
         created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
         updated_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
       );
 
       INSERT INTO targets_new
         SELECT id, name, ip, grp, interface, interface_alias,
-               is_user_target, expires_at, created_at, updated_at
+               is_user_target, expires_at, archived_at, created_at, updated_at
         FROM targets;
 
       DROP TABLE targets;
@@ -479,6 +484,10 @@ function getUptime(targetId) {
 
 function getDashboardSummary() {
   const db = getDb();
+  const now = Date.now();
+
+  // Exclude expired user targets (retained for reporting) from active counts.
+  const NOT_EXPIRED = '(t.is_user_target = 0 OR t.expires_at IS NULL OR t.expires_at > ?)';
 
   const counts = db
     .prepare(
@@ -492,9 +501,10 @@ function getDashboardSummary() {
     LEFT JOIN ping_results pr ON pr.id = (
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
     )
+    WHERE ${NOT_EXPIRED}
   `,
     )
-    .get();
+    .get(now);
 
   const latency = db
     .prepare(
@@ -506,10 +516,10 @@ function getDashboardSummary() {
     JOIN ping_results pr ON pr.id = (
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
     )
-    WHERE pr.is_alive = 1
+    WHERE pr.is_alive = 1 AND ${NOT_EXPIRED}
   `,
     )
-    .get();
+    .get(now);
 
   const activeAlerts = db
     .prepare(
@@ -712,67 +722,64 @@ function getUserTargets() {
     .all(Date.now());
 }
 
+// Mark user targets whose lifetime has ended as archived. The target row and
+// its ping history are RETAINED (so an availability report can still be
+// generated afterwards); active views exclude them via the expires_at filter.
+// archived_at is set once, so this only reports each target as newly-expired a
+// single time (used to notify clients).
 function archiveExpiredUserTargets() {
   const db = getDb();
   const now = Date.now();
 
-  // Find all expired user targets that have not yet been archived
-  const expired = db
+  const result = db
     .prepare(
-      `SELECT t.id, t.name, t.ip, t.interface, t.interface_alias,
-              t.created_at, t.expires_at,
-              COUNT(pr.id) AS ping_count,
-              CASE WHEN COUNT(pr.id) > 0
-                   THEN SUM(CASE WHEN pr.is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(pr.id)
-                   ELSE NULL END AS uptime_overall
+      `UPDATE targets
+         SET archived_at = ?
+       WHERE is_user_target = 1
+         AND expires_at IS NOT NULL
+         AND expires_at <= ?
+         AND archived_at IS NULL`,
+    )
+    .run(now, now);
+
+  return result.changes;
+}
+
+// Expired user targets for the Expired page. Live rows (retained in `targets`)
+// are reportable (they carry the real target_id and keep their ping history);
+// legacy rows from the old `expired_targets` archive are summary-only.
+function getExpiredTargets() {
+  const db = getDb();
+  const now = Date.now();
+  return db
+    .prepare(
+      `SELECT
+         t.id                                        AS target_id,
+         t.name, t.ip, t.interface, t.interface_alias,
+         t.created_at                                AS target_created_at,
+         t.expires_at                                AS expired_at,
+         t.archived_at,
+         (SELECT COUNT(*) FROM ping_results pr WHERE pr.target_id = t.id) AS ping_count,
+         (SELECT CASE WHEN COUNT(*) > 0
+                      THEN SUM(CASE WHEN pr.is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)
+                      ELSE NULL END
+            FROM ping_results pr WHERE pr.target_id = t.id)               AS uptime_overall,
+         1                                           AS reportable
        FROM targets t
-       LEFT JOIN ping_results pr ON pr.target_id = t.id
        WHERE t.is_user_target = 1
          AND t.expires_at IS NOT NULL
          AND t.expires_at <= ?
-       GROUP BY t.id`,
+       UNION ALL
+       SELECT
+         NULL AS target_id,
+         name, ip, interface, interface_alias,
+         target_created_at, expired_at, archived_at,
+         ping_count, uptime_overall,
+         0 AS reportable
+       FROM expired_targets
+       ORDER BY expired_at DESC`,
     )
     .all(now);
-
-  if (expired.length === 0) return 0;
-
-  const archiveStmt = db.prepare(`
-    INSERT INTO expired_targets
-      (name, ip, interface, interface_alias, target_created_at, expired_at, archived_at, ping_count, uptime_overall)
-    VALUES
-      (@name, @ip, @interface, @interface_alias, @target_created_at, @expired_at, @archived_at, @ping_count, @uptime_overall)
-  `);
-
-  const deleteStmt = db.prepare('DELETE FROM targets WHERE id = ?');
-
-  const doArchive = db.transaction((rows) => {
-    for (const row of rows) {
-      archiveStmt.run({
-        name:              row.name,
-        ip:                row.ip,
-        interface:         row.interface || null,
-        interface_alias:   row.interface_alias || null,
-        target_created_at: row.created_at,
-        expired_at:        row.expires_at,
-        archived_at:       now,
-        ping_count:        row.ping_count || 0,
-        uptime_overall:    row.uptime_overall ?? null,
-      });
-      deleteStmt.run(row.id);
-    }
-  });
-
-  doArchive(expired);
-  return expired.length;
-}
-
-function getExpiredTargets() {
-  const db = getDb();
-  return db
-    .prepare(
-      `SELECT * FROM expired_targets ORDER BY expired_at DESC`,
-    )
-    .all();
 }
 
 function cleanupExpiredUserTargets() {
