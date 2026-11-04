@@ -46,7 +46,7 @@ function initScheduler(config, db, wss, alertEngine, emailSvc) {
         console.error('[Scheduler] Failed to archive expired user targets:', archiveErr.message);
       }
 
-      const targets = db.getAllTargetsWithLatest();
+      const targets = db.getActiveTargetsForPing();
       if (targets.length === 0) return;
 
       const results = await pingAllTargets(targets, config.general);

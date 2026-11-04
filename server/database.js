@@ -36,6 +36,8 @@ function initDatabase() {
       is_user_target  INTEGER NOT NULL DEFAULT 0,
       expires_at      INTEGER,
       archived_at     INTEGER,
+      up_count        INTEGER NOT NULL DEFAULT 0,
+      total_count     INTEGER NOT NULL DEFAULT 0,
       created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
       updated_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
     );
@@ -137,6 +139,24 @@ function initDatabase() {
   if (!targetCols.includes("archived_at")) {
     _db.exec("ALTER TABLE targets ADD COLUMN archived_at INTEGER");
   }
+  // Running uptime counters so per-host lifetime uptime is O(1) instead of a
+  // full ping_results scan per target on every dashboard load. Backfill once
+  // from existing data when the columns are first added.
+  if (!targetCols.includes("up_count")) {
+    _db.exec("ALTER TABLE targets ADD COLUMN up_count INTEGER NOT NULL DEFAULT 0");
+    _db.exec("ALTER TABLE targets ADD COLUMN total_count INTEGER NOT NULL DEFAULT 0");
+    const agg = _db
+      .prepare(
+        "SELECT target_id, COUNT(*) AS tc, SUM(CASE WHEN is_alive = 1 THEN 1 ELSE 0 END) AS uc FROM ping_results GROUP BY target_id",
+      )
+      .all();
+    const upd = _db.prepare("UPDATE targets SET total_count = ?, up_count = ? WHERE id = ?");
+    const backfill = _db.transaction((rows) => {
+      for (const r of rows) upd.run(r.tc, r.uc || 0, r.target_id);
+    });
+    backfill(agg);
+    console.log(`[DB] Backfilled uptime counters for ${agg.length} target(s)`);
+  }
   if (!targetCols.includes("interface")) {
     _db.exec("ALTER TABLE targets ADD COLUMN interface TEXT");
   }
@@ -191,13 +211,15 @@ function initDatabase() {
         is_user_target  INTEGER NOT NULL DEFAULT 0,
         expires_at      INTEGER,
         archived_at     INTEGER,
+        up_count        INTEGER NOT NULL DEFAULT 0,
+        total_count     INTEGER NOT NULL DEFAULT 0,
         created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
         updated_at      INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
       );
 
       INSERT INTO targets_new
         SELECT id, name, ip, grp, interface, interface_alias,
-               is_user_target, expires_at, archived_at, created_at, updated_at
+               is_user_target, expires_at, archived_at, up_count, total_count, created_at, updated_at
         FROM targets;
 
       DROP TABLE targets;
@@ -281,9 +303,7 @@ function syncTargets(targets) {
   syncAll(targets);
 }
 
-function insertPingResult(data) {
-  const db = getDb();
-  const stmt = db.prepare(`
+const _insertPingStmt = () => getDb().prepare(`
     INSERT INTO ping_results
       (target_id, is_alive, min_latency, avg_latency, max_latency, jitter,
        packet_loss, packets_sent, packets_received, created_at)
@@ -291,19 +311,34 @@ function insertPingResult(data) {
       (@target_id, @is_alive, @min_latency, @avg_latency, @max_latency, @jitter,
        @packet_loss, @packets_sent, @packets_received, @created_at)
   `);
-  const result = stmt.run({
-    target_id: data.target_id,
-    is_alive: data.is_alive ? 1 : 0,
-    min_latency: data.min_latency ?? null,
-    avg_latency: data.avg_latency ?? null,
-    max_latency: data.max_latency ?? null,
-    jitter: data.jitter ?? null,
-    packet_loss: data.packet_loss ?? 100,
-    packets_sent: data.packets_sent ?? 0,
-    packets_received: data.packets_received ?? 0,
-    created_at: data.created_at ?? Date.now(),
+const _bumpCountersStmt = () => getDb().prepare(
+  "UPDATE targets SET total_count = total_count + 1, up_count = up_count + @alive WHERE id = @id",
+);
+
+function insertPingResult(data) {
+  const db = getDb();
+  const insert = _insertPingStmt();
+  const bump = _bumpCountersStmt();
+  const alive = data.is_alive ? 1 : 0;
+  // Insert the sample and update the target's running uptime counters atomically
+  // (the counters back the O(1) lifetime-uptime figure on the dashboard).
+  const tx = db.transaction((d) => {
+    const result = insert.run({
+      target_id: d.target_id,
+      is_alive: alive,
+      min_latency: d.min_latency ?? null,
+      avg_latency: d.avg_latency ?? null,
+      max_latency: d.max_latency ?? null,
+      jitter: d.jitter ?? null,
+      packet_loss: d.packet_loss ?? 100,
+      packets_sent: d.packets_sent ?? 0,
+      packets_received: d.packets_received ?? 0,
+      created_at: d.created_at ?? Date.now(),
+    });
+    bump.run({ id: d.target_id, alive });
+    return result.lastInsertRowid;
   });
-  return result.lastInsertRowid;
+  return tx(data);
 }
 
 function getLatestPingResult(targetId) {
@@ -320,6 +355,21 @@ function getLatestPingResult(targetId) {
       )
       .get(targetId) || null
   );
+}
+
+// Minimal active-target list for the ping scheduler: just the fields needed to
+// probe and attribute results. Avoids the latest-ping join and uptime math that
+// make getAllTargetsWithLatest expensive — this runs every ping cycle.
+function getActiveTargetsForPing() {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT id, name, ip, interface, interface_alias, is_user_target, expires_at
+         FROM targets
+        WHERE (is_user_target = 0)
+           OR (is_user_target = 1 AND (expires_at IS NULL OR expires_at > ?))`,
+    )
+    .all(Date.now());
 }
 
 function getAllTargetsWithLatest() {
@@ -342,11 +392,7 @@ function getAllTargetsWithLatest() {
       pr.packets_sent,
       pr.packets_received,
       pr.created_at   AS last_checked_at,
-      (
-        SELECT SUM(CASE WHEN pr2.is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)
-        FROM ping_results pr2
-        WHERE pr2.target_id = t.id
-      ) AS uptime_overall
+      CASE WHEN t.total_count > 0 THEN t.up_count * 100.0 / t.total_count ELSE NULL END AS uptime_overall
     FROM targets t
     LEFT JOIN ping_results pr ON pr.id = (
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
@@ -731,11 +777,7 @@ function getUserTargets() {
       pr.packets_sent,
       pr.packets_received,
       pr.created_at AS last_checked_at,
-      (
-        SELECT SUM(CASE WHEN pr2.is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)
-        FROM ping_results pr2
-        WHERE pr2.target_id = t.id
-      ) AS uptime_overall
+      CASE WHEN t.total_count > 0 THEN t.up_count * 100.0 / t.total_count ELSE NULL END AS uptime_overall
     FROM targets t
     LEFT JOIN ping_results pr ON pr.id = (
       SELECT id FROM ping_results WHERE target_id = t.id ORDER BY created_at DESC LIMIT 1
@@ -785,11 +827,8 @@ function getExpiredTargets() {
          t.created_at                                AS target_created_at,
          t.expires_at                                AS expired_at,
          t.archived_at,
-         (SELECT COUNT(*) FROM ping_results pr WHERE pr.target_id = t.id) AS ping_count,
-         (SELECT CASE WHEN COUNT(*) > 0
-                      THEN SUM(CASE WHEN pr.is_alive = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)
-                      ELSE NULL END
-            FROM ping_results pr WHERE pr.target_id = t.id)               AS uptime_overall,
+         t.total_count                               AS ping_count,
+         CASE WHEN t.total_count > 0 THEN t.up_count * 100.0 / t.total_count ELSE NULL END AS uptime_overall,
          1                                           AS reportable
        FROM targets t
        WHERE t.is_user_target = 1
@@ -906,6 +945,7 @@ module.exports = {
   insertPingResult,
   getLatestPingResult,
   getAllTargetsWithLatest,
+  getActiveTargetsForPing,
   getTargetById,
   getPingResults,
   getMetrics,
