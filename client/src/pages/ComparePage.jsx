@@ -8,7 +8,7 @@ import { getTargets, getGroups, getMetrics } from '../lib/api';
 import { buildColorMap } from '../components/UnifiedChart';
 import { RANGES } from '../components/TimeRangeSelector';
 import { cn } from '../lib/utils';
-import { GitCompare, Users, Target as TargetIcon } from 'lucide-react';
+import { GitCompare, Users, Target as TargetIcon, ChevronDown, ChevronUp } from 'lucide-react';
 
 const METRICS = [
   { key: 'latency', label: 'Latency', field: 'avg_latency', unit: 'ms' },
@@ -21,7 +21,7 @@ function intervalFor(minutes) {
 }
 
 // One comparison chart: a target (single line) or a group (one line per member).
-function ComparePanel({ title, icon: Icon, accent, members, range, metric, colorMap }) {
+function ComparePanel({ title, icon: Icon, accent, members, range, metric, colorMap, tall }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const m = METRICS.find(x => x.key === metric);
@@ -59,7 +59,7 @@ function ComparePanel({ title, icon: Icon, accent, members, range, metric, color
         <span className="text-sm font-semibold text-gray-200 truncate">{title}</span>
         <span className="text-xs text-gray-500 ml-auto">{m.label} · {range.label}</span>
       </div>
-      <div className="h-64 p-2">
+      <div className={cn('p-2', tall ? 'h-96' : 'h-64')}>
         {loading ? (
           <div className="h-full flex items-center justify-center text-gray-500 text-sm">Loading…</div>
         ) : data.length === 0 ? (
@@ -94,6 +94,7 @@ export default function ComparePage() {
   const [selGroups, setSelGroups] = useState(() => new Set());
   const [range, setRange] = useState(RANGES[2]); // 1h
   const [metric, setMetric] = useState('latency');
+  const [selectorOpen, setSelectorOpen] = useState(true);
 
   const allTargets = targets || [];
   const allGroups = groups || [];
@@ -103,13 +104,20 @@ export default function ComparePage() {
   const toggle = (set, setter) => id => setter(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleTarget = toggle(selTargets, setSelTargets);
   const toggleGroup = toggle(selGroups, setSelGroups);
+  const clearAll = () => { setSelTargets(new Set()); setSelGroups(new Set()); };
 
-  const panels = useMemo(() => {
+  // Target panels (single line, compact) and group panels (many lines, full width).
+  const targetPanels = useMemo(() => {
     const out = [];
     for (const id of selTargets) {
       const t = targetById.get(id);
       if (t) out.push({ key: `t${id}`, title: t.name, icon: TargetIcon, accent: colorMap[id] || '#2563eb', members: [{ id: t.id, name: t.name }] });
     }
+    return out;
+  }, [selTargets, targetById, colorMap]);
+
+  const groupPanels = useMemo(() => {
+    const out = [];
     for (const gid of selGroups) {
       const g = allGroups.find(x => x.id === gid);
       if (!g) continue;
@@ -117,8 +125,9 @@ export default function ComparePage() {
       out.push({ key: `g${gid}`, title: `${g.name} (${members.length})`, icon: Users, accent: g.color || '#2563eb', members });
     }
     return out;
-  }, [selTargets, selGroups, targetById, allGroups, colorMap]);
+  }, [selGroups, targetById, allGroups]);
 
+  const totalSelected = selTargets.size + selGroups.size;
   const btn = (active) => cn('px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors', active ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white bg-gray-800');
 
   return (
@@ -139,50 +148,75 @@ export default function ComparePage() {
             <span className="text-xs text-gray-500 mr-1">Range:</span>
             {RANGES.map(r => <button key={r.key} onClick={() => setRange(r)} className={btn(range.key === r.key)}>{r.label}</button>)}
           </div>
+          <button
+            onClick={() => setSelectorOpen(o => !o)}
+            className="ml-auto flex items-center gap-1.5 text-xs font-medium text-gray-300 hover:text-white bg-gray-800 rounded-md px-2.5 py-1.5"
+            title={selectorOpen ? 'Hide selection' : 'Show selection'}
+          >
+            {selectorOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {selectorOpen ? 'Hide selection' : 'Edit selection'}
+            {totalSelected > 0 && <span className="ml-1 px-1.5 py-0.5 rounded bg-blue-600 text-white text-[10px]">{totalSelected}</span>}
+          </button>
+          {totalSelected > 0 && (
+            <button onClick={clearAll} className="text-xs font-medium text-gray-400 hover:text-red-300 bg-gray-800 rounded-md px-2.5 py-1.5">
+              Clear
+            </button>
+          )}
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-gray-400 mb-2 flex items-center gap-1"><TargetIcon size={13} /> Targets</p>
-            <div className="max-h-48 overflow-y-auto border border-gray-800 rounded-lg divide-y divide-gray-800">
-              {allTargets.map(t => (
-                <label key={t.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800/50 cursor-pointer">
-                  <input type="checkbox" checked={selTargets.has(t.id)} onChange={() => toggleTarget(t.id)} className="accent-blue-500" />
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: colorMap[t.id] || '#64748b' }} />
-                  <span className="flex-1 truncate">{t.name} <span className="text-gray-500 font-mono text-xs">{t.ip}</span></span>
-                  {t.is_user_target ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300">Temp</span> : null}
-                </label>
-              ))}
+        {selectorOpen && (
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400 mb-2 flex items-center gap-1"><TargetIcon size={13} /> Targets</p>
+              <div className="max-h-48 overflow-y-auto border border-gray-800 rounded-lg divide-y divide-gray-800">
+                {allTargets.map(t => (
+                  <label key={t.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800/50 cursor-pointer">
+                    <input type="checkbox" checked={selTargets.has(t.id)} onChange={() => toggleTarget(t.id)} className="accent-blue-500" />
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: colorMap[t.id] || '#64748b' }} />
+                    <span className="flex-1 truncate">{t.name} <span className="text-gray-500 font-mono text-xs">{t.ip}</span></span>
+                    {t.is_user_target ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300">Temp</span> : null}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-2 flex items-center gap-1"><Users size={13} /> Groups</p>
+              <div className="max-h-48 overflow-y-auto border border-gray-800 rounded-lg divide-y divide-gray-800">
+                {allGroups.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-gray-600">No groups. Create them on the Targets &amp; Groups page.</p>
+                ) : allGroups.map(g => (
+                  <label key={g.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800/50 cursor-pointer">
+                    <input type="checkbox" checked={selGroups.has(g.id)} onChange={() => toggleGroup(g.id)} className="accent-blue-500" />
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color || '#64748b' }} />
+                    <span className="flex-1 truncate">{g.name}</span>
+                    <span className="text-xs text-gray-500">{g.target_ids.length}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
-          <div>
-            <p className="text-xs text-gray-400 mb-2 flex items-center gap-1"><Users size={13} /> Groups</p>
-            <div className="max-h-48 overflow-y-auto border border-gray-800 rounded-lg divide-y divide-gray-800">
-              {allGroups.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-gray-600">No groups. Create them on the Targets &amp; Groups page.</p>
-              ) : allGroups.map(g => (
-                <label key={g.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800/50 cursor-pointer">
-                  <input type="checkbox" checked={selGroups.has(g.id)} onChange={() => toggleGroup(g.id)} className="accent-blue-500" />
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color || '#64748b' }} />
-                  <span className="flex-1 truncate">{g.name}</span>
-                  <span className="text-xs text-gray-500">{g.target_ids.length}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Chart panels */}
-      {panels.length === 0 ? (
+      {totalSelected === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 gap-2 text-gray-500 border border-dashed border-gray-800 rounded-xl">
           <GitCompare size={28} className="opacity-40" />
           <p className="text-sm">Select targets or groups above to compare.</p>
         </div>
       ) : (
-        <div className="grid xl:grid-cols-2 gap-4">
-          {panels.map(p => (
-            <ComparePanel key={p.key} title={p.title} icon={p.icon} accent={p.accent} members={p.members} range={range} metric={metric} colorMap={colorMap} />
+        <div className="flex flex-col gap-4">
+          {/* Target charts: compact, 2-up grid */}
+          {targetPanels.length > 0 && (
+            <div className="grid xl:grid-cols-2 gap-4">
+              {targetPanels.map(p => (
+                <ComparePanel key={p.key} title={p.title} icon={p.icon} accent={p.accent} members={p.members} range={range} metric={metric} colorMap={colorMap} />
+              ))}
+            </div>
+          )}
+          {/* Group charts: full width, stacked vertically, taller */}
+          {groupPanels.map(p => (
+            <ComparePanel key={p.key} title={p.title} icon={p.icon} accent={p.accent} members={p.members} range={range} metric={metric} colorMap={colorMap} tall />
           ))}
         </div>
       )}
