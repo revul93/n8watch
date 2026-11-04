@@ -121,6 +121,27 @@ function initDatabase() {
 
     CREATE INDEX IF NOT EXISTS idx_speedtest_created
       ON speedtest_results(created_at DESC);
+
+    -- User-defined temporary groups: arbitrary named sets of targets (system or
+    -- user) used for organization and the comparison page. Independent of the
+    -- per-target grp label that drives the dashboard group panels.
+    CREATE TABLE IF NOT EXISTS temp_groups (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT    NOT NULL,
+      color      TEXT,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+    );
+
+    -- Many-to-many membership: a target can belong to any number of temp groups.
+    CREATE TABLE IF NOT EXISTS temp_group_members (
+      group_id   INTEGER NOT NULL REFERENCES temp_groups(id) ON DELETE CASCADE,
+      target_id  INTEGER NOT NULL REFERENCES targets(id)     ON DELETE CASCADE,
+      added_at   INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000),
+      PRIMARY KEY (group_id, target_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_temp_group_members_target
+      ON temp_group_members(target_id);
   `);
 
   // Migrate existing databases: add columns if they don't exist yet
@@ -759,6 +780,127 @@ function deleteUserTarget(id) {
   return info.changes > 0;
 }
 
+// Edit an ACTIVE temporary target. Accepts any subset of
+// { name, ip, interface, interface_alias, lifetime_days }. Returns the updated
+// row, or throws { code } on validation/uniqueness errors, or null if no such
+// editable target exists.
+function updateUserTarget(id, fields = {}) {
+  const db = getDb();
+  const now = Date.now();
+  const target = db
+    .prepare("SELECT * FROM targets WHERE id = ? AND is_user_target = 1 AND archived_at IS NULL")
+    .get(id);
+  if (!target) return null;
+
+  const next = {
+    name: target.name,
+    ip: target.ip,
+    interface: target.interface,
+    interface_alias: target.interface_alias,
+    expires_at: target.expires_at,
+  };
+  if (fields.name !== undefined) next.name = String(fields.name).trim();
+  if (fields.ip !== undefined) next.ip = String(fields.ip).trim();
+  if (fields.interface !== undefined) next.interface = fields.interface ? String(fields.interface).trim() : null;
+  if (fields.interface_alias !== undefined) next.interface_alias = fields.interface_alias ? String(fields.interface_alias).trim() : null;
+  if (fields.lifetime_days !== undefined && fields.lifetime_days !== null && fields.lifetime_days !== '') {
+    const days = Number(fields.lifetime_days);
+    if (Number.isFinite(days) && days > 0) next.expires_at = (target.created_at || now) + days * 86400000;
+  }
+
+  if (!next.name) { const e = new Error('Name is required'); e.code = 'VALIDATION'; throw e; }
+  if (!next.ip) { const e = new Error('IP is required'); e.code = 'VALIDATION'; throw e; }
+
+  // Uniqueness among ACTIVE targets (ignore archived + self).
+  const clash = db
+    .prepare(
+      "SELECT id FROM targets WHERE ip = ? AND COALESCE(interface,'') = COALESCE(?,'') AND archived_at IS NULL AND id <> ?",
+    )
+    .get(next.ip, next.interface || null, id);
+  if (clash) {
+    const e = new Error('A target with this IP and interface already exists');
+    e.code = 'UNIQUE_IP_INTERFACE';
+    throw e;
+  }
+
+  db.prepare(
+    `UPDATE targets
+       SET name = @name, ip = @ip, interface = @interface,
+           interface_alias = @interface_alias, expires_at = @expires_at,
+           updated_at = @updated_at
+     WHERE id = @id`,
+  ).run({ ...next, updated_at: now, id });
+
+  return db.prepare('SELECT * FROM targets WHERE id = ?').get(id);
+}
+
+// ── Temporary groups (flexible many-to-many) ────────────────────────────────────
+function listTempGroups() {
+  const db = getDb();
+  const groups = db.prepare('SELECT id, name, color, created_at FROM temp_groups ORDER BY name COLLATE NOCASE ASC').all();
+  const members = db.prepare('SELECT group_id, target_id FROM temp_group_members').all();
+  const byGroup = new Map();
+  for (const m of members) {
+    if (!byGroup.has(m.group_id)) byGroup.set(m.group_id, []);
+    byGroup.get(m.group_id).push(m.target_id);
+  }
+  return groups.map((g) => ({ ...g, target_ids: byGroup.get(g.id) || [] }));
+}
+
+function createTempGroup(name, color = null) {
+  const db = getDb();
+  const trimmed = String(name || '').trim();
+  if (!trimmed) { const e = new Error('Group name is required'); e.code = 'VALIDATION'; throw e; }
+  const info = db
+    .prepare('INSERT INTO temp_groups (name, color, created_at) VALUES (?, ?, ?)')
+    .run(trimmed, color || null, Date.now());
+  return db.prepare('SELECT id, name, color, created_at FROM temp_groups WHERE id = ?').get(info.lastInsertRowid);
+}
+
+function updateTempGroup(id, fields = {}) {
+  const db = getDb();
+  const g = db.prepare('SELECT * FROM temp_groups WHERE id = ?').get(id);
+  if (!g) return null;
+  const name = fields.name !== undefined ? String(fields.name).trim() : g.name;
+  const color = fields.color !== undefined ? (fields.color || null) : g.color;
+  if (!name) { const e = new Error('Group name is required'); e.code = 'VALIDATION'; throw e; }
+  db.prepare('UPDATE temp_groups SET name = ?, color = ? WHERE id = ?').run(name, color, id);
+  return db.prepare('SELECT id, name, color, created_at FROM temp_groups WHERE id = ?').get(id);
+}
+
+function deleteTempGroup(id) {
+  const db = getDb();
+  return db.prepare('DELETE FROM temp_groups WHERE id = ?').run(id).changes > 0;
+}
+
+// Replace a group's full membership with the given target ids.
+function setTempGroupMembers(groupId, targetIds = []) {
+  const db = getDb();
+  const g = db.prepare('SELECT id FROM temp_groups WHERE id = ?').get(groupId);
+  if (!g) return null;
+  const valid = db.prepare('SELECT id FROM targets');
+  const existing = new Set(valid.all().map((r) => r.id));
+  const ids = [...new Set(targetIds.map(Number).filter((n) => existing.has(n)))];
+  const del = db.prepare('DELETE FROM temp_group_members WHERE group_id = ?');
+  const ins = db.prepare('INSERT OR IGNORE INTO temp_group_members (group_id, target_id, added_at) VALUES (?, ?, ?)');
+  const tx = db.transaction(() => {
+    del.run(groupId);
+    for (const tid of ids) ins.run(groupId, tid, Date.now());
+  });
+  tx();
+  return ids;
+}
+
+function addTempGroupMember(groupId, targetId) {
+  const db = getDb();
+  db.prepare('INSERT OR IGNORE INTO temp_group_members (group_id, target_id, added_at) VALUES (?, ?, ?)').run(groupId, targetId, Date.now());
+}
+
+function removeTempGroupMember(groupId, targetId) {
+  const db = getDb();
+  return db.prepare('DELETE FROM temp_group_members WHERE group_id = ? AND target_id = ?').run(groupId, targetId).changes > 0;
+}
+
 function getUserTargets() {
   const db = getDb();
   return db
@@ -959,7 +1101,15 @@ module.exports = {
   getLatestPingResultForAll,
   addUserTarget,
   deleteUserTarget,
+  updateUserTarget,
   getUserTargets,
+  listTempGroups,
+  createTempGroup,
+  updateTempGroup,
+  deleteTempGroup,
+  setTempGroupMembers,
+  addTempGroupMember,
+  removeTempGroupMember,
   cleanupExpiredUserTargets,
   archiveExpiredUserTargets,
   getExpiredTargets,

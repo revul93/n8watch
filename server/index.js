@@ -28,6 +28,7 @@ const speedtestRouter = require("./routes/speedtest");
 const versionRouter = require("./routes/version");
 const adminRouter   = require("./routes/admin");
 const brandingRouter = require("./routes/branding");
+const groupsRouter = require("./routes/groups");
 
 // Maximum time (ms) to wait for in-flight requests during graceful shutdown
 const SHUTDOWN_TIMEOUT_MS = 5000;
@@ -122,6 +123,7 @@ async function main() {
   app.use("/api/speedtest", speedtestRouter);
   app.use("/api/version", versionRouter);
   app.use("/api/branding", brandingRouter);
+  app.use("/api/groups", groupsRouter);
   app.use("/api/admin", adminRouter);
 
   // 7. Create HTTP/HTTPS server and init WebSocket
