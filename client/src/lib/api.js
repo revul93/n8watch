@@ -144,8 +144,55 @@ export function deleteUserTarget(id) {
   });
 }
 
+// Edit an active temporary target. fields: { name, ip, interface, interface_alias, lifetime_days }
+export function updateUserTarget(id, fields) {
+  return fetch(`${BASE}/targets/user-targets/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  }).then(async res => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data.target;
+  });
+}
+
 export function getExpiredTargets() {
   return request('/targets/expired').then(res => res.targets || []);
+}
+
+// ── Temporary groups ────────────────────────────────────────────────────────────
+
+function groupsRequest(path, method = 'GET', body = undefined) {
+  return fetch(`${BASE}/groups${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }).then(async res => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  });
+}
+
+export function getGroups() {
+  return groupsRequest('').then(r => r.groups || []);
+}
+
+export function createGroup(data) {
+  return groupsRequest('', 'POST', data).then(r => r.group);
+}
+
+export function updateGroup(id, data) {
+  return groupsRequest(`/${id}`, 'PATCH', data).then(r => r.group);
+}
+
+export function deleteGroup(id) {
+  return groupsRequest(`/${id}`, 'DELETE');
+}
+
+export function setGroupMembers(id, targetIds) {
+  return groupsRequest(`/${id}/members`, 'PUT', { target_ids: targetIds });
 }
 
 // ── Admin API ─────────────────────────────────────────────────────────────────

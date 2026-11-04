@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { Activity, History, Bell, Menu, X, RefreshCw, PanelLeftClose, PanelLeftOpen, Archive, Settings } from "lucide-react";
+import { Activity, History, Bell, Menu, X, RefreshCw, PanelLeftClose, PanelLeftOpen, Archive, Settings, Target, GitCompare } from "lucide-react";
 import ConnectionStatus from "./ConnectionStatus";
 import ThemeToggle from "./ThemeToggle";
 import { cn } from "../lib/utils";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: Activity, exact: true },
+  { to: "/targets", label: "Targets", icon: Target },
+  { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/history", label: "History", icon: History },
   { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/expired", label: "Expired", icon: Archive },

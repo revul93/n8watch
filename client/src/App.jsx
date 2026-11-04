@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
+import TargetsPage from './pages/TargetsPage';
+import ComparePage from './pages/ComparePage';
 import History from './pages/History';
 import Alerts from './pages/Alerts';
 import ExpiredTargets from './pages/ExpiredTargets';
@@ -31,6 +33,8 @@ function AppInner() {
     <Layout darkMode={darkMode} setDarkMode={setDarkMode} configReloadedAt={configReloadedAt} lastConfigData={lastConfigData} updateAvailable={updateAvailable}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/targets" element={<TargetsPage />} />
+        <Route path="/compare" element={<ComparePage />} />
         <Route path="/history" element={<History />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/expired" element={<ExpiredTargets />} />
