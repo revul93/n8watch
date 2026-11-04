@@ -46,10 +46,12 @@ function initDatabase() {
     -- Two partial indexes implement NULL-safe equality for the interface column:
     --   1. Among targets with no interface: at most one entry per IP.
     --   2. Among targets with an interface: at most one entry per (IP, interface).
+    -- Only ACTIVE targets reserve an IP (archived_at IS NULL): an expired user
+    -- target is retained for reporting but must not block re-adding the same IP.
     CREATE UNIQUE INDEX IF NOT EXISTS uq_targets_ip_null_iface
-      ON targets(ip) WHERE interface IS NULL;
+      ON targets(ip) WHERE interface IS NULL AND archived_at IS NULL;
     CREATE UNIQUE INDEX IF NOT EXISTS uq_targets_ip_iface
-      ON targets(ip, interface) WHERE interface IS NOT NULL;
+      ON targets(ip, interface) WHERE interface IS NOT NULL AND archived_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS ping_results (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,6 +144,28 @@ function initDatabase() {
     _db.exec("ALTER TABLE targets ADD COLUMN interface_alias TEXT");
   }
 
+  // Migrate the IP uniqueness indexes to ignore archived (expired) targets, so a
+  // retained expired user target no longer blocks re-adding the same IP.
+  // CREATE INDEX IF NOT EXISTS won't replace an existing index, so drop & recreate
+  // any that predate the `archived_at IS NULL` predicate.
+  const ipIdx = _db
+    .prepare(
+      "SELECT name, sql FROM sqlite_master WHERE type='index' AND name IN ('uq_targets_ip_null_iface','uq_targets_ip_iface')",
+    )
+    .all();
+  const needsIdxMigration = ipIdx.some((i) => i.sql && !/archived_at/i.test(i.sql));
+  if (needsIdxMigration) {
+    _db.exec(`
+      DROP INDEX IF EXISTS uq_targets_ip_null_iface;
+      DROP INDEX IF EXISTS uq_targets_ip_iface;
+      CREATE UNIQUE INDEX uq_targets_ip_null_iface
+        ON targets(ip) WHERE interface IS NULL AND archived_at IS NULL;
+      CREATE UNIQUE INDEX uq_targets_ip_iface
+        ON targets(ip, interface) WHERE interface IS NOT NULL AND archived_at IS NULL;
+    `);
+    console.log("[DB] Migrated IP uniqueness indexes to exclude archived targets");
+  }
+
   // Migrate: if the targets table still has a UNIQUE constraint on the ip column
   // alone (the old schema), recreate the table without it and add the new
   // partial unique indexes that allow the same IP with different interfaces.
@@ -185,9 +209,9 @@ function initDatabase() {
     // Re-create the partial unique indexes after the migration
     _db.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS uq_targets_ip_null_iface
-        ON targets(ip) WHERE interface IS NULL;
+        ON targets(ip) WHERE interface IS NULL AND archived_at IS NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS uq_targets_ip_iface
-        ON targets(ip, interface) WHERE interface IS NOT NULL;
+        ON targets(ip, interface) WHERE interface IS NOT NULL AND archived_at IS NULL;
     `);
 
     console.log("[DB] Migrated targets table: replaced UNIQUE(ip) with partial unique indexes");
@@ -646,11 +670,13 @@ function addUserTarget(name, ip, iface, ifaceAlias, lifetimeDays) {
   const days = (typeof lifetimeDays === 'number' && lifetimeDays > 0) ? lifetimeDays : maxDays;
   const expiresAt = now + days * 86400000;
 
-  // Enforce (ip, interface) uniqueness at the application level.
+  // Enforce (ip, interface) uniqueness at the application level, but only among
+  // ACTIVE targets — a retained expired target (archived_at set) must not block
+  // re-adding the same IP.
   // Two NULLs are considered equal here (same host, same default interface).
   const existing = db
     .prepare(
-      "SELECT id FROM targets WHERE ip = ? AND COALESCE(interface, '') = COALESCE(?, '')",
+      "SELECT id FROM targets WHERE ip = ? AND COALESCE(interface, '') = COALESCE(?, '') AND archived_at IS NULL",
     )
     .get(ip, iface || null);
   if (existing) {
